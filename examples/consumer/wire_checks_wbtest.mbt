@@ -6,7 +6,7 @@ fn wire_prefix() -> Bytes {
 
 ///|
 fn wire_sample() -> Bytes {
-  wire_prefix() + b"\x07\xFF\x0F\xFF"
+  wire_prefix() + b"\x07\xFF\x0F\xFF" + b"\x80\x12\x34\x56\x78\x9A\xBC\xDE"
 }
 
 ///|
@@ -16,8 +16,18 @@ test "scalar validation accepts exact values and inclusive bounds" {
   assert_eq(record.adc, 4095U)
   assert_eq(record.delta, -1)
   assert_eq(
-    @wire.parse_wire_checks(wire_prefix() + b"\x07\x00\x00\x80").adc,
+    @wire.parse_wire_checks(
+      wire_prefix() + b"\x07\x00\x00\x80" + b"\x80\x12\x34\x56\x78\x9A\xBC\xDE",
+    ).adc,
     0U,
+  )
+}
+
+///|
+test "unsigned 64-bit integers decode all bytes in big-endian order" {
+  assert_eq(
+    @wire.parse_wire_checks(wire_sample()).big_tick,
+    0x80123456789ABCDEUL,
   )
 }
 

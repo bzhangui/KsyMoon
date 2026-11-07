@@ -7,5 +7,6 @@ import {
 pkgtype(kind: "executable")
 
 import {
+  "example/ksymoon-consumer/ivf",
   "example/ksymoon-consumer/wire",
 } for "wbtest"

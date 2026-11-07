@@ -27,3 +27,5 @@ seq:
   - id: delta
     type: s1
     valid: {max: -1}
+  - id: big_tick
+    type: u8be

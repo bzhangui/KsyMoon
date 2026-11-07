@@ -57,7 +57,7 @@ test "schema sizes can only reference previously read unsigned fields" {
     #|  - id: length
     #|    type: u1
   expect_schema_error(
-    source, "seq[0].size: expected an earlier scalar unsigned field, optionally minus an integer",
+    source, "seq[0].size: expected an earlier scalar u1, u2 or u4 field, optionally minus an integer",
   )
 }
 
@@ -71,7 +71,21 @@ test "signed fields cannot be used as unsigned lengths" {
     #|  - id: data
     #|    size: length
   expect_schema_error(
-    source, "seq[1].size: expected an earlier scalar unsigned field, optionally minus an integer",
+    source, "seq[1].size: expected an earlier scalar u1, u2 or u4 field, optionally minus an integer",
+  )
+}
+
+///|
+test "64-bit integers cannot silently narrow to a length" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - id: length
+    #|    type: u8le
+    #|  - id: data
+    #|    size: length
+  expect_schema_error(
+    source, "seq[1].size: expected an earlier scalar u1, u2 or u4 field, optionally minus an integer",
   )
 }
 

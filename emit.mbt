@@ -8,6 +8,7 @@ pub fn generate(source : String) -> String raise SchemaError {
   let root_record_type = root_type + "Record"
   let records = [schema.root, ..schema.records]
   let mut has_numeric_fields = false
+  let mut has_uint64 = false
   let mut has_repeated_fields = false
   let mut has_contents = false
   let mut has_validation = false
@@ -17,6 +18,7 @@ pub fn generate(source : String) -> String raise SchemaError {
         field.kind is Unsigned(_, _) ||
         field.kind is Signed(_, _) ||
         field.kind is Float32(_)
+      has_uint64 = has_uint64 || field.kind is Unsigned64(_)
       has_repeated_fields = has_repeated_fields || field.count is Some(_)
       has_contents = has_contents || field.kind is Contents(_)
       has_validation = has_validation || field.validation is Some(_)
@@ -33,7 +35,13 @@ pub fn generate(source : String) -> String raise SchemaError {
   }
   emit_record_type(output, root_record_type, schema.root, root_type)
   emit_reader(
-    output, root_type, has_numeric_fields, has_repeated_fields, has_contents, has_validation,
+    output,
+    root_type,
+    has_numeric_fields~,
+    has_uint64~,
+    has_repeated_fields~,
+    has_contents~,
+    has_validation~,
   )
   for record in schema.records {
     let name = nested_reader(id, record.name)
@@ -94,6 +102,7 @@ fn nested_reader(id : String, name : String) -> String {
 fn field_type(kind : FieldKind, root_type : String) -> String {
   match kind {
     Unsigned(_, _) => "UInt"
+    Unsigned64(_) => "UInt64"
     Signed(_, _) => "Int"
     Float32(_) => "Float"
     RawBytes(_) | Contents(_) => "BytesView"
@@ -143,6 +152,8 @@ fn read_code(kind : FieldKind, id : String, path : String) -> String {
   match kind {
     Unsigned(width, endian) =>
       "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
+    Unsigned64(endian) =>
+      "reader.read_uint64_bits(8, \{endian_flag(endian)}, \{path})"
     Signed(width, endian) => {
       let bits = "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
       let shift = (4 - width.to_int()) * 8

@@ -2,10 +2,11 @@
 fn emit_reader(
   output : StringBuilder,
   root_type : String,
-  has_numeric_fields : Bool,
-  has_repeated_fields : Bool,
-  has_contents : Bool,
-  has_validation : Bool,
+  has_numeric_fields~ : Bool,
+  has_uint64~ : Bool,
+  has_repeated_fields~ : Bool,
+  has_contents~ : Bool,
+  has_validation~ : Bool,
 ) -> Unit {
   let validation_error = if has_validation {
     "  __ROOT__InvalidValue(field~ : String, offset~ : Int, value~ : Int64, minimum~ : Int64, maximum~ : Int64)\n"
@@ -65,24 +66,18 @@ fn emit_reader(
     .replace_all(old="__REPEAT_STATE__", new=repeat_state[:])
   write_reader_block(output, header, root_type)
   if has_numeric_fields {
-    let numbers =
-      #|///|
-      #|fn __ROOT__Reader::read_bits(
-      #|  self : __ROOT__Reader,
-      #|  width : Int,
-      #|  little_endian : Bool,
-      #|  field : String,
-      #|) -> UInt raise __ROOT__ParseError {
-      #|  let bytes = self.take(width.to_int64(), field)
-      #|  let mut value = 0U
-      #|  for i in 0..<width {
-      #|    let index = if little_endian { width - 1 - i } else { i }
-      #|    value = (value << 8) | bytes[index].to_uint()
-      #|  }
-      #|  value
-      #|}
-      #|
-    write_reader_block(output, numbers, root_type)
+    write_reader_block(
+      output,
+      numeric_reader("read_bits", "UInt", "0U", "to_uint"),
+      root_type,
+    )
+  }
+  if has_uint64 {
+    write_reader_block(
+      output,
+      numeric_reader("read_uint64_bits", "UInt64", "0UL", "to_uint64"),
+      root_type,
+    )
   }
   if has_repeated_fields {
     let repeat =
@@ -143,6 +138,37 @@ fn emit_reader(
       #|
     write_reader_block(output, validation, root_type)
   }
+}
+
+///|
+fn numeric_reader(
+  name : String,
+  type_name : String,
+  zero : String,
+  convert : String,
+) -> String {
+  let block =
+    #|///|
+    #|fn __ROOT__Reader::__NAME__(
+    #|  self : __ROOT__Reader,
+    #|  width : Int,
+    #|  little_endian : Bool,
+    #|  field : String,
+    #|) -> __TYPE__ raise __ROOT__ParseError {
+    #|  let bytes = self.take(width.to_int64(), field)
+    #|  let mut value = __ZERO__
+    #|  for i in 0..<width {
+    #|    let index = if little_endian { width - 1 - i } else { i }
+    #|    value = (value << 8) | bytes[index].__CONVERT__()
+    #|  }
+    #|  value
+    #|}
+    #|
+  block
+  .replace_all(old="__NAME__", new=name[:])
+  .replace_all(old="__TYPE__", new=type_name[:])
+  .replace_all(old="__ZERO__", new=zero[:])
+  .replace_all(old="__CONVERT__", new=convert[:])
 }
 
 ///|

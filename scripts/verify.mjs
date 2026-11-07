@@ -21,6 +21,11 @@ const fixtures = [
   },
   { schema: "stm32_sample_frame", package: "stm32" },
   { schema: "wire_checks", package: "wire" },
+  {
+    schema: "vp8_duck_ivf",
+    package: "ivf",
+    sha256: "15e866272984260f415e5395ee78cfc11cd1c9810a3346b803145afa8257bdfa",
+  },
 ];
 
 function moon(cwd, ...args) {
@@ -83,6 +88,7 @@ for (const name of [
   "moon.mod", "moon.pkg", "main.mbt", "main_wbtest.mbt", "stl_checks.mbt", "stm32_checks.mbt",
   "wire_checks_wbtest.mbt",
   "prefix_wbtest.mbt",
+  "ivf_wbtest.mbt",
 ]) {
   copyFileSync(join(consumer, name), join(independent, name));
 }

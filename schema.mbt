@@ -25,6 +25,7 @@ priv enum LengthExpr {
 ///|
 priv enum FieldKind {
   Unsigned(Byte, Endian)
+  Unsigned64(Endian)
   Signed(Byte, Endian)
   Float32(Endian)
   RawBytes(LengthExpr)
@@ -225,7 +226,7 @@ fn parse_length(
           EarlierField(name, subtract)
         _ =>
           invalid(
-            path, "expected an earlier scalar unsigned field, optionally minus an integer",
+            path, "expected an earlier scalar u1, u2 or u4 field, optionally minus an integer",
           )
       }
     }
@@ -256,6 +257,9 @@ fn parse_kind(
     "u4" => Unsigned(4, default_endian(endian, path))
     "u4le" => Unsigned(4, Little)
     "u4be" => Unsigned(4, Big)
+    "u8" => Unsigned64(default_endian(endian, path))
+    "u8le" => Unsigned64(Little)
+    "u8be" => Unsigned64(Big)
     "s1" => Signed(1, Big)
     "s2" => Signed(2, default_endian(endian, path))
     "s2le" => Signed(2, Little)

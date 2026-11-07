@@ -13,6 +13,7 @@ pub struct WireChecksRecord {
   version : UInt
   adc : UInt
   delta : Int
+  big_tick : UInt64
 }
 
 ///|
@@ -59,6 +60,22 @@ fn WireChecksReader::read_bits(
   for i in 0..<width {
     let index = if little_endian { width - 1 - i } else { i }
     value = (value << 8) | bytes[index].to_uint()
+  }
+  value
+}
+
+///|
+fn WireChecksReader::read_uint64_bits(
+  self : WireChecksReader,
+  width : Int,
+  little_endian : Bool,
+  field : String,
+) -> UInt64 raise WireChecksParseError {
+  let bytes = self.take(width.to_int64(), field)
+  let mut value = 0UL
+  for i in 0..<width {
+    let index = if little_endian { width - 1 - i } else { i }
+    value = (value << 8) | bytes[index].to_uint64()
   }
   value
 }
@@ -120,6 +137,8 @@ fn read_wire_checks_root(reader : WireChecksReader, path : String) -> WireChecks
   let path_delta = path + ".delta"
   let v_delta = ((reader.read_bits(1, false, path_delta) << 24).reinterpret_as_int() >> 24)
   reader.check_scalar(v_delta.to_int64(), 1, -128L, -1L, path_delta)
+  let path_big_tick = path + ".big_tick"
+  let v_big_tick = reader.read_uint64_bits(8, false, path_big_tick)
   {
     magic: v_magic,
     marker: v_marker,
@@ -132,6 +151,7 @@ fn read_wire_checks_root(reader : WireChecksReader, path : String) -> WireChecks
     version: v_version,
     adc: v_adc,
     delta: v_delta,
+    big_tick: v_big_tick,
   }
 }
 
