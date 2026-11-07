@@ -2,6 +2,18 @@
 
 KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进制解析器。生成的源码只依赖 MoonBit 标准库。
 
+## 从 Mooncakes 安装
+
+在自己的 MoonBit 模块中安装生成器。
+
+```powershell
+moon add bzhangui/ksymoon@0.2.0
+```
+
+在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。用 `@ksymoon.generate(source)` 将描述文本生成为 MoonBit 源码，或用 `@ksymoon.validate(source)` 单独校验描述。两个接口都会用 `SchemaError` 报告超出支持范围的描述。
+
+`v0.2.0` 新增固定签名、有符号整数、整数标量约束、64 位无符号整数和只读 `check` 命令。示例包含 UDP、二进制 STL、STM32 采样帧和原样上游 IVF。
+
 ## 生成并运行
 
 安装 MoonBit 与 Node.js，在仓库根目录执行以下命令。验收工具链使用 Node.js 24 和 MoonBit v0.10.19+97801ee1b，生成器的 YAML 依赖锁定为 `moonbit-community/yaml@0.0.7`。
