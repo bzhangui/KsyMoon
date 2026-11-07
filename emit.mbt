@@ -5,6 +5,7 @@ pub fn generate(source : String) -> String raise SchemaError {
   let output = StringBuilder()
   let id = schema.root.name
   let root_type = pascal_case(id)
+  let root_record_type = root_type + "Record"
   let records = [schema.root, ..schema.records]
   let mut has_numeric_fields = false
   let mut has_repeated_fields = false
@@ -25,7 +26,7 @@ pub fn generate(source : String) -> String raise SchemaError {
       root_type,
     )
   }
-  emit_record_type(output, root_type, schema.root, root_type)
+  emit_record_type(output, root_record_type, schema.root, root_type)
   emit_reader(output, root_type, has_numeric_fields, has_repeated_fields)
   for record in schema.records {
     let name = nested_reader(id, record.name)
@@ -41,13 +42,13 @@ pub fn generate(source : String) -> String raise SchemaError {
   emit_record_reader(
     output,
     "read_\{id}_root",
-    root_type,
+    root_record_type,
     schema.root,
     id,
     root_type,
   )
   output.write_string(
-    "///|\npub fn parse_\{id}(input : Bytes) -> \{root_type} raise \{root_type}ParseError {\n",
+    "///|\npub fn parse_\{id}(input : Bytes) -> \{root_record_type} raise \{root_type}ParseError {\n",
   )
   let repeat_budget = if has_repeated_fields {
     ", repeats_left: 1_000_000"
@@ -135,7 +136,7 @@ fn read_code(kind : FieldKind, id : String, path : String) -> String {
     Unsigned(width, endian) =>
       "reader.read_bits(\{width}, \{endian_flag(endian)}, \{path})"
     Float32(endian) =>
-      "reader.read_bits(4, \{endian_flag(endian)}, \{path}).reinterpret_as_float()"
+      "Float::reinterpret_from_uint(reader.read_bits(4, \{endian_flag(endian)}, \{path}))"
     RawBytes(length) => "reader.take(\{length_code(length)}, \{path})"
     Nested(name) => "\{nested_reader(id, name)}(reader, \{path})"
   }
