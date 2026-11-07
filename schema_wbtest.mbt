@@ -8,6 +8,21 @@ fn expect_schema_error(source : String, message : String) -> Unit raise {
 }
 
 ///|
+test "scalar validation rejects impossible ranges before generating code" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - id: version
+    #|    type: u1
+    #|    valid: {min: 10, max: 2}
+  expect_schema_error(source, "seq[0].valid: minimum exceeds maximum")
+  expect_schema_error(
+    source.replace_all(old="{min: 10, max: 2}", new="{eq: 256}"),
+    "seq[0].valid: constraint is outside the integer field's range",
+  )
+}
+
+///|
 test "contents rejects values outside a byte" {
   let source =
     #|meta: {id: example}

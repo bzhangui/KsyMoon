@@ -5,7 +5,13 @@ fn emit_reader(
   has_numeric_fields : Bool,
   has_repeated_fields : Bool,
   has_contents : Bool,
+  has_validation : Bool,
 ) -> Unit {
+  let validation_error = if has_validation {
+    "  __ROOT__InvalidValue(field~ : String, offset~ : Int, value~ : Int64, minimum~ : Int64, maximum~ : Int64)\n"
+  } else {
+    ""
+  }
   let contents_error = if has_contents {
     "  __ROOT__ContentsMismatch(field~ : String, offset~ : Int, expected~ : Byte, actual~ : Byte)\n"
   } else {
@@ -26,7 +32,7 @@ fn emit_reader(
     #|pub suberror __ROOT__ParseError {
     #|  __ROOT__Truncated(field~ : String, offset~ : Int, needed~ : Int64, remaining~ : Int)
     #|  __ROOT__InvalidLength(field~ : String, offset~ : Int, length~ : Int64)
-    #|__REPEAT_ERROR____CONTENTS_ERROR__}
+    #|__REPEAT_ERROR____CONTENTS_ERROR____VALIDATION_ERROR__}
     #|
     #|///|
     #|priv struct __ROOT__Reader {
@@ -55,6 +61,7 @@ fn emit_reader(
   let header = header
     .replace_all(old="__REPEAT_ERROR__", new=repeat_error[:])
     .replace_all(old="__CONTENTS_ERROR__", new=contents_error[:])
+    .replace_all(old="__VALIDATION_ERROR__", new=validation_error[:])
     .replace_all(old="__REPEAT_STATE__", new=repeat_state[:])
   write_reader_block(output, header, root_type)
   if has_numeric_fields {
@@ -117,6 +124,24 @@ fn emit_reader(
       #|}
       #|
     write_reader_block(output, contents, root_type)
+  }
+  if has_validation {
+    let validation =
+      #|///|
+      #|fn __ROOT__Reader::check_scalar(
+      #|  self : __ROOT__Reader,
+      #|  value : Int64,
+      #|  width : Int,
+      #|  minimum : Int64,
+      #|  maximum : Int64,
+      #|  field : String,
+      #|) -> Unit raise __ROOT__ParseError {
+      #|  guard value >= minimum && value <= maximum else {
+      #|    raise __ROOT__InvalidValue(field~, offset=self.offset - width, value~, minimum~, maximum~)
+      #|  }
+      #|}
+      #|
+    write_reader_block(output, validation, root_type)
   }
 }
 

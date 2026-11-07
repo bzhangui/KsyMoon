@@ -10,6 +10,9 @@ pub struct WireChecksRecord {
   short_max : Int
   word_min : Int
   word_max : Int
+  version : UInt
+  adc : UInt
+  delta : Int
 }
 
 ///|
@@ -17,6 +20,7 @@ pub suberror WireChecksParseError {
   WireChecksTruncated(field~ : String, offset~ : Int, needed~ : Int64, remaining~ : Int)
   WireChecksInvalidLength(field~ : String, offset~ : Int, length~ : Int64)
   WireChecksContentsMismatch(field~ : String, offset~ : Int, expected~ : Byte, actual~ : Byte)
+  WireChecksInvalidValue(field~ : String, offset~ : Int, value~ : Int64, minimum~ : Int64, maximum~ : Int64)
 }
 
 ///|
@@ -76,6 +80,20 @@ fn WireChecksReader::read_contents(
 }
 
 ///|
+fn WireChecksReader::check_scalar(
+  self : WireChecksReader,
+  value : Int64,
+  width : Int,
+  minimum : Int64,
+  maximum : Int64,
+  field : String,
+) -> Unit raise WireChecksParseError {
+  guard value >= minimum && value <= maximum else {
+    raise WireChecksInvalidValue(field~, offset=self.offset - width, value~, minimum~, maximum~)
+  }
+}
+
+///|
 fn read_wire_checks_root(reader : WireChecksReader, path : String) -> WireChecksRecord raise WireChecksParseError {
   let path_magic = path + ".magic"
   let v_magic = reader.read_contents(Bytes::from_array([75, 83, 89, 33]), path_magic)
@@ -93,6 +111,15 @@ fn read_wire_checks_root(reader : WireChecksReader, path : String) -> WireChecks
   let v_word_min = reader.read_bits(4, false, path_word_min).reinterpret_as_int()
   let path_word_max = path + ".word_max"
   let v_word_max = reader.read_bits(4, true, path_word_max).reinterpret_as_int()
+  let path_version = path + ".version"
+  let v_version = reader.read_bits(1, false, path_version)
+  reader.check_scalar(v_version.to_int64(), 1, 7L, 7L, path_version)
+  let path_adc = path + ".adc"
+  let v_adc = reader.read_bits(2, true, path_adc)
+  reader.check_scalar(v_adc.to_int64(), 2, 0L, 4095L, path_adc)
+  let path_delta = path + ".delta"
+  let v_delta = ((reader.read_bits(1, false, path_delta) << 24).reinterpret_as_int() >> 24)
+  reader.check_scalar(v_delta.to_int64(), 1, -128L, -1L, path_delta)
   {
     magic: v_magic,
     marker: v_marker,
@@ -102,6 +129,9 @@ fn read_wire_checks_root(reader : WireChecksReader, path : String) -> WireChecks
     short_max: v_short_max,
     word_min: v_word_min,
     word_max: v_word_max,
+    version: v_version,
+    adc: v_adc,
+    delta: v_delta,
   }
 }
 

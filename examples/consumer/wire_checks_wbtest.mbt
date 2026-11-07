@@ -1,7 +1,56 @@
 ///|
-fn wire_sample() -> Bytes {
+fn wire_prefix() -> Bytes {
   b"KSY!\x00\xC3\xA9\xFF" +
   b"\x80\x7F\x00\x80\x7F\xFF\x80\x00\x00\x00\xFF\xFF\xFF\x7F"
+}
+
+///|
+fn wire_sample() -> Bytes {
+  wire_prefix() + b"\x07\xFF\x0F\xFF"
+}
+
+///|
+test "scalar validation accepts exact values and inclusive bounds" {
+  let record = @wire.parse_wire_checks(wire_sample())
+  assert_eq(record.version, 7U)
+  assert_eq(record.adc, 4095U)
+  assert_eq(record.delta, -1)
+  assert_eq(
+    @wire.parse_wire_checks(wire_prefix() + b"\x07\x00\x00\x80").adc,
+    0U,
+  )
+}
+
+///|
+test "scalar validation locates an out-of-range field after its read" {
+  try @wire.parse_wire_checks(wire_prefix() + b"\x07\x00\x10\xFF") catch {
+    @wire.WireChecksInvalidValue(field~, offset~, value~, minimum~, maximum~) => {
+      assert_eq(field, "wire_checks.adc")
+      assert_eq(offset, 23)
+      assert_eq(value, 4096L)
+      assert_eq(minimum, 0L)
+      assert_eq(maximum, 4095L)
+    }
+    err => raise err
+  } noraise {
+    _ => fail("accepted an out-of-range ADC value")
+  }
+}
+
+///|
+test "scalar validation rejects an incorrect exact value before later fields" {
+  try @wire.parse_wire_checks(wire_prefix() + b"\x08") catch {
+    @wire.WireChecksInvalidValue(field~, offset~, value~, minimum~, maximum~) => {
+      assert_eq(field, "wire_checks.version")
+      assert_eq(offset, 22)
+      assert_eq(value, 8L)
+      assert_eq(minimum, 7L)
+      assert_eq(maximum, 7L)
+    }
+    err => raise err
+  } noraise {
+    _ => fail("accepted an incorrect version")
+  }
 }
 
 ///|

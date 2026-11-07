@@ -31,6 +31,14 @@ priv struct Field {
   name : String
   kind : FieldKind
   count : LengthExpr?
+  validation : ScalarCheck?
+}
+
+///|
+priv struct ScalarCheck {
+  width : Byte
+  minimum : Int64
+  maximum : Int64
 }
 
 ///|
@@ -283,6 +291,66 @@ fn parse_contents(value : @yaml.Yaml, path : String) -> Bytes raise SchemaError 
 }
 
 ///|
+fn constraint_integer(
+  value : @yaml.Yaml,
+  path : String,
+) -> Int64 raise SchemaError {
+  match value {
+    @yaml.Integer(integer) => integer
+    _ => invalid(path, "expected an integer constant")
+  }
+}
+
+///|
+fn parse_scalar_check(
+  value : @yaml.Yaml,
+  kind : FieldKind,
+  path : String,
+) -> ScalarCheck raise SchemaError {
+  let (width, signed) = match kind {
+    Unsigned(width, _) => (width, false)
+    Signed(width, _) => (width, true)
+    _ => invalid(path, "only scalar integers up to 32 bits support 'valid'")
+  }
+  let bits = width.to_int() * 8
+  let limit = 1L << (if signed { bits - 1 } else { bits })
+  let type_min = if signed { -limit } else { 0L }
+  let type_max = limit - 1L
+  let (minimum, maximum) = match value {
+    @yaml.Map(keys) => {
+      check_keys(keys, ["eq", "min", "max"], path)
+      match (keys.get("eq"), keys.get("min"), keys.get("max")) {
+        (Some(eq), None, None) => {
+          let exact = constraint_integer(eq, path + ".eq")
+          (exact, exact)
+        }
+        (None, lower, upper) if lower is Some(_) || upper is Some(_) => {
+          let minimum = match lower {
+            Some(value) => constraint_integer(value, path + ".min")
+            None => type_min
+          }
+          let maximum = match upper {
+            Some(value) => constraint_integer(value, path + ".max")
+            None => type_max
+          }
+          (minimum, maximum)
+        }
+        _ => invalid(path, "expected 'eq' or at least one of 'min' and 'max'")
+      }
+    }
+    value => {
+      let exact = constraint_integer(value, path)
+      (exact, exact)
+    }
+  }
+  guard minimum <= maximum else { invalid(path, "minimum exceeds maximum") }
+  guard minimum >= type_min && maximum <= type_max else {
+    invalid(path, "constraint is outside the integer field's range")
+  }
+  { width, minimum, maximum, }
+}
+
+///|
 fn parse_field(
   value : @yaml.Yaml,
   earlier : Map[String, Field],
@@ -294,7 +362,8 @@ fn parse_field(
   check_keys(
     field,
     [
-      "id", "type", "size", "contents", "repeat", "repeat-expr", "doc", "doc-ref",
+      "id", "type", "size", "contents", "valid", "repeat", "repeat-expr", "doc",
+      "doc-ref",
     ],
     path,
   )
@@ -331,7 +400,16 @@ fn parse_field(
         "only repeat: expr with repeat-expr is supported",
       )
   }
-  { name, kind, count, }
+  let validation = match field.get("valid") {
+    None => None
+    Some(value) => {
+      guard count is None else {
+        invalid(path + ".valid", "only scalar fields support 'valid'")
+      }
+      Some(parse_scalar_check(value, kind, path + ".valid"))
+    }
+  }
+  { name, kind, count, validation, }
 }
 
 ///|

@@ -18,3 +18,12 @@ seq:
     type: s4be
   - id: word_max
     type: s4le
+  - id: version
+    type: u1
+    valid: 7
+  - id: adc
+    type: u2
+    valid: {min: 0, max: 4095}
+  - id: delta
+    type: s1
+    valid: {max: -1}
