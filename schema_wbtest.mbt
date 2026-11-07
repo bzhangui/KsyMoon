@@ -47,6 +47,20 @@ test "schema sizes can only reference previously read unsigned fields" {
 }
 
 ///|
+test "signed fields cannot be used as unsigned lengths" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - id: length
+    #|    type: s1
+    #|  - id: data
+    #|    size: length
+  expect_schema_error(
+    source, "seq[1].size: expected an earlier scalar unsigned field, optionally minus an integer",
+  )
+}
+
+///|
 test "recursive type definitions cannot generate unbounded parsing" {
   let source =
     #|meta: {id: example}

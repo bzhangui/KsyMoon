@@ -4,6 +4,12 @@
 pub struct WireChecksRecord {
   magic : BytesView
   marker : BytesView
+  byte_min : Int
+  byte_max : Int
+  short_min : Int
+  short_max : Int
+  word_min : Int
+  word_max : Int
 }
 
 ///|
@@ -38,6 +44,22 @@ fn WireChecksReader::take(
 }
 
 ///|
+fn WireChecksReader::read_bits(
+  self : WireChecksReader,
+  width : Int,
+  little_endian : Bool,
+  field : String,
+) -> UInt raise WireChecksParseError {
+  let bytes = self.take(width.to_int64(), field)
+  let mut value = 0U
+  for i in 0..<width {
+    let index = if little_endian { width - 1 - i } else { i }
+    value = (value << 8) | bytes[index].to_uint()
+  }
+  value
+}
+
+///|
 fn WireChecksReader::read_contents(
   self : WireChecksReader,
   expected : Bytes,
@@ -59,9 +81,27 @@ fn read_wire_checks_root(reader : WireChecksReader, path : String) -> WireChecks
   let v_magic = reader.read_contents(Bytes::from_array([75, 83, 89, 33]), path_magic)
   let path_marker = path + ".marker"
   let v_marker = reader.read_contents(Bytes::from_array([0, 195, 169, 255]), path_marker)
+  let path_byte_min = path + ".byte_min"
+  let v_byte_min = ((reader.read_bits(1, false, path_byte_min) << 24).reinterpret_as_int() >> 24)
+  let path_byte_max = path + ".byte_max"
+  let v_byte_max = ((reader.read_bits(1, false, path_byte_max) << 24).reinterpret_as_int() >> 24)
+  let path_short_min = path + ".short_min"
+  let v_short_min = ((reader.read_bits(2, true, path_short_min) << 16).reinterpret_as_int() >> 16)
+  let path_short_max = path + ".short_max"
+  let v_short_max = ((reader.read_bits(2, false, path_short_max) << 16).reinterpret_as_int() >> 16)
+  let path_word_min = path + ".word_min"
+  let v_word_min = reader.read_bits(4, false, path_word_min).reinterpret_as_int()
+  let path_word_max = path + ".word_max"
+  let v_word_max = reader.read_bits(4, true, path_word_max).reinterpret_as_int()
   {
     magic: v_magic,
     marker: v_marker,
+    byte_min: v_byte_min,
+    byte_max: v_byte_max,
+    short_min: v_short_min,
+    short_max: v_short_max,
+    word_min: v_word_min,
+    word_max: v_word_max,
   }
 }
 

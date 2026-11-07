@@ -19,6 +19,7 @@ priv enum LengthExpr {
 ///|
 priv enum FieldKind {
   Unsigned(Byte, Endian)
+  Signed(Byte, Endian)
   Float32(Endian)
   RawBytes(LengthExpr)
   Contents(Bytes)
@@ -241,6 +242,13 @@ fn parse_kind(
     "u4" => Unsigned(4, default_endian(endian, path))
     "u4le" => Unsigned(4, Little)
     "u4be" => Unsigned(4, Big)
+    "s1" => Signed(1, Big)
+    "s2" => Signed(2, default_endian(endian, path))
+    "s2le" => Signed(2, Little)
+    "s2be" => Signed(2, Big)
+    "s4" => Signed(4, default_endian(endian, path))
+    "s4le" => Signed(4, Little)
+    "s4be" => Signed(4, Big)
     "f4" => Float32(default_endian(endian, path))
     "f4le" => Float32(Little)
     "f4be" => Float32(Big)

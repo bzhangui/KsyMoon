@@ -14,6 +14,7 @@ pub fn generate(source : String) -> String raise SchemaError {
     for field in record.fields {
       has_numeric_fields = has_numeric_fields ||
         field.kind is Unsigned(_, _) ||
+        field.kind is Signed(_, _) ||
         field.kind is Float32(_)
       has_repeated_fields = has_repeated_fields || field.count is Some(_)
       has_contents = has_contents || field.kind is Contents(_)
@@ -91,6 +92,7 @@ fn nested_reader(id : String, name : String) -> String {
 fn field_type(kind : FieldKind, root_type : String) -> String {
   match kind {
     Unsigned(_, _) => "UInt"
+    Signed(_, _) => "Int"
     Float32(_) => "Float"
     RawBytes(_) | Contents(_) => "BytesView"
     Nested(name) => nested_type(root_type, name)
@@ -139,6 +141,15 @@ fn read_code(kind : FieldKind, id : String, path : String) -> String {
   match kind {
     Unsigned(width, endian) =>
       "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
+    Signed(width, endian) => {
+      let bits = "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
+      let shift = (4 - width.to_int()) * 8
+      if shift == 0 {
+        "\{bits}.reinterpret_as_int()"
+      } else {
+        "((\{bits} << \{shift}).reinterpret_as_int() >> \{shift})"
+      }
+    }
     Float32(endian) =>
       "Float::reinterpret_from_uint(reader.read_bits(4, \{endian_flag(endian)}, \{path}))"
     RawBytes(length) => "reader.take(\{length_code(length)}, \{path})"

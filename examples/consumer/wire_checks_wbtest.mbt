@@ -1,8 +1,25 @@
 ///|
+fn wire_sample() -> Bytes {
+  b"KSY!\x00\xC3\xA9\xFF" +
+  b"\x80\x7F\x00\x80\x7F\xFF\x80\x00\x00\x00\xFF\xFF\xFF\x7F"
+}
+
+///|
 test "contents accepts UTF-8 strings and mixed byte arrays" {
-  let record = @wire.parse_wire_checks(b"KSY!\x00\xC3\xA9\xFF")
+  let record = @wire.parse_wire_checks(wire_sample())
   assert_eq(record.magic.to_owned(), b"KSY!")
   assert_eq(record.marker.to_owned(), b"\x00\xC3\xA9\xFF")
+}
+
+///|
+test "signed integers decode 8, 16 and 32-bit boundaries across byte orders" {
+  let record = @wire.parse_wire_checks(wire_sample())
+  assert_eq(record.byte_min, -128)
+  assert_eq(record.byte_max, 127)
+  assert_eq(record.short_min, -32768)
+  assert_eq(record.short_max, 32767)
+  assert_eq(record.word_min, -2147483648)
+  assert_eq(record.word_max, 2147483647)
 }
 
 ///|
