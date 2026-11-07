@@ -1,0 +1,8 @@
+supported_targets = "js"
+
+import {
+  "bzhangui/ksymoon" @codegen,
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")

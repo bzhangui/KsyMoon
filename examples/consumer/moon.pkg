@@ -1,0 +1,5 @@
+import {
+  "example/ksymoon-consumer/udp" @udp,
+}
+
+pkgtype(kind: "executable")
