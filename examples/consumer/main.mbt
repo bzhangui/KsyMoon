@@ -60,6 +60,14 @@ fn main {
     println("STL truncated: stl.triangles[1].abr at byte 182, need 2, have 1")
     verify_stl_repeat_limit()
     println("STL repeat limit: rejected triangle count 4294967295")
+    verify_stm32_valid()
+    println(
+      "STM32 valid: sequence=0x1234, tick_ms=1000000, samples=[0, 2048, 4095]",
+    )
+    verify_stm32_truncated()
+    println(
+      "STM32 truncated: stm32_sample_frame.samples[2] at byte 11, need 2, have 1",
+    )
   } catch {
     _ => abort("generated parser verification failed")
   }

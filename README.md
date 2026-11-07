@@ -4,16 +4,18 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 ## 生成并运行
 
-安装 MoonBit 与 Node.js，在仓库根目录执行以下命令。本阶段使用 Windows 上的 `moonc v0.10.14` 和 Node.js 24 验证，生成器的 YAML 依赖锁定为 `moonbit-community/yaml@0.0.7`。
+安装 MoonBit 与 Node.js，在仓库根目录执行以下命令。本机验证使用 Windows、Node.js 24 和 MoonBit v0.10.14 / v0.10.19+97801ee1b，生成器的 YAML 依赖锁定为 `moonbit-community/yaml@0.0.7`。
 
 ```powershell
+moon update
 moon run --target js cmd/ksymoon -- generate fixtures/udp_datagram.ksy --out examples/consumer/udp/udp_datagram.mbt
 moon run --target js cmd/ksymoon -- generate fixtures/stl.ksy --out examples/consumer/stl/stl.mbt
+moon run --target js cmd/ksymoon -- generate fixtures/stm32_sample_frame.ksy --out examples/consumer/stm32/stm32_sample_frame.mbt
 moon -C examples/consumer test --target all --deny-warn
 moon -C examples/consumer run --target js .
 ```
 
-`examples/consumer` 有自己的 `moon.mod`，从自身的 `udp` 和 `stl` 包调用 `parse_udp_datagram(Bytes)` 和 `parse_stl(Bytes)`。在自己的模块里使用时，先创建目标包和 `moon.pkg`，再把生成的文件写入该包。
+`examples/consumer` 有自己的 `moon.mod`，从自身的 `udp`、`stl` 和 `stm32` 包调用生成的解析器。在自己的模块里使用时，先创建目标包和 `moon.pkg`，再把生成的文件写入该包。
 
 ## 复现验收
 
@@ -21,7 +23,9 @@ moon -C examples/consumer run --target js .
 node scripts/verify.mjs
 ```
 
-脚本核对两份上游 `.ksy` 的 SHA-256，在 `_build` 下新建独立消费模块，再生成解析器并逐字节比对仓库中的示例源码。脚本检查、构建、测试并运行 JS、Wasm、Wasm-GC、Native 四个目标，保留隔离目录以便查看生成物。
+脚本先更新 Mooncakes 索引并核对两份上游 `.ksy` 的 SHA-256，再在 `_build` 下新建独立消费模块，重新生成三个解析器并逐字节比对仓库中的示例源码。脚本检查、构建、测试并运行 JS、Wasm、Wasm-GC、Native 四个目标，保留隔离目录以便查看生成物。
+
+GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node.js 24，核对编译器版本后执行同一条命令。工作流支持推送、PR 和手动触发。 [工作流](.github/workflows/verify.yml)
 
 | 样本 | 验收结果 |
 | --- | --- |
@@ -31,8 +35,10 @@ node scripts/verify.mjs
 | 正常二进制 STL | 两个三角面，第二个三角面的第二个顶点为 `(-0.5, 2.5, 0)`，属性为 `0x5678` |
 | 截断 STL | `stl.triangles[1].abr` 从字节偏移 182 开始，需要 2 字节，剩 1 字节 |
 | 异常 STL 计数 | `0xffffffff` 三角面计数触发重复项上限 |
+| 正常 STM32 采样帧 | 帧序号 `0x1234`、时间戳 `1000000 ms`、采样值 `[0, 2048, 4095]` |
+| 截断 STM32 采样帧 | `stm32_sample_frame.samples[2]` 从字节偏移 11 开始，需要 2 字节，剩 1 字节 |
 
-报文和模型数据均为测试中构造的字节样本，偏移与数组索引从 0 开始。
+报文、模型与采样帧均为测试中构造的字节样本，偏移与数组索引从 0 开始。STM32 演示采用项目自定义的无填充小端帧，依次包含帧序号 `u2`、毫秒时间戳 `u4`、采样计数 `u1` 和对应数量的 `u2` 原始 ADC 读数。 [STM32 描述](fixtures/stm32_sample_frame.ksy)
 
 ## 支持的描述子集
 
@@ -44,4 +50,4 @@ node scripts/verify.mjs
 
 ## 来源与许可
 
-KsyMoon 源码采用 MIT 许可证。两份格式描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy)
+KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP 和 STL 描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy)

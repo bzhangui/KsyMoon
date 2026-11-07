@@ -18,7 +18,7 @@ priv enum LengthExpr {
 
 ///|
 priv enum FieldKind {
-  Unsigned(Int, Endian)
+  Unsigned(Byte, Endian)
   Float32(Endian)
   RawBytes(LengthExpr)
   Nested(String)

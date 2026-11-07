@@ -27,3 +27,13 @@ test "generated STL parser locates a truncated field inside the second triangle"
 test "generated STL parser bounds unsigned triangle counts before allocating" {
   verify_stl_repeat_limit()
 }
+
+///|
+test "generated STM32 parser reads little-endian ADC samples" {
+  verify_stm32_valid()
+}
+
+///|
+test "generated STM32 parser locates the truncated ADC reading" {
+  verify_stm32_truncated()
+}

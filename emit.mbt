@@ -134,7 +134,7 @@ fn endian_flag(endian : Endian) -> String {
 fn read_code(kind : FieldKind, id : String, path : String) -> String {
   match kind {
     Unsigned(width, endian) =>
-      "reader.read_bits(\{width}, \{endian_flag(endian)}, \{path})"
+      "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
     Float32(endian) =>
       "Float::reinterpret_from_uint(reader.read_bits(4, \{endian_flag(endian)}, \{path}))"
     RawBytes(length) => "reader.take(\{length_code(length)}, \{path})"

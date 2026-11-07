@@ -18,6 +18,7 @@ const fixtures = [
     package: "stl",
     sha256: "bf9fac93edff1b49e795a15a4abb311d690166fe7b38b6400f6958cd72ae67cd",
   },
+  { schema: "stm32_sample_frame", package: "stm32" },
 ];
 
 function moon(cwd, ...args) {
@@ -28,6 +29,7 @@ function moon(cwd, ...args) {
   }
 }
 
+moon(root, "update");
 moon(root, "check", "--target", "all", "--deny-warn");
 moon(root, "fmt", "--check");
 moon(root, "test", "--frozen", "--target", "all", "--deny-warn");
@@ -35,13 +37,17 @@ moon(root, "test", "--frozen", "--target", "all", "--deny-warn");
 mkdirSync(buildDir, { recursive: true });
 const independent = mkdtempSync(join(buildDir, "consumer-"));
 console.log(`Independent consumer: ${independent}`);
-for (const name of ["moon.mod", "moon.pkg", "main.mbt", "main_wbtest.mbt", "stl_checks.mbt"]) {
+for (const name of [
+  "moon.mod", "moon.pkg", "main.mbt", "main_wbtest.mbt", "stl_checks.mbt", "stm32_checks.mbt",
+]) {
   copyFileSync(join(consumer, name), join(independent, name));
 }
 for (const fixture of fixtures) {
   const input = join(root, "fixtures", `${fixture.schema}.ksy`);
-  const digest = createHash("sha256").update(readFileSync(input)).digest("hex");
-  if (digest !== fixture.sha256) throw new Error(`Upstream fixture changed: ${input}`);
+  if (fixture.sha256) {
+    const digest = createHash("sha256").update(readFileSync(input)).digest("hex");
+    if (digest !== fixture.sha256) throw new Error(`Upstream fixture changed: ${input}`);
+  }
 
   const outDir = join(independent, fixture.package);
   mkdirSync(outDir);
@@ -53,7 +59,7 @@ for (const fixture of fixtures) {
   if (!readFileSync(output).equals(readFileSync(join(consumer, fixture.package, name)))) {
     throw new Error(`Generated ${name} differs from the checked-in sample`);
   }
-  console.log(`Verified upstream ${fixture.schema}.ksy and reproducible output`);
+  console.log(`Verified ${fixture.schema}.ksy and reproducible output`);
 }
 
 for (const command of ["check", "build", "test"]) {

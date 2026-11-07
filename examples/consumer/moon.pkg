@@ -1,4 +1,5 @@
 import {
+  "example/ksymoon-consumer/stm32",
   "example/ksymoon-consumer/stl",
   "example/ksymoon-consumer/udp",
 }
