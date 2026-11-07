@@ -5,3 +5,7 @@ import {
 }
 
 pkgtype(kind: "executable")
+
+import {
+  "example/ksymoon-consumer/wire",
+} for "wbtest"

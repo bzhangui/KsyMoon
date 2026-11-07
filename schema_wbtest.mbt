@@ -8,6 +8,18 @@ fn expect_schema_error(source : String, message : String) -> Unit raise {
 }
 
 ///|
+test "contents rejects values outside a byte" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - id: magic
+    #|    contents: [0, 256]
+  expect_schema_error(
+    source, "seq[0].contents[1]: expected a byte (0..255) or a UTF-8 string",
+  )
+}
+
+///|
 test "schema keywords that change layout fail with a field path" {
   let source =
     #|meta: {id: example}

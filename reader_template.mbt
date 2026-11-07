@@ -4,7 +4,13 @@ fn emit_reader(
   root_type : String,
   has_numeric_fields : Bool,
   has_repeated_fields : Bool,
+  has_contents : Bool,
 ) -> Unit {
+  let contents_error = if has_contents {
+    "  __ROOT__ContentsMismatch(field~ : String, offset~ : Int, expected~ : Byte, actual~ : Byte)\n"
+  } else {
+    ""
+  }
   let repeat_error = if has_repeated_fields {
     "  __ROOT__RepeatLimit(field~ : String, offset~ : Int, count~ : Int64)\n"
   } else {
@@ -20,7 +26,7 @@ fn emit_reader(
     #|pub suberror __ROOT__ParseError {
     #|  __ROOT__Truncated(field~ : String, offset~ : Int, needed~ : Int64, remaining~ : Int)
     #|  __ROOT__InvalidLength(field~ : String, offset~ : Int, length~ : Int64)
-    #|__REPEAT_ERROR__}
+    #|__REPEAT_ERROR____CONTENTS_ERROR__}
     #|
     #|///|
     #|priv struct __ROOT__Reader {
@@ -48,6 +54,7 @@ fn emit_reader(
     #|
   let header = header
     .replace_all(old="__REPEAT_ERROR__", new=repeat_error[:])
+    .replace_all(old="__CONTENTS_ERROR__", new=contents_error[:])
     .replace_all(old="__REPEAT_STATE__", new=repeat_state[:])
   write_reader_block(output, header, root_type)
   if has_numeric_fields {
@@ -90,6 +97,26 @@ fn emit_reader(
       #|}
       #|
     write_reader_block(output, repeat, root_type)
+  }
+  if has_contents {
+    let contents =
+      #|///|
+      #|fn __ROOT__Reader::read_contents(
+      #|  self : __ROOT__Reader,
+      #|  expected : Bytes,
+      #|  field : String,
+      #|) -> BytesView raise __ROOT__ParseError {
+      #|  let start = self.offset
+      #|  let actual = self.take(expected.length().to_int64(), field)
+      #|  for i in 0..<expected.length() {
+      #|    guard actual[i] == expected[i] else {
+      #|      raise __ROOT__ContentsMismatch(field~, offset=start + i, expected=expected[i], actual=actual[i])
+      #|    }
+      #|  }
+      #|  actual
+      #|}
+      #|
+    write_reader_block(output, contents, root_type)
   }
 }
 

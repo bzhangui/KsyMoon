@@ -19,6 +19,7 @@ const fixtures = [
     sha256: "bf9fac93edff1b49e795a15a4abb311d690166fe7b38b6400f6958cd72ae67cd",
   },
   { schema: "stm32_sample_frame", package: "stm32" },
+  { schema: "wire_checks", package: "wire" },
 ];
 
 function moon(cwd, ...args) {
@@ -39,6 +40,7 @@ const independent = mkdtempSync(join(buildDir, "consumer-"));
 console.log(`Independent consumer: ${independent}`);
 for (const name of [
   "moon.mod", "moon.pkg", "main.mbt", "main_wbtest.mbt", "stl_checks.mbt", "stm32_checks.mbt",
+  "wire_checks_wbtest.mbt",
 ]) {
   copyFileSync(join(consumer, name), join(independent, name));
 }

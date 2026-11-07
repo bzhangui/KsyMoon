@@ -21,6 +21,7 @@ priv enum FieldKind {
   Unsigned(Byte, Endian)
   Float32(Endian)
   RawBytes(LengthExpr)
+  Contents(Bytes)
   Nested(String)
 }
 
@@ -249,6 +250,31 @@ fn parse_kind(
 }
 
 ///|
+fn parse_contents(value : @yaml.Yaml, path : String) -> Bytes raise SchemaError {
+  let bytes = match value {
+    @yaml.String(text) => @utf8.encode(text[:])
+    @yaml.Array(parts) => {
+      let bytes : Array[Byte] = []
+      for i, part in parts {
+        match part {
+          @yaml.Integer(n) if n >= 0L && n <= 255L => bytes.push(n.to_byte())
+          @yaml.String(text) => bytes.append(@utf8.encode(text[:]).to_array())
+          _ =>
+            invalid(
+              "\{path}[\{i}]",
+              "expected a byte (0..255) or a UTF-8 string",
+            )
+        }
+      }
+      Bytes::from_array(bytes[:])
+    }
+    _ => invalid(path, "expected a UTF-8 string or an array")
+  }
+  guard !bytes.is_empty() else { invalid(path, "signature cannot be empty") }
+  bytes
+}
+
+///|
 fn parse_field(
   value : @yaml.Yaml,
   earlier : Map[String, Field],
@@ -259,7 +285,9 @@ fn parse_field(
   let field = as_mapping(value, path)
   check_keys(
     field,
-    ["id", "type", "size", "repeat", "repeat-expr", "doc", "doc-ref"],
+    [
+      "id", "type", "size", "contents", "repeat", "repeat-expr", "doc", "doc-ref",
+    ],
     path,
   )
   let name = as_string(get_required(field, "id", path), path + ".id")
@@ -270,16 +298,20 @@ fn parse_field(
   guard !earlier.contains(name) else {
     invalid(path + ".id", "duplicate field '\{name}'")
   }
-  let kind = match (field.get("type"), field.get("size")) {
-    (Some(type_name), None) =>
+  let kind = match
+    (field.get("type"), field.get("size"), field.get("contents")) {
+    (Some(type_name), None, None) =>
       parse_kind(
         as_string(type_name, path + ".type"),
         endian,
         type_names,
         path + ".type",
       )
-    (None, Some(size)) => RawBytes(parse_length(size, earlier, path + ".size"))
-    _ => invalid(path, "expected exactly one of 'type' or 'size'")
+    (None, Some(size), None) =>
+      RawBytes(parse_length(size, earlier, path + ".size"))
+    (None, None, Some(contents)) =>
+      Contents(parse_contents(contents, path + ".contents"))
+    _ => invalid(path, "expected exactly one of 'type', 'size' or 'contents'")
   }
   let count = match (field.get("repeat"), field.get("repeat-expr")) {
     (None, None) => None
