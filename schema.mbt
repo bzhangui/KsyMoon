@@ -5,6 +5,12 @@ pub suberror SchemaError {
 }
 
 ///|
+/// Checks a description against the supported subset without generating source.
+pub fn validate(source : String) -> Unit raise SchemaError {
+  ignore(load_schema(source))
+}
+
+///|
 priv enum Endian {
   Little
   Big

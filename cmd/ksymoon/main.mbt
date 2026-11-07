@@ -1,5 +1,5 @@
 ///|
-const USAGE = "Usage: ksymoon generate INPUT.ksy --out OUTPUT.mbt"
+const USAGE = "Usage:\n  ksymoon check INPUT.ksy\n  ksymoon generate INPUT.ksy --out OUTPUT.mbt"
 
 ///|
 extern "js" fn read_schema(path : String) -> FixedArray[String] =
@@ -43,31 +43,38 @@ extern "js" fn report_error(message : String) -> Unit =
   #|}
 
 ///|
-fn generate_file(input : String, output : String) -> Unit {
-  guard output.has_suffix(".mbt") else {
-    report_error("output path must end in .mbt")
-    return
-  }
+fn process_file(input : String, output : String?) -> Unit {
   guard read_schema(input) is [source] else {
     report_error("could not read '\{input}'")
     return
   }
-  let code = @codegen.generate(source) catch {
-    @codegen.InvalidSchema(message) => {
-      report_error("\{input}: \{message}")
-      return
+  try {
+    match output {
+      None => {
+        @codegen.validate(source)
+        println("Valid schema: \{input}")
+      }
+      Some(path) => {
+        let code = @codegen.generate(source)
+        let message = write_source(path, code)
+        if !message.is_empty() {
+          report_error("could not write '\{path}': \{message}")
+        }
+      }
     }
-  }
-  let message = write_source(output, code)
-  if !message.is_empty() {
-    report_error("could not write '\{output}': \{message}")
+  } catch {
+    @codegen.InvalidSchema(message) => report_error("\{input}: \{message}")
   }
 }
 
 ///|
 fn main {
   match @env.args()[:] {
-    [_, _, "generate", input, "--out", output] => generate_file(input, output)
+    [_, _, "check", input] => process_file(input, None)
+    [_, _, "generate", input, "--out", output] if output.has_suffix(".mbt") =>
+      process_file(input, Some(output))
+    [_, _, "generate", _, "--out", _] =>
+      report_error("output path must end in .mbt")
     [_, _, "--help"] | [_, _, "-h"] => println(USAGE)
     _ => report_error(USAGE)
   }

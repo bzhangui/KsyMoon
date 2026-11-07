@@ -8,6 +8,7 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 ```powershell
 moon update
+moon run --target js cmd/ksymoon -- check fixtures/udp_datagram.ksy
 moon run --target js cmd/ksymoon -- generate fixtures/udp_datagram.ksy --out examples/consumer/udp/udp_datagram.mbt
 moon run --target js cmd/ksymoon -- generate fixtures/stl.ksy --out examples/consumer/stl/stl.mbt
 moon run --target js cmd/ksymoon -- generate fixtures/stm32_sample_frame.ksy --out examples/consumer/stm32/stm32_sample_frame.mbt
@@ -16,6 +17,8 @@ moon -C examples/consumer run --target js .
 ```
 
 `examples/consumer` 有自己的 `moon.mod`，从自身的 `udp`、`stl` 和 `stm32` 包调用生成的解析器。在自己的模块里使用时，先创建目标包和 `moon.pkg`，再把生成的文件写入该包。
+
+`check INPUT.ksy` 只校验描述。通过时返回状态 0，输入无法读取或描述超出支持范围时返回非零状态并打印诊断。库接口提供 `validate(source)` 和 `generate(source)`。
 
 ## 复现验收
 

@@ -1,6 +1,7 @@
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,12 +31,52 @@ function moon(cwd, ...args) {
   }
 }
 
+function verifyCli(scratch) {
+  const valid = join(scratch, "valid.ksy");
+  const invalid = join(scratch, "invalid.ksy");
+  const protectedOutput = join(scratch, "protected.mbt");
+  copyFileSync(join(root, "fixtures", "udp_datagram.ksy"), valid);
+  writeFileSync(invalid, "meta: {id: invalid}\nseq:\n  - {id: flag, type: u1, if: flag}\n");
+  writeFileSync(protectedOutput, "// existing output\n");
+  const filesBefore = readdirSync(scratch);
+
+  function cli(...args) {
+    const result = spawnSync("moon", [
+      "run", "--frozen", "--target", "js", "--deny-warn", "cmd/ksymoon", "--", ...args,
+    ], { cwd: root, encoding: "utf8" });
+    if (result.error) throw result.error;
+    assert.notEqual(result.status, null, result.signal);
+    return result;
+  }
+
+  const accepted = cli("check", valid);
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.ok(accepted.stdout.includes("Valid schema: "));
+  const rejected = cli("check", invalid);
+  assert.notEqual(rejected.status, 0);
+  assert.ok(rejected.stderr.includes(invalid));
+  assert.match(rejected.stderr, /seq\[0\]\.if: unsupported key/);
+  const missing = cli("check", join(scratch, "missing.ksy"));
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /could not read .*missing\.ksy/);
+  const checkWithOutput = cli("check", valid, "--out", protectedOutput);
+  assert.notEqual(checkWithOutput.status, 0);
+  assert.match(checkWithOutput.stderr, /Usage:/);
+  const invalidGenerate = cli("generate", invalid, "--out", protectedOutput);
+  assert.notEqual(invalidGenerate.status, 0);
+  assert.match(invalidGenerate.stderr, /seq\[0\]\.if: unsupported key/);
+  assert.equal(readFileSync(protectedOutput, "utf8"), "// existing output\n");
+  assert.deepEqual(readdirSync(scratch), filesBefore);
+  console.log("CLI check: valid, invalid, missing input, and protected output verified");
+}
+
 moon(root, "update");
 moon(root, "check", "--target", "all", "--deny-warn");
 moon(root, "fmt", "--check");
 moon(root, "test", "--frozen", "--target", "all", "--deny-warn");
 
 mkdirSync(buildDir, { recursive: true });
+verifyCli(mkdtempSync(join(buildDir, "cli-check-")));
 const independent = mkdtempSync(join(buildDir, "consumer-"));
 console.log(`Independent consumer: ${independent}`);
 for (const name of [
