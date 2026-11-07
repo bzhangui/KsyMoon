@@ -41,6 +41,7 @@ console.log(`Independent consumer: ${independent}`);
 for (const name of [
   "moon.mod", "moon.pkg", "main.mbt", "main_wbtest.mbt", "stl_checks.mbt", "stm32_checks.mbt",
   "wire_checks_wbtest.mbt",
+  "prefix_wbtest.mbt",
 ]) {
   copyFileSync(join(consumer, name), join(independent, name));
 }
