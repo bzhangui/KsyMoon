@@ -25,7 +25,14 @@ node scripts/verify.mjs
 
 脚本先更新 Mooncakes 索引并核对两份上游 `.ksy` 的 SHA-256，再在 `_build` 下新建独立消费模块，重新生成三个解析器并逐字节比对仓库中的示例源码。脚本检查、构建、测试并运行 JS、Wasm、Wasm-GC、Native 四个目标，保留隔离目录以便查看生成物。
 
-GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node.js 24，核对编译器版本后执行同一条命令。工作流支持推送、PR 和手动触发。 [工作流](.github/workflows/verify.yml)
+安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，并用 UDP 与 STL 的固定样本生成四个逐字段比较测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
+
+```powershell
+python -m pip install kaitaistruct==0.11
+node scripts/verify.mjs --kaitai-reference
+```
+
+GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node.js 24，核对编译器版本后运行包含 Kaitai 对照的验证。工作流支持推送、PR 和手动触发。 [工作流](.github/workflows/verify.yml)
 
 | 样本 | 验收结果 |
 | --- | --- |

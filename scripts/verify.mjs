@@ -65,6 +65,15 @@ for (const fixture of fixtures) {
   console.log(`Verified ${fixture.schema}.ksy and reproducible output`);
 }
 
+if (process.argv.includes("--kaitai-reference")) {
+  const result = spawnSync("python", [join(root, "scripts", "kaitai-reference.py"), independent], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error("Kaitai reference generation failed: " + result.status);
+}
+
 for (const command of ["check", "build", "test"]) {
   moon(independent, command, "--frozen", "--target", "all", "--deny-warn");
 }

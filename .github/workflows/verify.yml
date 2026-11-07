@@ -16,6 +16,15 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install pinned Kaitai reference runtime
+        run: python -m pip install kaitaistruct==0.11
       - name: Install pinned MoonBit and verify the three scenarios
         shell: bash
         run: |
@@ -33,4 +42,4 @@ jobs:
             printf 'Expected moonc v%s, got %s\n' "$MOONBIT_VERSION" "$compiler" >&2
             exit 1
           fi
-          node scripts/verify.mjs
+          node scripts/verify.mjs --kaitai-reference
