@@ -2,6 +2,8 @@
 
 KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进制解析器。生成的源码只依赖 MoonBit 标准库。
 
+项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。当前开发版为 `0.3.0-dev.1`，新增条件字段、惰性解析实例、值实例及基础表达式。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
+
 ## 从 Mooncakes 安装
 
 在自己的 MoonBit 模块中安装生成器。
@@ -12,7 +14,7 @@ moon add bzhangui/ksymoon@0.2.0
 
 在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。用 `@ksymoon.generate(source)` 将描述文本生成为 MoonBit 源码，或用 `@ksymoon.validate(source)` 单独校验描述。两个接口都会用 `SchemaError` 报告超出支持范围的描述。
 
-`v0.2.0` 新增固定签名、有符号整数、整数标量约束、64 位无符号整数和只读 `check` 命令。示例包含 UDP、二进制 STL、STM32 采样帧和原样上游 IVF。
+Mooncakes 当前已发布 `v0.2.0`，提供固定签名、有符号整数、整数标量约束、64 位无符号整数和只读 `check` 命令。新条件和实例语义通过本分支源码复现。
 
 ## 生成并运行
 
@@ -39,16 +41,17 @@ moon -C examples/consumer run --target js .
 node scripts/verify.mjs
 ```
 
-脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对三份上游 `.ksy` 的 SHA-256，再在 `_build` 下新建独立消费模块。五个解析器（UDP、STL、STM32、IVF 和基础特性测试）均重新生成并与仓库示例逐字节比对。脚本检查、构建、测试并运行 JS、Wasm、Wasm-GC、Native 四个目标，保留隔离目录以便查看生成物。
+脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局与四份上游兼容用例均重新生成并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
 
-安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，并用 UDP 与 STL 的固定样本生成四个逐字段比较测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
+安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 10 个对照测试，覆盖 UDP、STL、条件缺省值、定位数组实例、条件实例、整数除法及条件布局。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
 ```powershell
 python -m pip install kaitaistruct==0.11
 node scripts/verify.mjs --kaitai-reference
+python scripts/compatibility-report.py
 ```
 
-GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node.js 24，核对编译器版本后运行包含 Kaitai 对照的验证。工作流支持推送、PR 和手动触发。 [工作流](.github/workflows/verify.yml)
+GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node.js 24，运行对照验证，并检查固定上游测试库的全部 339 份描述。已生成的源码另建独立模块检查和构建，完整结果以 CI 附件导出。描述接受和编译结果、运行语义对照分别记录。 [工作流](.github/workflows/verify.yml)
 
 | 样本 | 验收结果 |
 | --- | --- |
@@ -67,15 +70,20 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 
 三个主场景的测试在每个目标上覆盖 208 个真前缀（UDP 11、STL 184、STM32 13），逐一核对截断类型、字段路径前缀、偏移和剩余字节。 [全前缀测试](examples/consumer/prefix_wbtest.mbt)
 
-## 支持的描述子集
+## 当前实现与兼容进度
 
 - `meta.id`、`meta.endian`、`seq` 和非递归本地 `types`。
 - `u1`、`u2`、`u4`、`u8`、`s1`、`s2`、`s4`、`f4`。多字节类型采用 `meta.endian` 或类型的显式大小端后缀，`u8` 生成为 `UInt64`。
 - `contents` 固定签名支持 UTF-8 字符串，以及包含字符串和字节整数的数组。`valid` 支持 32 位以内整数标量的常量、`eq`、`min` 和 `max`。
 - `size` 字节字段和 `repeat: expr` 数组。长度表达式支持非负常量、先前的 `u1/u2/u4` 标量字段，以及该字段减去非负整数。
+- `if` 条件标量、字节字段、嵌套记录和数组，结果生成为 `Option[T]`。条件为假时跳过读取、约束及重复项预留。
+- `instances` 的 `pos` 定位读取、计数数组和 `value` 计算值，均按需求值并缓存成功结果，使用生成记录的同名方法访问，如 `record.entries()`。条件实例在求值为假时跳过定位与读取。
+- `if/value/pos` 的有类型整数和布尔表达式，支持括号、算术、比较、位运算、逻辑短路、条件表达式、实例依赖和 `_io.pos/_io.size`。当前数字引用为 32 位以内非可选字段，计算类型为 Int64。 [新增回归](examples/consumer/conditional_wbtest.mbt)
 - 生成的解析器读取描述指定的前缀。UDP 校验和作为字段返回，由调用者按使用场景校验。
-- 生成器遇到 `instances`、条件字段、导入等超出子集的键时，返回对应的描述路径。运行时按错误类型报告字段路径和字节偏移，包括截断、非法长度、计数超限、签名不匹配和标量越界。单次解析最多处理 1,000,000 个重复项，嵌套数组的元素计入同一总额。
+- 当前尚待实现的标准语义包括 imports、参数、枚举、switch、位域、通用子流、更多字符串与处理器等，对应 P2—P5 的明确门禁。遇到尚未实现的语法会返回描述诊断。运行时错误包含字段路径和字节偏移。单次顺序解析及实例读取共享 1,000,000 个重复项的预算，失败的实例读取会归还本次预留，嵌套数组计入同一预算。 [完整兼容终点](docs/COMPATIBILITY.zh-CN.md)
 
 ## 来源与许可
 
 KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy) · [IVF 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/vp8_duck_ivf.ksy)
+
+四份新增兼容描述来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。条件布局和 MoonBit 断言由项目实现，官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
