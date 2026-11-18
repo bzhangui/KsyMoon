@@ -1,6 +1,6 @@
 name = "bzhangui/ksymoon"
 
-version = "0.2.0"
+version = "0.3.0-dev.1"
 
 readme = "README.md"
 
@@ -10,7 +10,7 @@ repository = "https://github.com/bzhangui/KsyMoon"
 
 preferred_target = "js"
 
-description = "Generate typed MoonBit parsers from a subset of Kaitai Struct descriptions."
+description = "MoonBit binary parser generator targeting Kaitai Struct 0.11 compatibility."
 
 import {
   "moonbit-community/yaml@0.0.7",

@@ -7,6 +7,11 @@ fn emit_reader(
   has_repeated_fields~ : Bool,
   has_contents~ : Bool,
   has_validation~ : Bool,
+  has_instances~ : Bool,
+  has_positions~ : Bool,
+  has_arithmetic~ : Bool,
+  has_read_fields~ : Bool,
+  has_input~ : Bool,
 ) -> Unit {
   let validation_error = if has_validation {
     "  __ROOT__InvalidValue(field~ : String, offset~ : Int, value~ : Int64, minimum~ : Int64, maximum~ : Int64)\n"
@@ -23,6 +28,21 @@ fn emit_reader(
   } else {
     ""
   }
+  let instance_error = if has_instances {
+    "  __ROOT__InstanceCycle(field~ : String, offset~ : Int)\n"
+  } else {
+    ""
+  }
+  let position_error = if has_positions {
+    "  __ROOT__InvalidPosition(field~ : String, offset~ : Int, position~ : Int64)\n"
+  } else {
+    ""
+  }
+  let arithmetic_error = if has_arithmetic {
+    "  __ROOT__ExpressionError(field~ : String, offset~ : Int, operation~ : String)\n"
+  } else {
+    ""
+  }
   let repeat_state = if has_repeated_fields {
     "  mut repeats_left : Int\n"
   } else {
@@ -33,7 +53,7 @@ fn emit_reader(
     #|pub suberror __ROOT__ParseError {
     #|  __ROOT__Truncated(field~ : String, offset~ : Int, needed~ : Int64, remaining~ : Int)
     #|  __ROOT__InvalidLength(field~ : String, offset~ : Int, length~ : Int64)
-    #|__REPEAT_ERROR____CONTENTS_ERROR____VALIDATION_ERROR__}
+    #|__REPEAT_ERROR____CONTENTS_ERROR____VALIDATION_ERROR____INSTANCE_ERROR____POSITION_ERROR____ARITHMETIC_ERROR__}
     #|
     #|///|
     #|priv struct __ROOT__Reader {
@@ -59,12 +79,54 @@ fn emit_reader(
     #|  self.input[start:self.offset]
     #|}
     #|
+  let header = if has_read_fields {
+    header
+  } else {
+    header.split_once("///|\nfn __ROOT__Reader::take(").unwrap().0.to_owned()
+  }
+  let header = if has_read_fields {
+    header
+  } else {
+    header
+    .replace_all(
+      old="  __ROOT__Truncated(field~ : String, offset~ : Int, needed~ : Int64, remaining~ : Int)\n",
+      new="",
+    )
+    .replace_all(
+      old="  __ROOT__InvalidLength(field~ : String, offset~ : Int, length~ : Int64)\n",
+      new="",
+    )
+    .replace_all(old="  mut offset : Int", new="  offset : Int")
+  }
+  let header = if has_input {
+    header
+  } else {
+    header.replace_all(old="  input : Bytes\n", new="")
+  }
   let header = header
     .replace_all(old="__REPEAT_ERROR__", new=repeat_error[:])
     .replace_all(old="__CONTENTS_ERROR__", new=contents_error[:])
     .replace_all(old="__VALIDATION_ERROR__", new=validation_error[:])
+    .replace_all(old="__INSTANCE_ERROR__", new=instance_error[:])
+    .replace_all(old="__POSITION_ERROR__", new=position_error[:])
+    .replace_all(old="__ARITHMETIC_ERROR__", new=arithmetic_error[:])
     .replace_all(old="__REPEAT_STATE__", new=repeat_state[:])
   write_reader_block(output, header, root_type)
+  if has_positions {
+    let seek =
+      #|///|
+      #|fn __ROOT__Reader::seek(self : __ROOT__Reader, position : Int64, field : String) -> Unit raise __ROOT__ParseError {
+      #|  guard position >= 0L && position <= self.input.length().to_int64() else {
+      #|    raise __ROOT__InvalidPosition(field~, offset=self.offset, position~)
+      #|  }
+      #|  self.offset = position.to_int()
+      #|}
+      #|
+    write_reader_block(output, seek, root_type)
+  }
+  if has_arithmetic {
+    emit_arithmetic(output, root_type)
+  }
   if has_numeric_fields {
     write_reader_block(
       output,

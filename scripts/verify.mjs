@@ -9,6 +9,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const consumer = join(root, "examples", "consumer");
 const buildDir = join(root, "_build");
 const fixtures = [
+  ...JSON.parse(readFileSync(join(root, "fixtures", "kaitai", "manifest.json"), "utf8")).fixtures,
   {
     schema: "udp_datagram",
     package: "udp",
@@ -21,6 +22,7 @@ const fixtures = [
   },
   { schema: "stm32_sample_frame", package: "stm32" },
   { schema: "wire_checks", package: "wire" },
+  { schema: "conditional_layout", package: "conditional_layout" },
   {
     schema: "vp8_duck_ivf",
     package: "ivf",
@@ -41,7 +43,7 @@ function verifyCli(scratch) {
   const invalid = join(scratch, "invalid.ksy");
   const protectedOutput = join(scratch, "protected.mbt");
   copyFileSync(join(root, "fixtures", "udp_datagram.ksy"), valid);
-  writeFileSync(invalid, "meta: {id: invalid}\nseq:\n  - {id: flag, type: u1, if: flag}\n");
+  writeFileSync(invalid, "meta: {id: invalid}\nseq:\n  - {id: flag, type: u1, if: 1}\n");
   writeFileSync(protectedOutput, "// existing output\n");
   const filesBefore = readdirSync(scratch);
 
@@ -60,7 +62,7 @@ function verifyCli(scratch) {
   const rejected = cli("check", invalid);
   assert.notEqual(rejected.status, 0);
   assert.ok(rejected.stderr.includes(invalid));
-  assert.match(rejected.stderr, /seq\[0\]\.if: unsupported key/);
+  assert.match(rejected.stderr, /seq\[0\]\.if: expected a boolean expression/);
   const missing = cli("check", join(scratch, "missing.ksy"));
   assert.notEqual(missing.status, 0);
   assert.match(missing.stderr, /could not read .*missing\.ksy/);
@@ -69,7 +71,7 @@ function verifyCli(scratch) {
   assert.match(checkWithOutput.stderr, /Usage:/);
   const invalidGenerate = cli("generate", invalid, "--out", protectedOutput);
   assert.notEqual(invalidGenerate.status, 0);
-  assert.match(invalidGenerate.stderr, /seq\[0\]\.if: unsupported key/);
+  assert.match(invalidGenerate.stderr, /seq\[0\]\.if: expected a boolean expression/);
   assert.equal(readFileSync(protectedOutput, "utf8"), "// existing output\n");
   assert.deepEqual(readdirSync(scratch), filesBefore);
   console.log("CLI check: valid, invalid, missing input, and protected output verified");
@@ -89,11 +91,12 @@ for (const name of [
   "wire_checks_wbtest.mbt",
   "prefix_wbtest.mbt",
   "ivf_wbtest.mbt",
+  "conditional_wbtest.mbt",
 ]) {
   copyFileSync(join(consumer, name), join(independent, name));
 }
 for (const fixture of fixtures) {
-  const input = join(root, "fixtures", `${fixture.schema}.ksy`);
+  const input = join(root, "fixtures", fixture.source ?? `${fixture.schema}.ksy`);
   if (fixture.sha256) {
     const digest = createHash("sha256").update(readFileSync(input)).digest("hex");
     if (digest !== fixture.sha256) throw new Error(`Upstream fixture changed: ${input}`);

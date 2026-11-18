@@ -25,7 +25,7 @@ jobs:
           java-version: "21"
       - name: Install pinned Kaitai reference runtime
         run: python -m pip install kaitaistruct==0.11
-      - name: Install pinned MoonBit and verify the three scenarios
+      - name: Verify parsers and Kaitai compatibility
         shell: bash
         run: |
           set -euo pipefail
@@ -43,3 +43,10 @@ jobs:
             exit 1
           fi
           node scripts/verify.mjs --kaitai-reference
+          python scripts/compatibility-report.py
+      - name: Upload complete compatibility inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaitai-compatibility-inventory
+          path: _build/compatibility-report.json
+          if-no-files-found: error

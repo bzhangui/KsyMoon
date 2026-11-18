@@ -1,0 +1,30 @@
+{
+  "repository": "https://github.com/kaitai-io/kaitai_struct_tests",
+  "revision": "4108136c807f8df88df843de6571f1a7bf29c74e",
+  "fixtures": [
+    {
+      "schema": "if_instances",
+      "package": "if_instances",
+      "source": "kaitai/if_instances.ksy",
+      "sha256": "bf6057aa237bf0147b793dc59139c747355ddd394c5c697141aad14206c616e5"
+    },
+    {
+      "schema": "if_values",
+      "package": "if_values",
+      "source": "kaitai/if_values.ksy",
+      "sha256": "0e4177ea376a94bab1d3019e0c25fd61de24272579956a8dcc409c59f717add3"
+    },
+    {
+      "schema": "instance_std_array",
+      "package": "instance_std_array",
+      "source": "kaitai/instance_std_array.ksy",
+      "sha256": "e0f62dbc1c20e81c812b93cd5a953cb5b3728d1f72a5171f7b0cbf4ce1594395"
+    },
+    {
+      "schema": "expr_int_div",
+      "package": "expr_int_div",
+      "source": "kaitai/expr_int_div.ksy",
+      "sha256": "ea36d32c3354088f5b13bb7f6b4eb290e207240551f1157b54d8073d3bb06d10"
+    }
+  ]
+}

@@ -35,7 +35,7 @@ test "contents rejects values outside a byte" {
 }
 
 ///|
-test "schema keywords that change layout fail with a field path" {
+test "conditions must be boolean rather than integer truthiness" {
   let source =
     #|meta: {id: example}
     #|seq:
@@ -44,7 +44,61 @@ test "schema keywords that change layout fail with a field path" {
     #|  - id: data
     #|    size: 1
     #|    if: flag
-  expect_schema_error(source, "seq[1].if: unsupported key")
+  expect_schema_error(source, "seq[1].if: expected a boolean expression")
+}
+
+///|
+test "expressions reject forward fields and optional numeric references" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: optional, type: u1, if: true}
+    #|  - {id: data, type: u1, if: optional == 1}
+  expect_schema_error(
+    source, "seq[1].if: expression requires a nonoptional scalar field",
+  )
+  expect_schema_error(
+    source.replace_all(old="optional == 1", new="later == 1"),
+    "seq[1].if: unknown or forward field 'later'",
+  )
+}
+
+///|
+test "instances reject cyclic value dependencies" {
+  let source =
+    #|meta: {id: example}
+    #|instances:
+    #|  first: {value: second + 1}
+    #|  second: {value: first + 1}
+  try validate(source) catch {
+    InvalidSchema(message) =>
+      assert_true(message.contains("cyclic instance dependency"))
+  } noraise {
+    _ => fail("accepted cyclic instances")
+  }
+}
+
+///|
+test "expression input is parsed rather than interpolated into output" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: flag, type: u1, if: "true); abort(\"bad\")"}
+  try generate(source) catch {
+    InvalidSchema(message) =>
+      assert_true(message.has_prefix("seq[0].if: unexpected expression token"))
+  } noraise {
+    _ => fail("accepted invalid expression syntax")
+  }
+}
+
+///|
+test "flat operator chains respect the expression depth bound" {
+  let sum = Array::make(100, "1").join(" + ")
+  let source = "meta: {id: example}\ninstances:\n  total: {value: '\{sum}'}\n"
+  expect_schema_error(
+    source, "instances.total.value: expression nesting exceeds 64",
+  )
 }
 
 ///|

@@ -12,8 +12,38 @@ pub fn generate(source : String) -> String raise SchemaError {
   let mut has_repeated_fields = false
   let mut has_contents = false
   let mut has_validation = false
+  let mut has_instances = false
+  let mut has_positions = false
+  let mut has_arithmetic = false
+  let mut has_read_fields = false
+  let mut has_stream_size = false
   for record in records {
-    for field in record.fields {
+    has_instances = has_instances || !record.instances.is_empty()
+    let fields = record.fields.copy()
+    for instance in record.instances {
+      if instance.condition is Some(condition) {
+        has_arithmetic = has_arithmetic || expression_arithmetic(condition)
+      }
+      match instance.kind {
+        Parsed(field, position) => {
+          fields.push(field)
+          if position is Some(position) {
+            has_positions = true
+            has_arithmetic = has_arithmetic || expression_arithmetic(position)
+          }
+        }
+        Value(expression) => {
+          has_arithmetic = has_arithmetic || expression_arithmetic(expression)
+          has_stream_size = has_stream_size ||
+            expression_stream_size(expression)
+        }
+      }
+    }
+    for field in fields {
+      has_read_fields = true
+      if field.condition is Some(condition) {
+        has_arithmetic = has_arithmetic || expression_arithmetic(condition)
+      }
       has_numeric_fields = has_numeric_fields ||
         field.kind is Unsigned(_, _) ||
         field.kind is Signed(_, _) ||
@@ -42,6 +72,11 @@ pub fn generate(source : String) -> String raise SchemaError {
     has_repeated_fields~,
     has_contents~,
     has_validation~,
+    has_instances~,
+    has_positions~,
+    has_arithmetic~,
+    has_read_fields~,
+    has_input=has_read_fields || has_stream_size,
   )
   for record in schema.records {
     let name = nested_reader(id, record.name)
@@ -62,16 +97,34 @@ pub fn generate(source : String) -> String raise SchemaError {
     id,
     root_type,
   )
+  for record in records {
+    emit_instances(output, record, id, root_type, has_repeated_fields)
+  }
+  let effect = if schema.root.fields.is_empty() {
+    ""
+  } else {
+    " raise \{root_type}ParseError"
+  }
+  let input_arg = if has_read_fields || has_stream_size {
+    "input"
+  } else {
+    "_input"
+  }
   output.write_string(
-    "///|\npub fn parse_\{id}(input : Bytes) -> \{root_record_type} raise \{root_type}ParseError {\n",
+    "///|\npub fn parse_\{id}(\{input_arg} : Bytes) -> \{root_record_type}\{effect} {\n",
   )
   let repeat_budget = if has_repeated_fields {
     ", repeats_left: 1_000_000"
   } else {
     ""
   }
+  let input_state = if has_read_fields || has_stream_size {
+    "input, "
+  } else {
+    ""
+  }
   output.write_string(
-    "  let reader : \{root_type}Reader = { input, offset: 0\{repeat_budget} }\n",
+    "  let reader : \{root_type}Reader = { \{input_state}offset: 0\{repeat_budget} }\n",
   )
   output.write_string("  read_\{id}_root(reader, \"\{id}\")\n}\n")
   output.to_string()
@@ -116,26 +169,34 @@ fn emit_record_type(
   type_name : String,
   record : RecordDef,
   root_type : String,
-) -> Unit {
+) -> Unit raise SchemaError {
   output.write_string("///|\npub struct \{type_name} {\n")
   for field in record.fields {
-    let element_type = field_type(field.kind, root_type)
-    let type_name = if field.count is Some(_) {
-      "Array[\{element_type}]"
-    } else {
-      element_type
-    }
+    let type_name = field_result_type(field, root_type)
     output.write_string("  \{field.name} : \{type_name}\n")
+  }
+  if !record.instances.is_empty() {
+    output.write_string(
+      "  priv _ksy_reader : \{root_type}Reader\n  priv _ksy_path : String\n",
+    )
+    for instance in record.instances {
+      let type_name = instance_result_type(record, instance, root_type)
+      output.write_string(
+        "  priv mut _ksy_cache_\{instance.name} : \{type_name}?\n",
+      )
+      output.write_string("  priv mut _ksy_busy_\{instance.name} : Bool\n")
+    }
   }
   output.write_string("}\n\n")
 }
 
 ///|
-fn length_code(expression : LengthExpr) -> String {
+fn length_code(expression : LengthExpr, in_instance~ : Bool = false) -> String {
+  let prefix = if in_instance { "self." } else { "v_" }
   match expression {
     Constant(value) => "\{value}L"
-    EarlierField(name, 0L) => "v_\{name}.to_int64()"
-    EarlierField(name, subtract) => "v_\{name}.to_int64() - \{subtract}L"
+    EarlierField(name, 0L) => "\{prefix}\{name}.to_int64()"
+    EarlierField(name, subtract) => "\{prefix}\{name}.to_int64() - \{subtract}L"
   }
 }
 
@@ -148,7 +209,12 @@ fn endian_flag(endian : Endian) -> String {
 }
 
 ///|
-fn read_code(kind : FieldKind, id : String, path : String) -> String {
+fn read_code(
+  kind : FieldKind,
+  id : String,
+  path : String,
+  in_instance~ : Bool = false,
+) -> String {
   match kind {
     Unsigned(width, endian) =>
       "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
@@ -165,7 +231,8 @@ fn read_code(kind : FieldKind, id : String, path : String) -> String {
     }
     Float32(endian) =>
       "Float::reinterpret_from_uint(reader.read_bits(4, \{endian_flag(endian)}, \{path}))"
-    RawBytes(length) => "reader.take(\{length_code(length)}, \{path})"
+    RawBytes(length) =>
+      "reader.take(\{length_code(length, in_instance~)}, \{path})"
     Contents(bytes) => {
       let values = bytes
         .iter()
@@ -186,13 +253,26 @@ fn emit_record_reader(
   id : String,
   root_type : String,
 ) -> Unit {
+  let effect = if record.fields.is_empty() {
+    ""
+  } else {
+    " raise \{root_type}ParseError"
+  }
   output.write_string(
-    "///|\nfn \{reader_name}(reader : \{root_type}Reader, path : String) -> \{type_name} raise \{root_type}ParseError {\n",
+    "///|\nfn \{reader_name}(reader : \{root_type}Reader, path : String) -> \{type_name}\{effect} {\n",
   )
   for field in record.fields {
     let name = field.name
     let field_path = "path_\{name}"
     output.write_string("  let \{field_path} = path + \".\{name}\"\n")
+    if field.condition is Some(condition) {
+      let predicate = expression_code(
+        condition,
+        fn(name) { "v_\{name}.to_int64()" },
+        field_path,
+      )
+      output.write_string("  let v_\{name} = if \{predicate} {\n")
+    }
     match field.count {
       None => {
         output.write_string(
@@ -219,10 +299,20 @@ fn emit_record_reader(
         output.write_string("  }\n")
       }
     }
+    if field.condition is Some(_) {
+      output.write_string("    Some(v_\{name})\n  } else { None }\n")
+    }
   }
   output.write_string("  {\n")
   for field in record.fields {
     output.write_string("    \{field.name}: v_\{field.name},\n")
+  }
+  if !record.instances.is_empty() {
+    output.write_string("    _ksy_reader: reader,\n    _ksy_path: path,\n")
+    for instance in record.instances {
+      output.write_string("    _ksy_cache_\{instance.name}: None,\n")
+      output.write_string("    _ksy_busy_\{instance.name}: false,\n")
+    }
   }
   output.write_string("  }\n}\n\n")
 }

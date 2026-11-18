@@ -1,11 +1,11 @@
 ///|
-/// A schema could not be loaded or uses a construct outside the supported subset.
+/// A schema is invalid or requires a language feature awaiting implementation.
 pub suberror SchemaError {
   InvalidSchema(String)
 }
 
 ///|
-/// Checks a description against the supported subset without generating source.
+/// Checks a description against implemented language features without emitting source.
 pub fn validate(source : String) -> Unit raise SchemaError {
   ignore(load_schema(source))
 }
@@ -39,6 +39,7 @@ priv struct Field {
   kind : FieldKind
   count : LengthExpr?
   validation : ScalarCheck?
+  condition : Expr?
 }
 
 ///|
@@ -52,6 +53,7 @@ priv struct ScalarCheck {
 priv struct RecordDef {
   name : String
   fields : Array[Field]
+  instances : Array[Instance]
 }
 
 ///|
@@ -222,7 +224,7 @@ fn parse_length(
         None => (expression.to_owned(), 0L)
       }
       match earlier.get(name) {
-        Some({ kind: Unsigned(_, _), count: None, .. }) =>
+        Some({ kind: Unsigned(_, _), count: None, condition: None, .. }) =>
           EarlierField(name, subtract)
         _ =>
           invalid(
@@ -373,7 +375,7 @@ fn parse_field(
     field,
     [
       "id", "type", "size", "contents", "valid", "repeat", "repeat-expr", "doc",
-      "doc-ref",
+      "doc-ref", "if",
     ],
     path,
   )
@@ -419,7 +421,17 @@ fn parse_field(
       Some(parse_scalar_check(value, kind, path + ".valid"))
     }
   }
-  { name, kind, count, validation, }
+  let condition = parse_condition(
+    field.get("if"),
+    fn(name) raise SchemaError {
+      match earlier.get(name) {
+        Some(field) => field_expression_type(field, path + ".if")
+        None => invalid(path + ".if", "unknown or forward field '\{name}'")
+      }
+    },
+    path + ".if",
+  )
+  { name, kind, count, validation, condition, }
 }
 
 ///|
@@ -429,12 +441,10 @@ fn parse_record(
   endian : Endian?,
   type_names : Array[String],
   path : String,
+  instances : @yaml.Yaml?,
 ) -> RecordDef raise SchemaError {
   guard value is @yaml.Array(sequence) else {
     invalid(path, "expected a sequence")
-  }
-  guard !sequence.is_empty() else {
-    invalid(path, "expected at least one field")
   }
   let earlier : Map[String, Field] = Map([])
   let fields = []
@@ -443,7 +453,23 @@ fn parse_record(
     earlier[field.name] = field
     fields.push(field)
   }
-  { name, fields, }
+  let instance_path = if path == "seq" {
+    "instances"
+  } else {
+    path[:path.length() - 3].to_owned() + "instances"
+  }
+  let record : RecordDef = {
+    name,
+    fields,
+    instances: parse_instances(
+      instances, fields, endian, type_names, instance_path,
+    ),
+  }
+  check_instances(record, instance_path)
+  guard !fields.is_empty() || !record.instances.is_empty() else {
+    invalid(path, "expected at least one field or instance")
+  }
+  record
 }
 
 ///|
@@ -453,7 +479,13 @@ fn collect_records(
   active : Array[String],
   collected : Map[String, RecordDef],
 ) -> Unit raise SchemaError {
-  for field in record.fields {
+  let all_fields = record.fields.copy()
+  for instance in record.instances {
+    if instance.kind is Parsed(field, _) {
+      all_fields.push(field)
+    }
+  }
+  for field in all_fields {
     if field.kind is Nested(name) {
       guard !active.contains(name) else {
         invalid("types.\{name}", "recursive type reference")
@@ -478,7 +510,11 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     invalid("schema", "expected one YAML document")
   }
   let root = as_mapping(document, "schema")
-  check_keys(root, ["meta", "seq", "types", "doc", "doc-ref"], "schema")
+  check_keys(
+    root,
+    ["meta", "seq", "types", "instances", "doc", "doc-ref"],
+    "schema",
+  )
   let meta = as_mapping(get_required(root, "meta", "schema"), "meta")
   check_keys(
     meta,
@@ -509,21 +545,23 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     let path = "types.\{name}"
     check_identifier(name, path)
     let mapping = as_mapping(value, path)
-    check_keys(mapping, ["seq", "doc", "doc-ref"], path)
+    check_keys(mapping, ["seq", "instances", "doc", "doc-ref"], path)
     definitions[name] = parse_record(
       name,
-      get_required(mapping, "seq", path),
+      mapping.get("seq").unwrap_or(@yaml.Array([])),
       endian,
       names,
       path + ".seq",
+      mapping.get("instances"),
     )
   }
   let root_record = parse_record(
     id,
-    get_required(root, "seq", "schema"),
+    root.get("seq").unwrap_or(@yaml.Array([])),
     endian,
     names,
     "seq",
+    root.get("instances"),
   )
   let reachable : Map[String, RecordDef] = Map([])
   collect_records(root_record, definitions, [], reachable)

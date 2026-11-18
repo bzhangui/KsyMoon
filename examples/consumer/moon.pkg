@@ -7,6 +7,11 @@ import {
 pkgtype(kind: "executable")
 
 import {
+  "example/ksymoon-consumer/conditional_layout" @conditional,
+  "example/ksymoon-consumer/if_instances",
+  "example/ksymoon-consumer/if_values",
+  "example/ksymoon-consumer/instance_std_array",
+  "example/ksymoon-consumer/expr_int_div",
   "example/ksymoon-consumer/ivf",
   "example/ksymoon-consumer/wire",
 } for "wbtest"
