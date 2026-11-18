@@ -4,16 +4,16 @@
 
 KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语言与二进制读取语义，生成可独立使用的类型化解析器。v1.0 的交付范围覆盖语法、表达式、类型与流语义、运行时错误、依赖解析及标准处理器。编译器和运行时的核心逻辑由 MoonBit 承担。 [语言指南](https://doc.kaitai.io/user_guide.html) · [官方编译器 0.11](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
-2026-11-18 的初审反馈指出，v0.2.0 把条件字段和 instances 排除在交付目标之外，缺少完整兼容终点。本计划以标准能力和固定测试集作为验收依据，按阶段推进到完整目标。当前开发版为 `0.3.0-dev.1`，当前已发布版为 `0.2.0`。
+2026-11-18 的初审反馈指出，v0.2.0 把条件字段和 instances 排除在交付目标之外，缺少完整兼容终点。本计划以标准能力和固定测试集作为验收依据，按阶段推进到完整目标。当前开发版为 `0.3.0-dev.2`，当前已发布版为 `0.2.0`。
 
 ## 固定基线
 
 - 语义基线采用官方编译器 0.11 和 Python `kaitaistruct==0.11`。与 MoonBit 的 JS、Wasm、Wasm-GC、Native 四个目标逐字段比较正常结果、条件缺省值和惰性行为。
 - 官方测试库固定在 `4108136c807f8df88df843de6571f1a7bf29c74e`，其 `formats/` 下共有 339 份描述。每次 CI 盘点全部文件，包括依赖其他文件、需要更多语义、故意验证失败等用例。 [测试库快照](https://github.com/kaitai-io/kaitai_struct_tests/tree/4108136c807f8df88df843de6571f1a7bf29c74e)
-- 测试归档 SHA-256 固定为 `3a78e2ffb3938c18b5c1d2f06f3bc8567bc72e054a8e68f0ddacbfa1406937fe`。四份直接复用的测试描述另有逐文件哈希和原 MIT 许可证。 [输入清单](../fixtures/kaitai/manifest.json) · [许可证](../fixtures/kaitai/LICENSE)
+- 测试归档 SHA-256 固定为 `3a78e2ffb3938c18b5c1d2f06f3bc8567bc72e054a8e68f0ddacbfa1406937fe`。35 份直接复用的测试描述、新增 31 组二进制样本及 Python 测试说明另有逐文件哈希和原 MIT 许可证。 [输入清单](../fixtures/kaitai/manifest.json) · [许可证](../fixtures/kaitai/LICENSE)
 - 已生成的解析器必须在独立模块通过四后端的检查和构建。二进制运行与参考对照另行统计，所有未完成项保留诊断。
 
-## 当前里程碑 P1
+## 已完成 P1
 
 已实现并纳入正式复现流程的内容如下。
 
@@ -23,7 +23,23 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 4. **表达式基础**。支持有符号 64 位整数与布尔字面量、字段或实例引用、括号、算术、比较、逻辑短路、位运算、条件表达式，以及 `_io.pos` / `_io.size`。整数除法与取模遵循 Kaitai 的 floor 规则。溢出、除零和非法移位提供可诊断错误。
 5. **兼容回归**。四份原样上游描述覆盖条件实例、条件值实例、定位数组实例和负数整除。自定义布局另外覆盖条件数组、惰性读取、缓存、游标、重试、资源预算、短路、溢出和实例环。
 
-当前字段引用表达式覆盖 32 位以内整数，`size` 和 `repeat-expr` 沿用原有长度表达式。表达式对条件值的访问、对象导航和更宽类型的推导将在 P2、P3 完成。完整解析实例所需的 `io`、有界子流和跨类型导航也列入后续门禁。
+当前字段引用表达式覆盖 32 位以内整数，`size` 和 `repeat-expr` 沿用原有长度表达式。表达式对条件值的访问、对象导航和更宽类型的推导将在 P2、P3 完成。有界子流已在本轮 P2 落实，跨流 `io` 与跨类型导航继续列入后续门禁。
+
+## 本轮 P2 实现与证据
+
+开发版 `0.3.0-dev.2` 的实现提交为 [`3fce6b2`](https://github.com/bzhangui/KsyMoon/commit/3fce6b2102ef14bebbd4dc00bc11ab25b8c417bc)。[同提交 CI](https://github.com/bzhangui/KsyMoon/actions/runs/44277616395) 已通过，固定 MoonBit `v0.10.19+97801ee1b`。公开数据保留该实现提交的结果。 [完整 339 份报告](reports/kaitai-0.11-p2.json)
+
+| 能力 | 已实现语义与运行证据 |
+| --- | --- |
+| 有界子流 | 用户类型的 `size` / `size-eos` / 终止符产生独立流，父流消费边界，子流位置从 0 开始，实例保留原子流。验证相对定位、成功游标恢复、重复失败重试、子流越界和截断。 |
+| 重复 | 支持 `expr/eos/until`。EOS 在当前流结束，Until 读取后判断并保留终止元素，支持 `_`、`_.整数成员`、`_index` 与流状态。零字节 Until 可以按索引正常终止，EOS 无进展提供诊断，所有子流共享重复项预算。 |
+| 类型分支 | 整数、字符串和布尔标签，分支为已支持的数值或本地用户类型，输出带载荷枚举。验证默认分支、无界未知分支不读取、有界未知分支保留原始字节及零长度边界。嵌套 `types` 按作用域解析。 |
+| 字符串与字节选项 | `str/strz` 的 ASCII、UTF-8、UTF-16LE/BE，字段或 `meta` 默认编码，`size-eos`、`terminator`、`pad-right`、`include`、`consume`、`eos-error`，双字节终止符对齐及严格解码。与官方对齐同字节填充和终止符时的 `include` 行为。 |
+| 输入原样性 | 新增 31 组上游 `.ksy`、二进制、Python 测试说明保持原字节。MoonBit 加载层通过 YAML 事件保留数字映射键。输入、样本、断言文件和编译器归档均验证 SHA-256。 |
+
+本轮四后端每个目标通过 **19 项生成器测试和 121 项消费测试**，后者包含 **75 个官方解析器对照测试**。35 份上游描述有运行对照，其中新增 31 份同时执行上游 Python 原始测试。948 个新增上游真前缀中，883 个被拒绝、65 个被接受，与官方判定一致。原有 UDP、STL、STM32、IVF 持续通过。Windows 从公开提交重新克隆，默认一键命令的四后端各通过 19 + 111 项测试；`--kaitai-reference` 额外重算并执行 10 项原有对照，同时核对已存的 65 项 P2 期望值。
+
+**已知边界。** 定位实例读取失败后，KsyMoon 恢复游标及该次预留预算，官方 Python 0.11 保留失败位置。该行为差异单独记录，正常结果和成功定位的恢复已对照。当前仍使用 1,000,000 项资源预算、32 位以内数值字段引用和受限长度表达式，跨流 `instances.io`、字节数组表达式、完整对象导航及其他编码尚待实现。本轮覆盖了上表能力，P2 的全部门禁尚未关闭。
 
 ## 后续阶段及完成条件
 
@@ -50,9 +66,9 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 ```powershell
 python -m pip install kaitaistruct==0.11
 node scripts/verify.mjs --kaitai-reference
-python scripts/compatibility-report.py
+python scripts/compatibility-report.py --runtime-report
 ```
 
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。第二条脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
 
-`generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。当前盘点为 25 份生成、314 份待支持。四份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P2—P5 建立。
+`generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。当前盘点为 **99 份生成、240 份待支持**，全部 339 份都保留结果。35 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P2—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
