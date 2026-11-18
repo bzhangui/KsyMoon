@@ -20,6 +20,24 @@ priv enum Endian {
 priv enum LengthExpr {
   Constant(Int64)
   EarlierField(String, Int64)
+  Remaining
+}
+
+///|
+priv enum Repetition {
+  Times(LengthExpr)
+  ToEnd
+  Until(Expr)
+}
+
+///|
+priv struct ByteOptions {
+  length : LengthExpr?
+  terminator : Byte?
+  padding : Byte?
+  keep_terminator : Bool
+  consume : Bool
+  eos_error : Bool
 }
 
 ///|
@@ -28,16 +46,19 @@ priv enum FieldKind {
   Unsigned64(Endian)
   Signed(Byte, Endian)
   Float32(Endian)
-  RawBytes(LengthExpr)
   Contents(Bytes)
   Nested(String)
+  ByteField(ByteOptions)
+  Text(ByteOptions, String)
+  Bounded(FieldKind, ByteOptions)
+  Switch(String, Expr, Array[(Expr, FieldKind)], FieldKind?)
 }
 
 ///|
 priv struct Field {
   name : String
   kind : FieldKind
-  count : LengthExpr?
+  count : Repetition?
   validation : ScalarCheck?
   condition : Expr?
 }
@@ -375,7 +396,8 @@ fn parse_field(
     field,
     [
       "id", "type", "size", "contents", "valid", "repeat", "repeat-expr", "doc",
-      "doc-ref", "if",
+      "doc-ref", "if", "repeat-until", "size-eos", "encoding", "terminator", "pad-right",
+      "include", "consume", "eos-error",
     ],
     path,
   )
@@ -387,29 +409,41 @@ fn parse_field(
   guard !earlier.contains(name) else {
     invalid(path + ".id", "duplicate field '\{name}'")
   }
-  let kind = match
-    (field.get("type"), field.get("size"), field.get("contents")) {
-    (Some(type_name), None, None) =>
-      parse_kind(
-        as_string(type_name, path + ".type"),
-        endian,
-        type_names,
-        path + ".type",
+  let kind = parse_field_kind(field, earlier, endian, type_names, path)
+  let count = match
+    (field.get("repeat"), field.get("repeat-expr"), field.get("repeat-until")) {
+    (None, None, None) => None
+    (Some(@yaml.String("expr")), Some(count), None) =>
+      Some(Times(parse_length(count, earlier, path + ".repeat-expr")))
+    (Some(@yaml.String("eos")), None, None) => Some(ToEnd)
+    (Some(@yaml.String("until")), None, Some(value)) => {
+      let expression = parse_expression(value, path + ".repeat-until")
+      // Member references are resolved against the complete type graph below.
+      require_expression_type(
+        expression,
+        Boolean,
+        fn(name) raise SchemaError {
+          if name == "_index" || name.has_prefix("_.") {
+            Integer
+          } else if name == "_" {
+            kind_expression_type(kind, path + ".repeat-until")
+          } else {
+            match earlier.get(name) {
+              Some(field) =>
+                field_expression_type(field, path + ".repeat-until")
+              None =>
+                invalid(path + ".repeat-until", "unknown field '" + name + "'")
+            }
+          }
+        },
+        path + ".repeat-until",
       )
-    (None, Some(size), None) =>
-      RawBytes(parse_length(size, earlier, path + ".size"))
-    (None, None, Some(contents)) =>
-      Contents(parse_contents(contents, path + ".contents"))
-    _ => invalid(path, "expected exactly one of 'type', 'size' or 'contents'")
-  }
-  let count = match (field.get("repeat"), field.get("repeat-expr")) {
-    (None, None) => None
-    (Some(@yaml.String("expr")), Some(count)) =>
-      Some(parse_length(count, earlier, path + ".repeat-expr"))
+      Some(Until(expression))
+    }
     _ =>
       invalid(
         path + ".repeat",
-        "only repeat: expr with repeat-expr is supported",
+        "expected expr/repeat-expr, eos, or until/repeat-until",
       )
   }
   let validation = match field.get("valid") {
@@ -486,7 +520,7 @@ fn collect_records(
     }
   }
   for field in all_fields {
-    if field.kind is Nested(name) {
+    for name in kind_references(field.kind) {
       guard !active.contains(name) else {
         invalid("types.\{name}", "recursive type reference")
       }
@@ -503,9 +537,7 @@ fn collect_records(
 
 ///|
 fn load_schema(source : String) -> Schema raise SchemaError {
-  let documents = @yaml.Yaml::load_from_string(source[:]) catch {
-    @yaml.YamlError(mark~, info~) => invalid("YAML line \{mark.line + 1}", info)
-  }
+  let documents = load_ksy_yaml(source)
   guard documents is [document] else {
     invalid("schema", "expected one YAML document")
   }
@@ -520,7 +552,7 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     meta,
     [
       "id", "endian", "title", "application", "file-extension", "xref", "license",
-      "tags", "ks-version",
+      "tags", "ks-version", "encoding",
     ],
     "meta",
   )
@@ -532,6 +564,10 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     Some(@yaml.String("be")) => Some(Big)
     _ => invalid("meta.endian", "expected 'le' or 'be'")
   }
+  let root = inherit_encoding(
+    flatten_types(root, "", Map([]), Map([])),
+    meta.get("encoding"),
+  )
   let types = match root.get("types") {
     Some(value) => as_mapping(value, "types")
     None => Map([])
@@ -563,6 +599,9 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     "seq",
     root.get("instances"),
   )
+  for record in [root_record, ..definitions.values().collect()] {
+    check_repeat_members(record, definitions)
+  }
   let reachable : Map[String, RecordDef] = Map([])
   collect_records(root_record, definitions, [], reachable)
   { root: root_record, records: reachable.values().collect(), }

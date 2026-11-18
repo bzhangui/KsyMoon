@@ -19,7 +19,7 @@ pub suberror Stm32SampleFrameParseError {
 priv struct Stm32SampleFrameReader {
   input : Bytes
   mut offset : Int
-  mut repeats_left : Int
+  budget : Array[Int]
 }
 
 ///|
@@ -65,11 +65,11 @@ fn Stm32SampleFrameReader::reserve_repeats(
   guard count >= 0L else {
     raise Stm32SampleFrameInvalidLength(field~, offset=self.offset, length=count)
   }
-  guard count <= self.repeats_left.to_int64() else {
+  guard count <= self.budget[0].to_int64() else {
     raise Stm32SampleFrameRepeatLimit(field~, offset=self.offset, count~)
   }
   let count = count.to_int()
-  self.repeats_left -= count
+  self.budget[0] -= count
   count
 }
 
@@ -82,11 +82,12 @@ fn read_stm32_sample_frame_root(reader : Stm32SampleFrameReader, path : String) 
   let path_sample_count = path + ".sample_count"
   let v_sample_count = reader.read_bits(1, false, path_sample_count)
   let path_samples = path + ".samples"
-  let count_samples = reader.reserve_repeats(v_sample_count.to_int64(), path_samples)
+  let count_v_samples = reader.reserve_repeats(v_sample_count.to_int64(), path_samples)
   let v_samples = []
-  for index in 0..<count_samples {
+  for index in 0..<count_v_samples {
     let item_path = path_samples + "[" + index.to_string() + "]"
-    v_samples.push(reader.read_bits(2, true, item_path))
+    let item = reader.read_bits(2, true, item_path)
+    v_samples.push(item)
   }
   {
     sequence: v_sequence,
@@ -98,6 +99,6 @@ fn read_stm32_sample_frame_root(reader : Stm32SampleFrameReader, path : String) 
 
 ///|
 pub fn parse_stm32_sample_frame(input : Bytes) -> Stm32SampleFrameRecord raise Stm32SampleFrameParseError {
-  let reader : Stm32SampleFrameReader = { input, offset: 0, repeats_left: 1_000_000 }
+  let reader : Stm32SampleFrameReader = { input, offset: 0, budget: [1_000_000] }
   read_stm32_sample_frame_root(reader, "stm32_sample_frame")
 }

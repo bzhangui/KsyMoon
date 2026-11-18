@@ -43,7 +43,7 @@ jobs:
             exit 1
           fi
           node scripts/verify.mjs --kaitai-reference
-          python scripts/compatibility-report.py
+          python scripts/compatibility-report.py --runtime-report
       - name: Upload complete compatibility inventory
         uses: actions/upload-artifact@v4
         with:

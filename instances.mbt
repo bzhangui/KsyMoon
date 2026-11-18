@@ -58,7 +58,8 @@ fn parse_instances(
       properties,
       [
         "value", "pos", "if", "type", "size", "contents", "valid", "repeat", "repeat-expr",
-        "doc", "doc-ref",
+        "doc", "doc-ref", "repeat-until", "size-eos", "encoding", "terminator", "pad-right",
+        "include", "consume", "eos-error",
       ],
       path,
     )

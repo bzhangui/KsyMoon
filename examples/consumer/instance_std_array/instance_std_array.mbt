@@ -24,7 +24,7 @@ pub suberror InstanceStdArrayParseError {
 priv struct InstanceStdArrayReader {
   input : Bytes
   mut offset : Int
-  mut repeats_left : Int
+  budget : Array[Int]
 }
 
 ///|
@@ -78,11 +78,11 @@ fn InstanceStdArrayReader::reserve_repeats(
   guard count >= 0L else {
     raise InstanceStdArrayInvalidLength(field~, offset=self.offset, length=count)
   }
-  guard count <= self.repeats_left.to_int64() else {
+  guard count <= self.budget[0].to_int64() else {
     raise InstanceStdArrayRepeatLimit(field~, offset=self.offset, count~)
   }
   let count = count.to_int()
-  self.repeats_left -= count
+  self.budget[0] -= count
   count
 }
 
@@ -115,16 +115,17 @@ pub fn InstanceStdArrayRecord::entries(self : InstanceStdArrayRecord) -> Array[B
   defer { self._ksy_busy_entries = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     reader.seek(self.ofs.to_int64(), field)
-    let count = reader.reserve_repeats(self.qty_entries.to_int64(), field)
-    let result = []
-    for index in 0..<count {
-      let item_path = field + "[" + index.to_string() + "]"
-      result.push(reader.take(self.entry_size.to_int64(), item_path))
-    }
+  let count_result = reader.reserve_repeats(self.qty_entries.to_int64(), field)
+  let result = []
+  for index in 0..<count_result {
+    let item_path = field + "[" + index.to_string() + "]"
+    let item = reader.take(self.entry_size.to_int64(), item_path)
+    result.push(item)
+  }
     result
   }
   self._ksy_cache_entries = Some(value)
@@ -133,6 +134,6 @@ pub fn InstanceStdArrayRecord::entries(self : InstanceStdArrayRecord) -> Array[B
 
 ///|
 pub fn parse_instance_std_array(input : Bytes) -> InstanceStdArrayRecord raise InstanceStdArrayParseError {
-  let reader : InstanceStdArrayReader = { input, offset: 0, repeats_left: 1_000_000 }
+  let reader : InstanceStdArrayReader = { input, offset: 0, budget: [1_000_000] }
   read_instance_std_array_root(reader, "instance_std_array")
 }

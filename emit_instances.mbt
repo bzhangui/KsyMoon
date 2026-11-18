@@ -29,10 +29,10 @@ fn instance_result_type(
         },
         instance.name,
       )
-      if kind == Integer {
-        "Int64"
-      } else {
-        "Bool"
+      match kind {
+        Integer => "Int64"
+        Boolean => "Bool"
+        Text => "String"
       }
     }
   }
@@ -47,7 +47,7 @@ fn instance_result_type(
 fn instance_reference(record : RecordDef, name : String) -> String {
   for field in record.fields {
     if field.name == name {
-      return "self.\{name}.to_int64()"
+      return record_reference(record, name, true)
     }
   }
   let instance = record.instances
@@ -56,6 +56,7 @@ fn instance_reference(record : RecordDef, name : String) -> String {
     .unwrap()
   match instance.kind {
     Value(_) => "self.\{name}()"
+    Parsed({ kind: Text(_, _), .. }, _) => "self.\{name}()"
     Parsed(_, _) => "self.\{name}().to_int64()"
   }
 }
@@ -98,7 +99,7 @@ fn emit_instances(
     }
     if has_repeated_fields && instance.kind is Parsed(_, _) {
       output.write_string(
-        "  let saved_repeats = reader.repeats_left\n  errdefer { reader.repeats_left = saved_repeats }\n",
+        "  let saved_repeats = reader.budget[0]\n  errdefer { reader.budget[0] = saved_repeats }\n",
       )
     }
     output.write_string("  let value = {\n")
@@ -119,32 +120,7 @@ fn emit_instances(
             "    reader.seek(\{expression_code(position, reference, "field")}, field)\n",
           )
         }
-        match field.count {
-          None => {
-            output.write_string(
-              "    let result = \{read_code(field.kind, id, "field", in_instance=true)}\n",
-            )
-            if field.validation is Some(check) {
-              output.write_string(
-                "    reader.check_scalar(result.to_int64(), \{check.width.to_int()}, \{check.minimum}L, \{check.maximum}L, field)\n",
-              )
-            }
-          }
-          Some(count) => {
-            output.write_string(
-              "    let count = reader.reserve_repeats(\{length_code(count, in_instance=true)}, field)\n",
-            )
-            output.write_string(
-              "    let result = []\n    for index in 0..<count {\n",
-            )
-            output.write_string(
-              "      let item_path = field + \"[\" + index.to_string() + \"]\"\n",
-            )
-            output.write_string(
-              "      result.push(\{read_code(field.kind, id, "item_path", in_instance=true)})\n    }\n",
-            )
-          }
-        }
+        emit_field_read(output, field, "result", id, "field", reference, true)
       }
     }
     output.write_string(

@@ -27,7 +27,7 @@ pub suberror IfValuesParseError {
 priv struct IfValuesReader {
   input : Bytes
   mut offset : Int
-  mut repeats_left : Int
+  budget : Array[Int]
 }
 
 ///|
@@ -110,11 +110,11 @@ fn IfValuesReader::reserve_repeats(
   guard count >= 0L else {
     raise IfValuesInvalidLength(field~, offset=self.offset, length=count)
   }
-  guard count <= self.repeats_left.to_int64() else {
+  guard count <= self.budget[0].to_int64() else {
     raise IfValuesRepeatLimit(field~, offset=self.offset, count~)
   }
   let count = count.to_int()
-  self.repeats_left -= count
+  self.budget[0] -= count
   count
 }
 
@@ -134,11 +134,12 @@ fn read_if_values_type_code(reader : IfValuesReader, path : String) -> IfValues_
 ///|
 fn read_if_values_root(reader : IfValuesReader, path : String) -> IfValuesRecord raise IfValuesParseError {
   let path_codes = path + ".codes"
-  let count_codes = reader.reserve_repeats(3L, path_codes)
+  let count_v_codes = reader.reserve_repeats(3L, path_codes)
   let v_codes = []
-  for index in 0..<count_codes {
+  for index in 0..<count_v_codes {
     let item_path = path_codes + "[" + index.to_string() + "]"
-    v_codes.push(read_if_values_type_code(reader, item_path))
+    let item = read_if_values_type_code(reader, item_path)
+    v_codes.push(item)
   }
   {
     codes: v_codes,
@@ -165,6 +166,6 @@ pub fn IfValues_code::half_opcode(self : IfValues_code) -> Option[Int64] raise I
 
 ///|
 pub fn parse_if_values(input : Bytes) -> IfValuesRecord raise IfValuesParseError {
-  let reader : IfValuesReader = { input, offset: 0, repeats_left: 1_000_000 }
+  let reader : IfValuesReader = { input, offset: 0, budget: [1_000_000] }
   read_if_values_root(reader, "if_values")
 }

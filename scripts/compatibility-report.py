@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import sys
 import time
 from urllib.request import urlopen
 import zipfile
@@ -96,10 +97,18 @@ def main():
         "total": len(rows),
         "counts": counts,
         "generated_sources_compile_and_build": True,
-        "runtime_oracle_schemas": ["if_instances.ksy", "if_values.ksy", "instance_std_array.ksy", "expr_int_div.ksy"],
+        "runtime_oracle_schemas": [],
         "meaning": "generated means source emitted and independently checked/built on four targets; runtime conformance is measured separately",
         "schemas": rows,
     }
+    if "--runtime-report" in sys.argv:
+        runtime_path = ROOT / "_build/kaitai-runtime-report.json"
+        runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+        if (runtime["source_commit"] != report["source_commit"] or not runtime["official_reference_rerun"]
+                or runtime["tracked_worktree_dirty"] != report["tracked_worktree_dirty"]):
+            raise ValueError("Runtime evidence does not match the current source/reference run")
+        report["runtime_oracle_schemas"] = runtime["upstream_schemas"]
+        report["runtime_verification"] = runtime
     output = ROOT / "_build/compatibility-report.json"
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Full corpus inventory: {len(rows)} schemas, {counts.get('generated', 0)} generated, "

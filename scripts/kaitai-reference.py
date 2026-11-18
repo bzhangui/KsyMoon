@@ -3,8 +3,10 @@
 import hashlib
 import importlib
 import importlib.metadata
+import kaitaistruct
 import io
 import json
+import shutil
 from pathlib import Path
 import struct
 import subprocess
@@ -39,7 +41,7 @@ def compile_references():
     manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
     schemas = {
         name: ROOT / "fixtures" / f"{name}.ksy"
-        for name in ("udp_datagram", "stl", "conditional_layout")
+        for name in ("udp_datagram", "stl", "conditional_layout", "stream_control", "repeat_zero_progress")
     }
     schemas.update({entry["schema"]: ROOT / "fixtures" / entry["source"] for entry in manifest["fixtures"]})
     subprocess.run(
@@ -48,6 +50,23 @@ def compile_references():
          *(str(path) for path in schemas.values())],
         check=True,
     )
+    # Execute the unmodified upstream Python specifications against the official target.
+    spec_dir = work / "spec"
+    spec_dir.mkdir()
+    (work / "src").mkdir()
+    (work / "testformats").mkdir()
+    for generated in work.glob("*.py"):
+        shutil.copyfile(generated, work / "testformats" / generated.name)
+    for entry in manifest["fixtures"]:
+        if "sample" not in entry:
+            continue
+        for key in ("sample", "spec"):
+            source = ROOT / "fixtures" / entry[key]
+            if hashlib.sha256(source.read_bytes()).hexdigest() != entry[key + "_sha256"]:
+                raise ValueError(f"Upstream {key} changed: {source}")
+        shutil.copyfile(ROOT / "fixtures" / entry["sample"], work / "src" / Path(entry["sample"]).name)
+        shutil.copyfile(ROOT / "fixtures" / entry["spec"], spec_dir / Path(entry["spec"]).name)
+    subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "spec"], cwd=work, check=True)
     sys.path.insert(0, str(work))
     return {name: getattr(importlib.import_module(name), "".join(part.title() for part in name.split("_")))
             for name in schemas}
@@ -158,6 +177,113 @@ def compatibility_tests(references):
         ])
 
 
+def stream_tests(references):
+    manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
+    for entry in manifest["fixtures"]:
+        if "sample" not in entry:
+            continue
+        name = entry["schema"]
+        data = (ROOT / "fixtures" / entry["sample"]).read_bytes()
+        frame = references[name].from_bytes(data)
+        checks = []
+        counter = 0
+
+        def visit(value, path, owner=None, field=None):
+            nonlocal counter
+            if field == "body" and name.startswith("switch_"):
+                variant = None
+                if isinstance(value, bytes):
+                    variant = "Raw"
+                elif value is None:
+                    checks.append(f"  assert_true({path} is Unknown)")
+                    return
+                elif isinstance(value, int):
+                    variant = f"Case{[1, 2, 4, 8].index(owner.code)}"
+                else:
+                    cls = type(value).__name__
+                    if cls in ("Intval", "ChunkMeta"):
+                        variant = "Case0"
+                    elif cls in ("Strval", "ChunkDir"):
+                        variant = "Case1"
+                    else:
+                        variant = "Default"
+                variable = f"branch_{counter}"
+                counter += 1
+                checks.append(f'  guard {path} is {variant}({variable}) else {{ fail("wrong switch case at {path}") }}')
+                path = variable
+            if isinstance(value, list):
+                checks.append(f"  assert_eq({path}.length(), {len(value)})")
+                for index, item in enumerate(value):
+                    visit(item, f"{path}[{index}]")
+            elif isinstance(value, bytes):
+                checks.append(f"  assert_eq({path}.to_owned(), {bytes_literal(value)})")
+            elif isinstance(value, str):
+                checks.append(f"  assert_eq({path}, {json.dumps(value, ensure_ascii=False)})")
+            elif isinstance(value, int):
+                # Compare through Int64 for all <=32-bit signed/unsigned scalars.
+                if name == "switch_integers" and field == "body" and owner.code == 8:
+                    checks.append(f"  assert_eq({path}, {value}UL)")
+                else:
+                    checks.append(f"  assert_eq({path}.to_int64(), {value}L)")
+            else:
+                for key, item in vars(value).items():
+                    if not key.startswith("_"):
+                        visit(item, f"{path}.{key}", value, key)
+        visit(frame, "frame")
+        yield "\n".join(["///|", f'test "Kaitai reference upstream {name}" {{',
+                         f"  let frame = @{name}.parse_{name}({bytes_literal(data)})", *checks, "}"])
+
+        prefix_checks = []
+        for cut in range(len(data)):
+            partial = data[:cut]
+            try:
+                references[name].from_bytes(partial)
+            except (EOFError, UnicodeError, kaitaistruct.KaitaiStructError):
+                prefix_checks.extend([
+                    f"  try @{name}.parse_{name}({bytes_literal(partial)}) catch {{",
+                    "    _ => ()",
+                    f'  }} noraise {{ _ => fail("accepted {name} prefix {cut}") }}',
+                ])
+            else:
+                prefix_checks.append(f"  ignore(@{name}.parse_{name}({bytes_literal(partial)}))")
+        yield "\n".join(["///|", f'test "Kaitai reference prefix outcomes {name}" {{', *prefix_checks, "}"])
+
+    # Positions inside bounded streams and laziness are additional custom regressions.
+    for tag, body in ((1, b"\x78\x56\x34\x12"), (2, b"Hi\0!"), (99, b"RAW!")):
+        data = b"\xaa\x10\x20\x30\x40\x55" + bytes([tag]) + body + b"A\0B\0one\0two\0"
+        frame = references["stream_control"].from_bytes(data)
+        assert frame.block._io.pos() == 1
+        assert frame.block.at_zero == 16 and frame.block.at_end == 64
+        assert frame.block._io.pos() == 1
+        for _ in range(2):
+            try:
+                frame.block.outside
+            except EOFError:
+                pass
+            else:
+                raise AssertionError("official parser escaped a bounded stream")
+            # Python 0.11 leaves a failed positioned getter at its failing cursor.
+            # KsyMoon deliberately restores it for safe retry (covered separately).
+            assert frame.block._io.pos() == 4
+            frame.block._io.seek(1)
+        checks = ["  assert_eq(frame.block.at_zero(), 16U)", "  assert_eq(frame.block.at_end(), 64U)",
+                  "  assert_eq(frame.block.cursor(), 1L)", "  assert_eq(frame.block.stream_size(), 4L)",
+                  f"  assert_eq(frame.tail, {frame.tail}U)", f"  assert_eq(frame.unicode, {json.dumps(frame.unicode)})",
+                  f"  assert_eq(frame.lines, {json.dumps(frame.lines)})",
+                  f"  assert_eq(frame.empty_steps.length(), {len(frame.empty_steps)})"]
+        if tag == 1:
+            checks += ['  guard frame.choice is Case0(word) else { fail("word switch") }',
+                       f"  assert_eq(word.value, {frame.choice.value}U)"]
+        elif tag == 2:
+            checks += ['  guard frame.choice is Case1(message) else { fail("string switch") }',
+                       f"  assert_eq(message.value, {json.dumps(frame.choice.value)})"]
+        else:
+            checks += ['  guard frame.choice is Raw(raw) else { fail("raw switch") }',
+                       f"  assert_eq(raw.to_owned(), {bytes_literal(frame.choice)})"]
+        yield "\n".join(["///|", f'test "Kaitai reference bounded stream tag {tag}" {{',
+                         f"  let frame = @stream_control.parse_stream_control({bytes_literal(data)})", *checks, "}"])
+
+
 def main():
     consumer = Path(sys.argv[1])
     if importlib.metadata.version("kaitaistruct") != VERSION:
@@ -176,9 +302,29 @@ def main():
     ]
     semantic_tests = list(compatibility_tests(references))
     tests.extend(semantic_tests)
+    stream_comparisons = list(stream_tests(references))
+    stream_output = ("// Expected values and prefix outcomes from official Kaitai Struct 0.11.\n"
+                     "// Inputs, binary samples and Python specifications are pinned in fixtures/kaitai/manifest.json.\n"
+                     "// Refresh: python scripts/kaitai-reference.py examples/consumer --refresh-stream-golden\n\n"
+                     + "\n\n".join(stream_comparisons) + "\n")
+    golden = ROOT / "examples/consumer/stream_reference_wbtest.mbt"
+    if "--refresh-stream-golden" in sys.argv:
+        golden.write_text(stream_output, encoding="utf-8")
+    elif golden.read_text(encoding="utf-8") != stream_output:
+        raise ValueError("P2 reference assertions differ from the checked-in official oracle output")
+    (consumer / "stream_reference_wbtest.mbt").write_text(stream_output, encoding="utf-8")
     (consumer / "kaitai_reference_wbtest.mbt").write_text("\n\n".join(tests) + "\n", encoding="utf-8")
-    print(f"Kaitai reference {VERSION}: generated {len(tests)} comparisons "
-          f"(4 UDP/STL + {len(semantic_tests)} conditional/instance checks)", flush=True)
+    manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
+    (consumer / "oracle-cases.json").write_text(json.dumps({
+        "compiler_version": VERSION,
+        "upstream_schemas": [entry["schema"] + ".ksy" for entry in manifest["fixtures"]],
+        "upstream_specs": sum("spec" in entry for entry in manifest["fixtures"]),
+        "upstream_proper_prefixes": sum(len((ROOT / "fixtures" / entry["sample"]).read_bytes()) for entry in manifest["fixtures"] if "sample" in entry),
+        "prefixes_rejected": stream_output.count('} noraise { _ => fail("accepted '),
+        "comparison_tests": len(tests) + len(stream_comparisons),
+    }, indent=2) + "\n", encoding="utf-8")
+    print(f"Kaitai reference {VERSION}: verified {len(tests) + len(stream_comparisons)} comparisons "
+          f"(4 UDP/STL + {len(semantic_tests)} conditional/instance + {len(stream_comparisons)} P2 stream/control checks)", flush=True)
 
 
 if __name__ == "__main__":

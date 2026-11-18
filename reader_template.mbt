@@ -2,6 +2,10 @@
 fn emit_reader(
   output : StringBuilder,
   root_type : String,
+  has_bounded~ : Bool,
+  has_byte_options~ : Bool,
+  has_strings~ : Bool,
+  has_open_repeats~ : Bool,
   has_numeric_fields~ : Bool,
   has_uint64~ : Bool,
   has_repeated_fields~ : Bool,
@@ -24,7 +28,12 @@ fn emit_reader(
     ""
   }
   let repeat_error = if has_repeated_fields {
-    "  __ROOT__RepeatLimit(field~ : String, offset~ : Int, count~ : Int64)\n"
+    "  __ROOT__RepeatLimit(field~ : String, offset~ : Int, count~ : Int64)\n" +
+    (if has_open_repeats {
+      "  __ROOT__NoProgress(field~ : String, offset~ : Int)\n"
+    } else {
+      ""
+    })
   } else {
     ""
   }
@@ -44,7 +53,7 @@ fn emit_reader(
     ""
   }
   let repeat_state = if has_repeated_fields {
-    "  mut repeats_left : Int\n"
+    "  budget : Array[Int]\n"
   } else {
     ""
   }
@@ -79,6 +88,20 @@ fn emit_reader(
     #|  self.input[start:self.offset]
     #|}
     #|
+  let header = header.replace_all(
+    old="__ARITHMETIC_ERROR__",
+    new=(arithmetic_error +
+      (if has_byte_options {
+        "  __ROOT__MissingTerminator(field~ : String, offset~ : Int)\n"
+      } else {
+        ""
+      }) +
+      (if has_strings {
+        "  __ROOT__InvalidEncoding(field~ : String, offset~ : Int, encoding~ : String)\n"
+      } else {
+        ""
+      }))[:],
+  )
   let header = if has_read_fields {
     header
   } else {
@@ -112,6 +135,9 @@ fn emit_reader(
     .replace_all(old="__ARITHMETIC_ERROR__", new=arithmetic_error[:])
     .replace_all(old="__REPEAT_STATE__", new=repeat_state[:])
   write_reader_block(output, header, root_type)
+  emit_stream_reader(
+    output, root_type, has_bounded, has_byte_options, has_strings, has_repeated_fields,
+  )
   if has_positions {
     let seek =
       #|///|
@@ -152,11 +178,11 @@ fn emit_reader(
       #|  guard count >= 0L else {
       #|    raise __ROOT__InvalidLength(field~, offset=self.offset, length=count)
       #|  }
-      #|  guard count <= self.repeats_left.to_int64() else {
+      #|  guard count <= self.budget[0].to_int64() else {
       #|    raise __ROOT__RepeatLimit(field~, offset=self.offset, count~)
       #|  }
       #|  let count = count.to_int()
-      #|  self.repeats_left -= count
+      #|  self.budget[0] -= count
       #|  count
       #|}
       #|

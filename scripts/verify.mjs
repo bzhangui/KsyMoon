@@ -23,6 +23,8 @@ const fixtures = [
   { schema: "stm32_sample_frame", package: "stm32" },
   { schema: "wire_checks", package: "wire" },
   { schema: "conditional_layout", package: "conditional_layout" },
+  { schema: "stream_control", package: "stream_control" },
+  { schema: "repeat_zero_progress", package: "repeat_zero_progress" },
   {
     schema: "vp8_duck_ivf",
     package: "ivf",
@@ -92,6 +94,8 @@ for (const name of [
   "prefix_wbtest.mbt",
   "ivf_wbtest.mbt",
   "conditional_wbtest.mbt",
+  "stream_wbtest.mbt",
+  "stream_reference_wbtest.mbt",
 ]) {
   copyFileSync(join(consumer, name), join(independent, name));
 }
@@ -102,6 +106,9 @@ for (const fixture of fixtures) {
     if (digest !== fixture.sha256) throw new Error(`Upstream fixture changed: ${input}`);
   }
 
+  if (fixture.sample) {
+    assert.equal(createHash("sha256").update(readFileSync(join(root, "fixtures", fixture.sample))).digest("hex"), fixture.sample_sha256);
+  }
   const outDir = join(independent, fixture.package);
   mkdirSync(outDir);
   copyFileSync(join(consumer, fixture.package, "moon.pkg"), join(outDir, "moon.pkg"));
@@ -131,3 +138,16 @@ for (const target of ["js", "wasm", "wasm-gc", "native"]) {
   console.log(`Run consumer: ${target}`);
   moon(independent, "run", "--frozen", "--target", target, "--deny-warn", ".");
 }
+
+const gitHead = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+assert.equal(gitHead.status, 0);
+const gitDiff = spawnSync("git", ["diff", "HEAD", "--name-only"], { cwd: root, encoding: "utf8" });
+assert.equal(gitDiff.status, 0);
+writeFileSync(join(buildDir, "kaitai-runtime-report.json"), JSON.stringify({
+  source_commit: gitHead.stdout.trim(),
+  tracked_worktree_dirty: Boolean(gitDiff.stdout.trim()),
+  targets: ["js", "wasm", "wasm-gc", "native"],
+  check_build_test_and_run: true,
+  official_reference_rerun: process.argv.includes("--kaitai-reference"),
+  ...(process.argv.includes("--kaitai-reference") ? JSON.parse(readFileSync(join(independent, "oracle-cases.json"), "utf8")) : {}),
+}, null, 2) + "\n");

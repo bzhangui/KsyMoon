@@ -32,7 +32,7 @@ pub suberror StlParseError {
 priv struct StlReader {
   input : Bytes
   mut offset : Int
-  mut repeats_left : Int
+  budget : Array[Int]
 }
 
 ///|
@@ -78,11 +78,11 @@ fn StlReader::reserve_repeats(
   guard count >= 0L else {
     raise StlInvalidLength(field~, offset=self.offset, length=count)
   }
-  guard count <= self.repeats_left.to_int64() else {
+  guard count <= self.budget[0].to_int64() else {
     raise StlRepeatLimit(field~, offset=self.offset, count~)
   }
   let count = count.to_int()
-  self.repeats_left -= count
+  self.budget[0] -= count
   count
 }
 
@@ -106,11 +106,12 @@ fn read_stl_type_triangle(reader : StlReader, path : String) -> Stl_triangle rai
   let path_normal = path + ".normal"
   let v_normal = read_stl_type_vec3d(reader, path_normal)
   let path_vertices = path + ".vertices"
-  let count_vertices = reader.reserve_repeats(3L, path_vertices)
+  let count_v_vertices = reader.reserve_repeats(3L, path_vertices)
   let v_vertices = []
-  for index in 0..<count_vertices {
+  for index in 0..<count_v_vertices {
     let item_path = path_vertices + "[" + index.to_string() + "]"
-    v_vertices.push(read_stl_type_vec3d(reader, item_path))
+    let item = read_stl_type_vec3d(reader, item_path)
+    v_vertices.push(item)
   }
   let path_abr = path + ".abr"
   let v_abr = reader.read_bits(2, true, path_abr)
@@ -128,11 +129,12 @@ fn read_stl_root(reader : StlReader, path : String) -> StlRecord raise StlParseE
   let path_num_triangles = path + ".num_triangles"
   let v_num_triangles = reader.read_bits(4, true, path_num_triangles)
   let path_triangles = path + ".triangles"
-  let count_triangles = reader.reserve_repeats(v_num_triangles.to_int64(), path_triangles)
+  let count_v_triangles = reader.reserve_repeats(v_num_triangles.to_int64(), path_triangles)
   let v_triangles = []
-  for index in 0..<count_triangles {
+  for index in 0..<count_v_triangles {
     let item_path = path_triangles + "[" + index.to_string() + "]"
-    v_triangles.push(read_stl_type_triangle(reader, item_path))
+    let item = read_stl_type_triangle(reader, item_path)
+    v_triangles.push(item)
   }
   {
     header: v_header,
@@ -143,6 +145,6 @@ fn read_stl_root(reader : StlReader, path : String) -> StlRecord raise StlParseE
 
 ///|
 pub fn parse_stl(input : Bytes) -> StlRecord raise StlParseError {
-  let reader : StlReader = { input, offset: 0, repeats_left: 1_000_000 }
+  let reader : StlReader = { input, offset: 0, budget: [1_000_000] }
   read_stl_root(reader, "stl")
 }

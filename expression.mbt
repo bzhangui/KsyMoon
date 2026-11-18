@@ -1,6 +1,7 @@
 ///|
 priv enum Expr {
   Integer(Int64)
+  Text(String)
   Boolean(Bool)
   Reference(String)
   StreamPosition
@@ -14,6 +15,7 @@ priv enum Expr {
 priv enum ExprType {
   Integer
   Boolean
+  Text
 } derive(Eq)
 
 ///|
@@ -39,6 +41,28 @@ fn expression_tokens(
     let ch = chars[i]
     if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' {
       i += 1
+      continue
+    }
+    if ch == '\'' || ch == '"' {
+      let quote = ch
+      let token = StringBuilder()
+      token.write_char(quote)
+      i += 1
+      let mut closed = false
+      while i < chars.length() {
+        let current = chars[i]
+        token.write_char(current)
+        i += 1
+        if current == '\\' && i < chars.length() {
+          token.write_char(chars[i])
+          i += 1
+        } else if current == quote {
+          closed = true
+          break
+        }
+      }
+      guard closed else { invalid(path, "unterminated string literal") }
+      tokens.push(token.to_string())
       continue
     }
     let token = StringBuilder()
@@ -132,6 +156,7 @@ fn ExprParser::parse(
       match attribute {
         "pos" => StreamPosition
         "size" => StreamSize
+        "eof" => Binary("==", StreamPosition, StreamSize)
         _ => invalid(self.path, "expected _io.pos or _io.size")
       }
     }
@@ -141,6 +166,18 @@ fn ExprParser::parse(
           _ => invalid(self.path, "invalid or out-of-range integer constant")
         },
       )
+    quoted if quoted[0] == '\'' || quoted[0] == '"' =>
+      Text(parse_quoted(quoted, self.path))
+    "_" | "_index" =>
+      if token == "_" && self.peek() == "." {
+        self.index += 1
+        let attribute = self.peek()
+        check_identifier(attribute, self.path)
+        self.index += 1
+        Reference("_." + attribute)
+      } else {
+        Reference(token)
+      }
     name if name[0] >= 'a' && name[0] <= 'z' => {
       check_identifier(name, self.path)
       Reference(name)
@@ -224,6 +261,7 @@ fn expression_type(
   match expression {
     Integer(_) | StreamPosition | StreamSize => Integer
     Boolean(_) => Boolean
+    Text(_) => Text
     Reference(name) => lookup(name)
     Unary(op, value) => {
       let expected = if op == "not" { ExprType::Boolean } else { Integer }
@@ -292,13 +330,7 @@ fn field_expression_type(
   guard field.count is None && field.condition is None else {
     invalid(path, "expression requires a nonoptional scalar field")
   }
-  match field.kind {
-    Unsigned(_, _) | Signed(_, _) => Integer
-    _ =>
-      invalid(
-        path, "expression currently requires an integer of at most 32 bits",
-      )
-  }
+  kind_expression_type(field.kind, path)
 }
 
 ///|
@@ -309,6 +341,7 @@ fn expression_code(
 ) -> String {
   match expression {
     Integer(n) => "\{n}L"
+    Text(value) => value.escape()
     Boolean(value) => if value { "true" } else { "false" }
     Reference(name) => reference(name)
     StreamPosition => "reader.offset.to_int64()"
@@ -362,4 +395,32 @@ fn expression_stream_size(expression : Expr) -> Bool {
       expression_stream_size(b)
     _ => false
   }
+}
+
+///|
+fn parse_quoted(source : String, path : String) -> String raise SchemaError {
+  let chars = source.to_array()
+  let output = StringBuilder()
+  let mut i = 1
+  while i < chars.length() - 1 {
+    let ch = chars[i]
+    if ch == '\\' {
+      i += 1
+      output.write_char(
+        match chars[i] {
+          'n' => '\n'
+          'r' => '\r'
+          't' => '\t'
+          '\\' => '\\'
+          '\'' => '\''
+          '"' => '"'
+          _ => invalid(path, "unsupported string escape")
+        },
+      )
+    } else {
+      output.write_char(ch)
+    }
+    i += 1
+  }
+  output.to_string()
 }

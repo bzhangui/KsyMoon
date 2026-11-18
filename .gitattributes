@@ -1,3 +1,5 @@
 * text=auto eol=lf
 fixtures/*.ksy -text
 fixtures/kaitai/*.ksy -text
+fixtures/kaitai/samples/*.bin -text
+fixtures/kaitai/spec/*.py -text

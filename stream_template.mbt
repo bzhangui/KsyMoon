@@ -1,0 +1,99 @@
+///|
+fn emit_stream_reader(
+  output : StringBuilder,
+  root_type : String,
+  bounded : Bool,
+  byte_options : Bool,
+  strings : Bool,
+  repeated : Bool,
+) -> Unit {
+  if bounded {
+    let budget = if repeated { ", budget: self.budget" } else { "" }
+    let self_arg = if repeated { "self" } else { "_self" }
+    output.write_string(
+      "///|\nfn \{root_type}Reader::substream(\{self_arg} : \{root_type}Reader, bytes : BytesView) -> \{root_type}Reader {\n  { input: bytes.to_owned(), offset: 0\{budget} }\n}\n\n",
+    )
+  }
+  if byte_options {
+    let block =
+      #|///|
+      #|fn __ROOT__Reader::read_bytes(self : __ROOT__Reader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise __ROOT__ParseError {
+      #|  let bytes = if length == -1L {
+      #|    let start = self.offset
+      #|    let mut end = start
+      #|    while end + unit <= self.input.length() {
+      #|      let matches = if unit == 1 { self.input[end].to_int() == terminator } else if big_endian { self.input[end] == 0 && self.input[end + 1].to_int() == terminator } else { self.input[end].to_int() == terminator && self.input[end + 1] == 0 }
+      #|      if matches { break }
+      #|      end += unit
+      #|    }
+      #|    if end + unit > self.input.length() {
+      #|      end = self.input.length()
+      #|      self.offset = end
+      #|      guard !eos_error else { raise __ROOT__MissingTerminator(field~, offset=end) }
+      #|      self.input[start:end]
+      #|    } else {
+      #|      self.offset = end + (if consume { unit } else { 0 })
+      #|      self.input[start:end + (if keep_terminator { unit } else { 0 })]
+      #|    }
+      #|  } else { self.take(length, field) }
+      #|  let mut end = bytes.length()
+      #|  if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
+      #|  // A sized field is consumed completely even when a terminator occurs early.
+      #|  if length != -1L && terminator >= 0 {
+      #|    let mut i = 0
+      #|    while i + unit <= end {
+      #|      let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
+      #|      if matches { end = i + (if keep_terminator { unit } else { 0 }); break }
+      #|      i += unit
+      #|    }
+      #|  }
+      #|  bytes[:end]
+      #|}
+      #|
+    write_reader_block(output, block, root_type)
+  }
+  if strings {
+    let block =
+      #|///|
+      #|fn __ROOT__Reader::decode_text(_self : __ROOT__Reader, bytes : BytesView, encoding : String, field : String, start : Int) -> String raise __ROOT__ParseError {
+      #|  let output = StringBuilder()
+      #|  let mut i = 0
+      #|  while i < bytes.length() {
+      #|    let first = bytes[i].to_int()
+      #|    let mut code = first
+      #|    let mut width = 1
+      #|    if encoding == "UTF-16LE" || encoding == "UTF-16BE" {
+      #|      guard i + 1 < bytes.length() else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }
+      #|      code = if encoding == "UTF-16LE" { first | (bytes[i + 1].to_int() << 8) } else { (first << 8) | bytes[i + 1].to_int() }
+      #|      width = 2
+      #|      if code >= 0xD800 && code <= 0xDBFF {
+      #|        guard i + 3 < bytes.length() else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }
+      #|        let low = if encoding == "UTF-16LE" { bytes[i + 2].to_int() | (bytes[i + 3].to_int() << 8) } else { (bytes[i + 2].to_int() << 8) | bytes[i + 3].to_int() }
+      #|        guard low >= 0xDC00 && low <= 0xDFFF else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }
+      #|        code = 0x10000 + ((code - 0xD800) << 10) + low - 0xDC00
+      #|        width = 4
+      #|      } else {
+      #|        guard code < 0xDC00 || code > 0xDFFF else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }
+      #|      }
+      #|    } else if first >= 128 {
+      #|      guard encoding != "ASCII" else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }
+      #|      width = if first >= 0xC2 && first <= 0xDF { 2 } else if first >= 0xE0 && first <= 0xEF { 3 } else if first >= 0xF0 && first <= 0xF4 { 4 } else { 0 }
+      #|      guard width > 0 && i + width <= bytes.length() else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }
+      #|      code = first & (if width == 2 { 0x1F } else if width == 3 { 0x0F } else { 7 })
+      #|      for j in 1..<width {
+      #|        let next = bytes[i + j].to_int()
+      #|        guard next >= 0x80 && next <= 0xBF else { raise __ROOT__InvalidEncoding(field~, offset=start + i + j, encoding~) }
+      #|        code = (code << 6) | (next & 0x3F)
+      #|      }
+      #|      let minimum = if width == 2 { 128 } else if width == 3 { 2048 } else { 65536 }
+      #|      guard code >= minimum && code <= 0x10FFFF && (code < 0xD800 || code > 0xDFFF) else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }
+      #|    }
+      #|    output.write_char(code.to_char().unwrap())
+      #|    i += width
+      #|  }
+      #|  output.to_string()
+      #|}
+      #|
+    write_reader_block(output, block, root_type)
+  }
+}

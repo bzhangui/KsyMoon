@@ -39,7 +39,7 @@ pub suberror Vp8DuckIvfParseError {
 priv struct Vp8DuckIvfReader {
   input : Bytes
   mut offset : Int
-  mut repeats_left : Int
+  budget : Array[Int]
 }
 
 ///|
@@ -101,11 +101,11 @@ fn Vp8DuckIvfReader::reserve_repeats(
   guard count >= 0L else {
     raise Vp8DuckIvfInvalidLength(field~, offset=self.offset, length=count)
   }
-  guard count <= self.repeats_left.to_int64() else {
+  guard count <= self.budget[0].to_int64() else {
     raise Vp8DuckIvfRepeatLimit(field~, offset=self.offset, count~)
   }
   let count = count.to_int()
-  self.repeats_left -= count
+  self.budget[0] -= count
   count
 }
 
@@ -172,11 +172,12 @@ fn read_vp8_duck_ivf_root(reader : Vp8DuckIvfReader, path : String) -> Vp8DuckIv
   let path_unused = path + ".unused"
   let v_unused = reader.read_bits(4, true, path_unused)
   let path_image_data = path + ".image_data"
-  let count_image_data = reader.reserve_repeats(v_num_frames.to_int64(), path_image_data)
+  let count_v_image_data = reader.reserve_repeats(v_num_frames.to_int64(), path_image_data)
   let v_image_data = []
-  for index in 0..<count_image_data {
+  for index in 0..<count_v_image_data {
     let item_path = path_image_data + "[" + index.to_string() + "]"
-    v_image_data.push(read_vp8_duck_ivf_type_blocks(reader, item_path))
+    let item = read_vp8_duck_ivf_type_blocks(reader, item_path)
+    v_image_data.push(item)
   }
   {
     magic1: v_magic1,
@@ -195,6 +196,6 @@ fn read_vp8_duck_ivf_root(reader : Vp8DuckIvfReader, path : String) -> Vp8DuckIv
 
 ///|
 pub fn parse_vp8_duck_ivf(input : Bytes) -> Vp8DuckIvfRecord raise Vp8DuckIvfParseError {
-  let reader : Vp8DuckIvfReader = { input, offset: 0, repeats_left: 1_000_000 }
+  let reader : Vp8DuckIvfReader = { input, offset: 0, budget: [1_000_000] }
   read_vp8_duck_ivf_root(reader, "vp8_duck_ivf")
 }

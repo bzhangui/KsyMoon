@@ -25,6 +25,316 @@
       "package": "expr_int_div",
       "source": "kaitai/expr_int_div.ksy",
       "sha256": "ea36d32c3354088f5b13bb7f6b4eb290e207240551f1157b54d8073d3bb06d10"
+    },
+    {
+      "schema": "repeat_eos_u4",
+      "package": "repeat_eos_u4",
+      "source": "kaitai/repeat_eos_u4.ksy",
+      "sha256": "cb3fb603d68706d4b01470b06ab1eea6f8882433a5105b9f012b6b30c2fd6e85",
+      "sample": "kaitai/samples/repeat_eos_struct.bin",
+      "sample_sha256": "a84cb7174a1eb77e09a34b2533d022eaf7b73fad97b1f1399d581c950f1b6c76",
+      "spec": "kaitai/spec/test_repeat_eos_u4.py",
+      "spec_sha256": "97061530bb8b2ce8d65e095b5bc5bc67034958a8c940684ea20b57fefd4a5e47"
+    },
+    {
+      "schema": "repeat_eos_struct",
+      "package": "repeat_eos_struct",
+      "source": "kaitai/repeat_eos_struct.ksy",
+      "sha256": "2af14f017983f667871f47cfdd3b476885a35d74d5ad75625e81924fe41a64ce",
+      "sample": "kaitai/samples/repeat_eos_struct.bin",
+      "sample_sha256": "a84cb7174a1eb77e09a34b2533d022eaf7b73fad97b1f1399d581c950f1b6c76",
+      "spec": "kaitai/spec/test_repeat_eos_struct.py",
+      "spec_sha256": "ca5c9144c2e7f147cebad0e21c571518cc8b9303bdd369de3944aadca8b67e07"
+    },
+    {
+      "schema": "repeat_until_s4",
+      "package": "repeat_until_s4",
+      "source": "kaitai/repeat_until_s4.ksy",
+      "sha256": "ba1bb098c49209d280dfca1340ee31b29f612df210d626e37b113b07fb7c333c",
+      "sample": "kaitai/samples/repeat_until_s4.bin",
+      "sample_sha256": "9a11459f531523a3a05f8a12113fc4560005197bb7fbbd0d1c9873eb66213dc1",
+      "spec": "kaitai/spec/test_repeat_until_s4.py",
+      "spec_sha256": "e0962f9a799219879a8d78ad1837116c10a6f6d7ff1e3d7c52e496cc019b76cf"
+    },
+    {
+      "schema": "repeat_until_sized",
+      "package": "repeat_until_sized",
+      "source": "kaitai/repeat_until_sized.ksy",
+      "sha256": "89ce6bc608de1e69f1e6bd531c7baea1cd9e326740289249fe61b00abea44053",
+      "sample": "kaitai/samples/repeat_until_process.bin",
+      "sample_sha256": "91b6d4c1618da4c62e0ec18b3ffb5738fa38c51a53d0c437f4e695517b2b49d6",
+      "spec": "kaitai/spec/test_repeat_until_sized.py",
+      "spec_sha256": "130cad6cd378b5ed1ea1c2771544337d289547f19fa1aa801b27fba488fbdf74"
+    },
+    {
+      "schema": "repeat_until_complex",
+      "package": "repeat_until_complex",
+      "source": "kaitai/repeat_until_complex.ksy",
+      "sha256": "73e0b4366f4d5284a83989944f67ce32808d3054811f2f2bef3e5ff7d0f8ed75",
+      "sample": "kaitai/samples/repeat_until_complex.bin",
+      "sample_sha256": "42850408f8f4a1ddb53904998ea63d1acb8a3351cbf5c291fc626f6cd66adbc3",
+      "spec": "kaitai/spec/test_repeat_until_complex.py",
+      "spec_sha256": "d71f19d2ac40e86b72472032f3ba0756eec936f0e94d606db4426d9656a576c4"
+    },
+    {
+      "schema": "repeat_eos_bytes",
+      "package": "repeat_eos_bytes",
+      "source": "kaitai/repeat_eos_bytes.ksy",
+      "sha256": "16b1958d03a5ceb4d27dbb244599e81e40595cd809e045ccf91d0f863fa7270d",
+      "sample": "kaitai/samples/repeat_until_process.bin",
+      "sample_sha256": "91b6d4c1618da4c62e0ec18b3ffb5738fa38c51a53d0c437f4e695517b2b49d6",
+      "spec": "kaitai/spec/test_repeat_eos_bytes.py",
+      "spec_sha256": "c5d24de5bebe9c3e792cfbc35d228a54edf3ef6321331b45f1c63b73abea0f0d"
+    },
+    {
+      "schema": "repeat_eos_bytes_pad_term",
+      "package": "repeat_eos_bytes_pad_term",
+      "source": "kaitai/repeat_eos_bytes_pad_term.ksy",
+      "sha256": "0c09989f37f9674ecc3f3f584d1df3836698870ccdefbc5bcca18967d8cacbce",
+      "sample": "kaitai/samples/repeat_until_process.bin",
+      "sample_sha256": "91b6d4c1618da4c62e0ec18b3ffb5738fa38c51a53d0c437f4e695517b2b49d6",
+      "spec": "kaitai/spec/test_repeat_eos_bytes_pad_term.py",
+      "spec_sha256": "d1661fe3cc1277020b1102b0e4c2c9542b90054ea047dc7b2254f4fba2d14858"
+    },
+    {
+      "schema": "switch_integers",
+      "package": "switch_integers",
+      "source": "kaitai/switch_integers.ksy",
+      "sha256": "0ba390474da513c97ba5651c429366d2ab0db98b8714d0da024ce347069c79e8",
+      "sample": "kaitai/samples/switch_integers.bin",
+      "sample_sha256": "c4464582a2f8475784abae4d1b2d11b71d28bc868b981cd3d00d39bfc864eb83",
+      "spec": "kaitai/spec/test_switch_integers.py",
+      "spec_sha256": "cc1c48e785f15c66b117823ccee3981cc8be7be3fdac0a82fa87620eadc90be3"
+    },
+    {
+      "schema": "switch_manual_int",
+      "package": "switch_manual_int",
+      "source": "kaitai/switch_manual_int.ksy",
+      "sha256": "42bd84e8c5a7e74d664b790323a37f3c0e301ebd43499959a937de654c317bbc",
+      "sample": "kaitai/samples/switch_opcodes.bin",
+      "sample_sha256": "84b15df496b84df9e214da490590bf1242bb83d8f9f008910fecc07dd4aa2ff5",
+      "spec": "kaitai/spec/test_switch_manual_int.py",
+      "spec_sha256": "a05de5b1eb731c35cd3aac21b6721e801fd30f23e7eca81ae80cb96a1c2c0169"
+    },
+    {
+      "schema": "switch_manual_int_else",
+      "package": "switch_manual_int_else",
+      "source": "kaitai/switch_manual_int_else.ksy",
+      "sha256": "09cbbbd60227efd166b8174d34895fa8510fdacceb5b79e12898950024b19126",
+      "sample": "kaitai/samples/switch_opcodes2.bin",
+      "sample_sha256": "c13c3770c75f9bc1b7f37217781c87542382263a57c9cce719cec0e8ed9fe9b2",
+      "spec": "kaitai/spec/test_switch_manual_int_else.py",
+      "spec_sha256": "4658524e40009f93a7a5616c821d64b4d5974e87054f4ae07c93757c958d231e"
+    },
+    {
+      "schema": "switch_manual_int_size",
+      "package": "switch_manual_int_size",
+      "source": "kaitai/switch_manual_int_size.ksy",
+      "sha256": "2acc4d57b99f43b7f059bb86a73deb5c9e94ee31bea63548a71fe54fee031bf5",
+      "sample": "kaitai/samples/switch_tlv.bin",
+      "sample_sha256": "0a940c370e1952e77cfbdb6097308292dc0a20905987f9ba4fd4ce90fab73878",
+      "spec": "kaitai/spec/test_switch_manual_int_size.py",
+      "spec_sha256": "94a9c31667ab0c64220b054c89e9fd59221dd50b6b61c92d898316941d065604"
+    },
+    {
+      "schema": "switch_manual_int_size_else",
+      "package": "switch_manual_int_size_else",
+      "source": "kaitai/switch_manual_int_size_else.ksy",
+      "sha256": "e209c7bf4728ef56a56b2182bf36654b99d54e1e38bc095552f9adfa42926a91",
+      "sample": "kaitai/samples/switch_tlv.bin",
+      "sample_sha256": "0a940c370e1952e77cfbdb6097308292dc0a20905987f9ba4fd4ce90fab73878",
+      "spec": "kaitai/spec/test_switch_manual_int_size_else.py",
+      "spec_sha256": "011b2181d1beec9d8cb00d5133e3d6ef66a6d8738cbc7859792202146ae12a77"
+    },
+    {
+      "schema": "switch_manual_str",
+      "package": "switch_manual_str",
+      "source": "kaitai/switch_manual_str.ksy",
+      "sha256": "705b53f6932b8af1e479f90cdaa30081719cf81e372f77679ab340616d69acde",
+      "sample": "kaitai/samples/switch_opcodes.bin",
+      "sample_sha256": "84b15df496b84df9e214da490590bf1242bb83d8f9f008910fecc07dd4aa2ff5",
+      "spec": "kaitai/spec/test_switch_manual_str.py",
+      "spec_sha256": "b7d3467500847805c128299359056151f0a6fbb176b6325ea4b0d2e83ec2b27e"
+    },
+    {
+      "schema": "switch_manual_str_else",
+      "package": "switch_manual_str_else",
+      "source": "kaitai/switch_manual_str_else.ksy",
+      "sha256": "f6a13a34a3faeabdd037ec599bb88790fd5506a9067224f341dea9b05adb8725",
+      "sample": "kaitai/samples/switch_opcodes2.bin",
+      "sample_sha256": "c13c3770c75f9bc1b7f37217781c87542382263a57c9cce719cec0e8ed9fe9b2",
+      "spec": "kaitai/spec/test_switch_manual_str_else.py",
+      "spec_sha256": "9b44814e852e11f459d14b8d8899a1e86579c0ee61213291e377b30aa531ad88"
+    },
+    {
+      "schema": "str_eos",
+      "package": "str_eos",
+      "source": "kaitai/str_eos.ksy",
+      "sha256": "4c8db6bf89a348c7f139f43072a0ecabc5a0610ad126506a8e4ecfcf2b2b19e8",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_str_eos.py",
+      "spec_sha256": "8c06f543beb8253afe7cd7ab75cc85656a99f6d0ca666dddc15b98e9d0404bc2"
+    },
+    {
+      "schema": "str_pad_term",
+      "package": "str_pad_term",
+      "source": "kaitai/str_pad_term.ksy",
+      "sha256": "193e671a90c03cf831093825e16c27ba5d9a8cdeb6ac898d2f5a4eb0150a6b1e",
+      "sample": "kaitai/samples/str_pad_term.bin",
+      "sample_sha256": "6f363ffffc4b360a0a3bc17c2d4223e2453f689f60e4410138a2b8c947dca455",
+      "spec": "kaitai/spec/test_str_pad_term.py",
+      "spec_sha256": "68c4e34ebcc0e2cb01cbe408ec9ba1e0921d5c345a966e88e1982ed8ab6f4255"
+    },
+    {
+      "schema": "str_pad_term_empty",
+      "package": "str_pad_term_empty",
+      "source": "kaitai/str_pad_term_empty.ksy",
+      "sha256": "1121ebf8a03445cc5c89eedac14a10ef5a2c0e096108170e361d5cc4d5ba5f04",
+      "sample": "kaitai/samples/str_pad_term_empty.bin",
+      "sample_sha256": "6f88c0568c7b1ce652ea025c032fb23d92b22e4f55be7a7d01e7ac5955d3d556",
+      "spec": "kaitai/spec/test_str_pad_term_empty.py",
+      "spec_sha256": "1cc2d69ad9ab63a51b999127be1b0e5fac39b02383ca8879028ec302bee888c8"
+    },
+    {
+      "schema": "str_pad_term_equal",
+      "package": "str_pad_term_equal",
+      "source": "kaitai/str_pad_term_equal.ksy",
+      "sha256": "77df5e9967431a7976ec00706d097c442a0bde5b9e237134bf4316f4969ed828",
+      "sample": "kaitai/samples/str_pad_term.bin",
+      "sample_sha256": "6f363ffffc4b360a0a3bc17c2d4223e2453f689f60e4410138a2b8c947dca455",
+      "spec": "kaitai/spec/test_str_pad_term_equal.py",
+      "spec_sha256": "e37667665e45962b8e4166c43d4b92e2fdef63620f17c056f8d6e7fbea96e5fb"
+    },
+    {
+      "schema": "str_pad_term_zero_size",
+      "package": "str_pad_term_zero_size",
+      "source": "kaitai/str_pad_term_zero_size.ksy",
+      "sha256": "a4c6957652530f876cf21b51a65036624df64aa16e6bd13195b8925d429b670a",
+      "sample": "kaitai/samples/enum_negative.bin",
+      "sample_sha256": "437cb43a30226e639b33d84533cfc3ddd970a40055b9c8c0bf7e3795cf184eb6",
+      "spec": "kaitai/spec/test_str_pad_term_zero_size.py",
+      "spec_sha256": "81f4e813b5f0bbf7e386394bd77c78c5b621f8788dd92f2f15620e6ca8d2c28e"
+    },
+    {
+      "schema": "str_eos_pad_term",
+      "package": "str_eos_pad_term",
+      "source": "kaitai/str_eos_pad_term.ksy",
+      "sha256": "f66c7b3822d1838864453f0522029e32e3ec2e524c2a4ae139d7e1d05058bda5",
+      "sample": "kaitai/samples/str_pad_term.bin",
+      "sample_sha256": "6f363ffffc4b360a0a3bc17c2d4223e2453f689f60e4410138a2b8c947dca455",
+      "spec": "kaitai/spec/test_str_eos_pad_term.py",
+      "spec_sha256": "360171e8be410c1333cef57e20ca47df72f1059a36b825d270e0a5b25fd66286"
+    },
+    {
+      "schema": "term_strz",
+      "package": "term_strz",
+      "source": "kaitai/term_strz.ksy",
+      "sha256": "6a0528ee48396779c7cd5e02fa6c7cabc3809fe85f3c9af8513b6f6cb9f055e8",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_term_strz.py",
+      "spec_sha256": "ef5ca8affbb84aa18e1dd3c9ee81d58ee5a71fc9a95f88a6adc519cafceb329a"
+    },
+    {
+      "schema": "term_strz2",
+      "package": "term_strz2",
+      "source": "kaitai/term_strz2.ksy",
+      "sha256": "25429fb2e9146099e45d1858d78c4c8565f39939b38937e4cbde4b02bd7be3c0",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_term_strz2.py",
+      "spec_sha256": "cfbc98c0fc5bd55d88d0604b78acfd5cd6fb76c3210fcf196f1f8a31dfc9c14b"
+    },
+    {
+      "schema": "term_strz3",
+      "package": "term_strz3",
+      "source": "kaitai/term_strz3.ksy",
+      "sha256": "7b514fec5f1e6b8d227d1953c550ba07ef5fdcc7f1a9d752b8a0463811b80cae",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_term_strz3.py",
+      "spec_sha256": "0de7b4bb81cfc88d1cede3016e67bb9278de6c3ceb68d98ad2b1d1652cf35b66"
+    },
+    {
+      "schema": "term_strz4",
+      "package": "term_strz4",
+      "source": "kaitai/term_strz4.ksy",
+      "sha256": "d6f0279774a473fc493094e4def9b9b06077c9ea47c1f24d120dc4ce6645d972",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_term_strz4.py",
+      "spec_sha256": "b2a6a5f508c4a0030a939a26184f61df13c4ce2456e250b54e72c201d8aa88fd"
+    },
+    {
+      "schema": "bytes_eos_pad_term",
+      "package": "bytes_eos_pad_term",
+      "source": "kaitai/bytes_eos_pad_term.ksy",
+      "sha256": "ff63d879ade71d354c1fc1cfea7111eab00ef7f94d0fa3ac33fc578a72e490a3",
+      "sample": "kaitai/samples/str_pad_term.bin",
+      "sample_sha256": "6f363ffffc4b360a0a3bc17c2d4223e2453f689f60e4410138a2b8c947dca455",
+      "spec": "kaitai/spec/test_bytes_eos_pad_term.py",
+      "spec_sha256": "e9b3425959e8b96b002708d03cd04727853c01ad831b2eb0a976f89d1db3dafb"
+    },
+    {
+      "schema": "term_strz_utf16_v1",
+      "package": "term_strz_utf16_v1",
+      "source": "kaitai/term_strz_utf16_v1.ksy",
+      "sha256": "f4f3ee8f1106324017a4b38eefb0c09e233cb960028f762c786fe2654a588849",
+      "sample": "kaitai/samples/term_strz_utf16.bin",
+      "sample_sha256": "ab99433a927910d1be5448bdc6dd8e7311cf6b612b5250a62f23da7b717094b0",
+      "spec": "kaitai/spec/test_term_strz_utf16_v1.py",
+      "spec_sha256": "c35b854a65e337dc3fb1dbca318198ff03fd5c45d23a605b24f13a1562de623f"
+    },
+    {
+      "schema": "term_strz_utf16_v2",
+      "package": "term_strz_utf16_v2",
+      "source": "kaitai/term_strz_utf16_v2.ksy",
+      "sha256": "c15366113e21e11594366ba5af836c467b96c02eb4b36221282653ac7a0ce50e",
+      "sample": "kaitai/samples/term_strz_utf16.bin",
+      "sample_sha256": "ab99433a927910d1be5448bdc6dd8e7311cf6b612b5250a62f23da7b717094b0",
+      "spec": "kaitai/spec/test_term_strz_utf16_v2.py",
+      "spec_sha256": "24c80e47ed403a4345f6678f1cfef9dc5ffd551c2f876b3d600772d5c5d38755"
+    },
+    {
+      "schema": "term_strz_utf16_v3",
+      "package": "term_strz_utf16_v3",
+      "source": "kaitai/term_strz_utf16_v3.ksy",
+      "sha256": "98e574542b139517a311f2e34454bdad7349d765d05a90ecdb72c9cff9ccbbf6",
+      "sample": "kaitai/samples/term_strz_utf16.bin",
+      "sample_sha256": "ab99433a927910d1be5448bdc6dd8e7311cf6b612b5250a62f23da7b717094b0",
+      "spec": "kaitai/spec/test_term_strz_utf16_v3.py",
+      "spec_sha256": "48b859ec9efcfcb982557fb3d8ebd50612f4c63c620b9f726de6c51995e175bf"
+    },
+    {
+      "schema": "term_strz_utf16_v4",
+      "package": "term_strz_utf16_v4",
+      "source": "kaitai/term_strz_utf16_v4.ksy",
+      "sha256": "a91ed94c5b4347db02b7ffff3091e37bb3cb2d5ff5f9088fe54f760b35cf26a2",
+      "sample": "kaitai/samples/term_strz_utf16.bin",
+      "sample_sha256": "ab99433a927910d1be5448bdc6dd8e7311cf6b612b5250a62f23da7b717094b0",
+      "spec": "kaitai/spec/test_term_strz_utf16_v4.py",
+      "spec_sha256": "7479b2f2ecee2157e192dd5911014a9ce14f7b43b9ca9a5f9eb7ba86add9db23"
+    },
+    {
+      "schema": "str_pad_term_utf16",
+      "package": "str_pad_term_utf16",
+      "source": "kaitai/str_pad_term_utf16.ksy",
+      "sha256": "d725f7c6f441151d5a069ccf6f61fa38e9550d9481e70e2589188363cb7ad66a",
+      "sample": "kaitai/samples/str_pad_term_utf16.bin",
+      "sample_sha256": "ffb4f8b9d81ddb03e1e26d5c223a124de5e91d63205ae591f6edff330ca6138e",
+      "spec": "kaitai/spec/test_str_pad_term_utf16.py",
+      "spec_sha256": "31b84693e3cc58c3bd126ec4fa7f0136588f6a99d3512627356e8ca24f7b0c84"
+    },
+    {
+      "schema": "str_encodings_utf16",
+      "package": "str_encodings_utf16",
+      "source": "kaitai/str_encodings_utf16.ksy",
+      "sha256": "d8f2949bff4fe9a48b7b8f99e6c90dac2e2c1a7b0d5033e62fd47158d10032f6",
+      "sample": "kaitai/samples/str_encodings_utf16.bin",
+      "sample_sha256": "534f74d40e37e00ee4e513bde43c8b9fef880498bd96eb88d15b4262ee7796bf",
+      "spec": "kaitai/spec/test_str_encodings_utf16.py",
+      "spec_sha256": "738dd23e0ca3bc32f55edec212946445ad4a4507b237408cf8241dbe20797467"
     }
   ]
 }

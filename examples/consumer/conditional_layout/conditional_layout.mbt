@@ -77,7 +77,7 @@ pub suberror ConditionalLayoutParseError {
 priv struct ConditionalLayoutReader {
   input : Bytes
   mut offset : Int
-  mut repeats_left : Int
+  budget : Array[Int]
 }
 
 ///|
@@ -168,11 +168,11 @@ fn ConditionalLayoutReader::reserve_repeats(
   guard count >= 0L else {
     raise ConditionalLayoutInvalidLength(field~, offset=self.offset, length=count)
   }
-  guard count <= self.repeats_left.to_int64() else {
+  guard count <= self.budget[0].to_int64() else {
     raise ConditionalLayoutRepeatLimit(field~, offset=self.offset, count~)
   }
   let count = count.to_int()
-  self.repeats_left -= count
+  self.budget[0] -= count
   count
 }
 
@@ -224,11 +224,12 @@ fn read_conditional_layout_root(reader : ConditionalLayoutReader, path : String)
   } else { None }
   let path_entries = path + ".entries"
   let v_entries = if (v_flag.to_int64() == 2L) {
-  let count_entries = reader.reserve_repeats(v_count.to_int64(), path_entries)
+  let count_v_entries = reader.reserve_repeats(v_count.to_int64(), path_entries)
   let v_entries = []
-  for index in 0..<count_entries {
+  for index in 0..<count_v_entries {
     let item_path = path_entries + "[" + index.to_string() + "]"
-    v_entries.push(read_conditional_layout_type_entry(reader, item_path))
+    let item = read_conditional_layout_type_entry(reader, item_path)
+    v_entries.push(item)
   }
     Some(v_entries)
   } else { None }
@@ -300,11 +301,11 @@ pub fn ConditionalLayoutRecord::last(self : ConditionalLayoutRecord) -> UInt rai
   defer { self._ksy_busy_last = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     reader.seek(reader.arithmetic("-", reader.input.length().to_int64(), 1L, field), field)
-    let result = reader.read_bits(1, false, field)
+  let result = reader.read_bits(1, false, field)
     result
   }
   self._ksy_cache_last = Some(value)
@@ -319,10 +320,10 @@ pub fn ConditionalLayoutRecord::following(self : ConditionalLayoutRecord) -> UIn
   guard !self._ksy_busy_following else { raise ConditionalLayoutInstanceCycle(field~, offset=reader.offset) }
   self._ksy_busy_following = true
   defer { self._ksy_busy_following = false }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
-    let result = reader.read_bits(1, false, field)
+  let result = reader.read_bits(1, false, field)
     result
   }
   self._ksy_cache_following = Some(value)
@@ -339,16 +340,17 @@ pub fn ConditionalLayoutRecord::repeated(self : ConditionalLayoutRecord) -> Arra
   defer { self._ksy_busy_repeated = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     reader.seek(2L, field)
-    let count = reader.reserve_repeats(self.count.to_int64(), field)
-    let result = []
-    for index in 0..<count {
-      let item_path = field + "[" + index.to_string() + "]"
-      result.push(reader.take(1L, item_path))
-    }
+  let count_result = reader.reserve_repeats(self.count.to_int64(), field)
+  let result = []
+  for index in 0..<count_result {
+    let item_path = field + "[" + index.to_string() + "]"
+    let item = reader.take(1L, item_path)
+    result.push(item)
+  }
     result
   }
   self._ksy_cache_repeated = Some(value)
@@ -365,12 +367,12 @@ pub fn ConditionalLayoutRecord::never(self : ConditionalLayoutRecord) -> Option[
   defer { self._ksy_busy_never = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     if false {
     reader.seek(-1L, field)
-    let result = reader.read_bits(1, false, field)
+  let result = reader.read_bits(1, false, field)
     Some(result)
     } else { None }
   }
@@ -388,11 +390,11 @@ pub fn ConditionalLayoutRecord::bad_position(self : ConditionalLayoutRecord) -> 
   defer { self._ksy_busy_bad_position = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     reader.seek(-1L, field)
-    let result = reader.read_bits(1, false, field)
+  let result = reader.read_bits(1, false, field)
     result
   }
   self._ksy_cache_bad_position = Some(value)
@@ -409,11 +411,11 @@ pub fn ConditionalLayoutRecord::bad_read(self : ConditionalLayoutRecord) -> UInt
   defer { self._ksy_busy_bad_read = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     reader.seek(reader.arithmetic("-", reader.input.length().to_int64(), 1L, field), field)
-    let result = reader.read_bits(4, true, field)
+  let result = reader.read_bits(4, true, field)
     result
   }
   self._ksy_cache_bad_read = Some(value)
@@ -654,11 +656,11 @@ pub fn ConditionalLayoutRecord::loop_a(self : ConditionalLayoutRecord) -> UInt r
   defer { self._ksy_busy_loop_a = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     reader.seek(self.loop_b().to_int64(), field)
-    let result = reader.read_bits(1, false, field)
+  let result = reader.read_bits(1, false, field)
     result
   }
   self._ksy_cache_loop_a = Some(value)
@@ -675,11 +677,11 @@ pub fn ConditionalLayoutRecord::loop_b(self : ConditionalLayoutRecord) -> UInt r
   defer { self._ksy_busy_loop_b = false }
   let saved = reader.offset
   defer { reader.offset = saved }
-  let saved_repeats = reader.repeats_left
-  errdefer { reader.repeats_left = saved_repeats }
+  let saved_repeats = reader.budget[0]
+  errdefer { reader.budget[0] = saved_repeats }
   let value = {
     reader.seek(self.loop_a().to_int64(), field)
-    let result = reader.read_bits(1, false, field)
+  let result = reader.read_bits(1, false, field)
     result
   }
   self._ksy_cache_loop_b = Some(value)
@@ -688,6 +690,6 @@ pub fn ConditionalLayoutRecord::loop_b(self : ConditionalLayoutRecord) -> UInt r
 
 ///|
 pub fn parse_conditional_layout(input : Bytes) -> ConditionalLayoutRecord raise ConditionalLayoutParseError {
-  let reader : ConditionalLayoutReader = { input, offset: 0, repeats_left: 1_000_000 }
+  let reader : ConditionalLayoutReader = { input, offset: 0, budget: [1_000_000] }
   read_conditional_layout_root(reader, "conditional_layout")
 }

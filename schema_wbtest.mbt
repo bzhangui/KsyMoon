@@ -170,3 +170,89 @@ test "a schema id does not shadow a MoonBit builtin type" {
     generated.contains("pub fn parse_bytes(input : Bytes) -> BytesRecord"),
   )
 }
+
+///|
+test "repeat modes reject missing or contradictory controls" {
+  let source = "meta: {id: example}\nseq:\n  - {id: entries, type: u1, repeat: until}\n"
+  expect_schema_error(
+    source, "seq[0].repeat: expected expr/repeat-expr, eos, or until/repeat-until",
+  )
+  expect_schema_error(
+    source.replace_all(old="repeat: until", new="repeat: eos, repeat-expr: 2"),
+    "seq[0].repeat: expected expr/repeat-expr, eos, or until/repeat-until",
+  )
+}
+
+///|
+test "sized streams reject contradictory size and eos bounds" {
+  expect_schema_error(
+    "meta: {id: example}\nseq:\n  - {id: data, size: 4, size-eos: true}\n", "seq[0]: size and size-eos are mutually exclusive; size-eos must be boolean",
+  )
+}
+
+///|
+test "encoding and padding options have explicit validation" {
+  expect_schema_error(
+    "meta: {id: example}\nseq:\n  - {id: text, type: str, size: 4, encoding: SJIS}\n",
+    "seq[0].encoding: encoding is awaiting implementation: SJIS",
+  )
+  expect_schema_error(
+    "meta: {id: example}\nseq:\n  - {id: text, terminator: 0, pad-right: 32}\n",
+    "seq[0].pad-right: padding requires a sized field",
+  )
+}
+
+///|
+test "until members resolve against the element definition" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: rows, type: row, repeat: until, repeat-until: '_.missing == 0'}
+    #|types:
+    #|  row:
+    #|    seq:
+    #|      - {id: marker, type: u1}
+  expect_schema_error(source, "rows: unknown element member 'missing'")
+}
+
+///|
+test "switch case types agree with selector types" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: tag, type: u1}
+    #|  - id: body
+    #|    type:
+    #|      switch-on: tag
+    #|      cases:
+    #|        '"x"': u1
+  expect_schema_error(source, "seq[1]: expected an integer expression")
+}
+
+///|
+test "numeric YAML keys remain intact and duplicates are rejected" {
+  expect_schema_error(
+    "meta: {id: example}\nseq:\n  - id: body\n    type:\n      switch-on: 1\n      cases: {1: u1, 1: u2le}\n",
+    "YAML line 7: 1: duplicated key in mapping",
+  )
+}
+
+///|
+test "scope flattening rejects colliding type names" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: data, type: a}
+    #|types:
+    #|  a:
+    #|    seq:
+    #|      - {id: data, type: b}
+    #|    types:
+    #|      b:
+    #|        seq:
+    #|          - {id: data, type: u1}
+    #|  a_b:
+    #|    seq:
+    #|      - {id: data, type: u1}
+  expect_schema_error(source, "types.a_b: flattened type name collision")
+}

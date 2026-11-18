@@ -87,7 +87,7 @@ pub fn IfInstancesRecord::never_happens(self : IfInstancesRecord) -> Option[UInt
   let value = {
     if false {
     reader.seek(100500L, field)
-    let result = reader.read_bits(1, false, field)
+  let result = reader.read_bits(1, false, field)
     Some(result)
     } else { None }
   }
