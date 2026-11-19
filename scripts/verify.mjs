@@ -25,6 +25,11 @@ const fixtures = [
   { schema: "conditional_layout", package: "conditional_layout" },
   { schema: "stream_control", package: "stream_control" },
   { schema: "repeat_zero_progress", package: "repeat_zero_progress" },
+  { schema: "reader_edges", package: "reader_edges" },
+  { schema: "pure_nested_value", package: "pure_nested_value" },
+  { schema: "pure_stream_value", package: "pure_stream_value" },
+  { schema: "pure_repeated_value", package: "pure_repeated_value" },
+
   {
     schema: "vp8_duck_ivf",
     package: "ivf",
@@ -95,6 +100,7 @@ for (const name of [
   "ivf_wbtest.mbt",
   "conditional_wbtest.mbt",
   "stream_wbtest.mbt",
+  "reader_edges_wbtest.mbt",
   "stream_reference_wbtest.mbt",
 ]) {
   copyFileSync(join(consumer, name), join(independent, name));

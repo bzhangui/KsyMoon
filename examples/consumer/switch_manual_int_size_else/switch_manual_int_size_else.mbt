@@ -76,8 +76,8 @@ fn SwitchManualIntSizeElseReader::substream(self : SwitchManualIntSizeElseReader
 }
 
 ///|
-fn SwitchManualIntSizeElseReader::read_bytes(self : SwitchManualIntSizeElseReader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise SwitchManualIntSizeElseParseError {
-  let bytes = if length == -1L {
+fn SwitchManualIntSizeElseReader::read_bytes(self : SwitchManualIntSizeElseReader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise SwitchManualIntSizeElseParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -98,7 +98,7 @@ fn SwitchManualIntSizeElseReader::read_bytes(self : SwitchManualIntSizeElseReade
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -185,9 +185,9 @@ fn SwitchManualIntSizeElseReader::reserve_repeats(
 ///|
 fn read_switch_manual_int_size_else_type_chunk_chunk_meta(reader : SwitchManualIntSizeElseReader, path : String) -> SwitchManualIntSizeElse_chunk_chunk_meta raise SwitchManualIntSizeElseParseError {
   let path_title = path + ".title"
-  let v_title = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 0, -1, false, true, true, 1, false, path_title); reader.decode_text(text_bytes, "UTF-8", path_title, text_start) }
+  let v_title = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, true, true, 1, false, path_title); reader.decode_text(text_bytes, "UTF-8", path_title, text_start) }
   let path_author = path + ".author"
-  let v_author = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 0, -1, false, true, true, 1, false, path_author); reader.decode_text(text_bytes, "UTF-8", path_author, text_start) }
+  let v_author = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, true, true, 1, false, path_author); reader.decode_text(text_bytes, "UTF-8", path_author, text_start) }
   {
     title: v_title,
     author: v_author,

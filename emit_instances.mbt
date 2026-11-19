@@ -68,8 +68,10 @@ fn emit_instances(
   id : String,
   root_type : String,
   has_repeated_fields : Bool,
+  effects : Map[String, Bool],
+  is_root~ : Bool,
 ) -> Unit raise SchemaError {
-  let type_name = if record.name == id {
+  let type_name = if is_root {
     root_type + "Record"
   } else {
     nested_type(root_type, record.name)
@@ -97,7 +99,17 @@ fn emit_instances(
         "  let saved = reader.offset\n  defer { reader.offset = saved }\n",
       )
     }
-    if has_repeated_fields && instance.kind is Parsed(_, _) {
+    let rollback = match instance.kind {
+      Parsed(field, position) =>
+        position is Some(_) ||
+        field_raises(field, effects) ||
+        (
+          instance.condition is Some(condition) &&
+          expression_arithmetic(condition)
+        )
+      _ => false
+    }
+    if has_repeated_fields && rollback {
       output.write_string(
         "  let saved_repeats = reader.budget[0]\n  errdefer { reader.budget[0] = saved_repeats }\n",
       )

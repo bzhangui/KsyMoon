@@ -34,6 +34,7 @@ priv enum Repetition {
 priv struct ByteOptions {
   length : LengthExpr?
   terminator : Byte?
+  implicit_terminator : Bool
   padding : Byte?
   keep_terminator : Bool
   consume : Bool

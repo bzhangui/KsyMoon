@@ -41,8 +41,8 @@ fn TermStrzUtf16V3Reader::take(
 }
 
 ///|
-fn TermStrzUtf16V3Reader::read_bytes(self : TermStrzUtf16V3Reader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise TermStrzUtf16V3ParseError {
-  let bytes = if length == -1L {
+fn TermStrzUtf16V3Reader::read_bytes(self : TermStrzUtf16V3Reader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise TermStrzUtf16V3ParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -63,7 +63,7 @@ fn TermStrzUtf16V3Reader::read_bytes(self : TermStrzUtf16V3Reader, length : Int6
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -133,13 +133,13 @@ fn TermStrzUtf16V3Reader::read_bits(
 ///|
 fn read_term_strz_utf16_v3_root(reader : TermStrzUtf16V3Reader, path : String) -> TermStrzUtf16V3Record raise TermStrzUtf16V3ParseError {
   let path_s1 = path + ".s1"
-  let v_s1 = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 0, -1, false, false, true, 2, false, path_s1); reader.decode_text(text_bytes, "UTF-16LE", path_s1, text_start) }
+  let v_s1 = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, false, true, 2, false, path_s1); reader.decode_text(text_bytes, "UTF-16LE", path_s1, text_start) }
   let path_term = path + ".term"
   let v_term = reader.read_bits(2, true, path_term)
   let path_s2 = path + ".s2"
-  let v_s2 = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 0, -1, false, false, true, 2, false, path_s2); reader.decode_text(text_bytes, "UTF-16LE", path_s2, text_start) }
+  let v_s2 = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, false, true, 2, false, path_s2); reader.decode_text(text_bytes, "UTF-16LE", path_s2, text_start) }
   let path_s3 = path + ".s3"
-  let v_s3 = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 0, -1, false, true, true, 2, false, path_s3); reader.decode_text(text_bytes, "UTF-16LE", path_s3, text_start) }
+  let v_s3 = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, true, true, 2, false, path_s3); reader.decode_text(text_bytes, "UTF-16LE", path_s3, text_start) }
   {
     s1: v_s1,
     term: v_term,

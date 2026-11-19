@@ -40,8 +40,8 @@ fn RepeatEosBytesPadTermReader::take(
 }
 
 ///|
-fn RepeatEosBytesPadTermReader::read_bytes(self : RepeatEosBytesPadTermReader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise RepeatEosBytesPadTermParseError {
-  let bytes = if length == -1L {
+fn RepeatEosBytesPadTermReader::read_bytes(self : RepeatEosBytesPadTermReader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise RepeatEosBytesPadTermParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -62,7 +62,7 @@ fn RepeatEosBytesPadTermReader::read_bytes(self : RepeatEosBytesPadTermReader, l
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -99,7 +99,7 @@ fn read_repeat_eos_bytes_pad_term_root(reader : RepeatEosBytesPadTermReader, pat
     let item_path = path_records + "[" + index.to_string() + "]"
     ignore(reader.reserve_repeats(1L, item_path))
     let before = reader.offset
-    let item = reader.read_bytes(5L, 85, 170, true, true, true, 1, false, item_path)
+    let item = reader.read_bytes(5L, false, 85, 170, true, true, true, 1, false, item_path)
     v_records.push(item)
     guard reader.offset > before else { raise RepeatEosBytesPadTermNoProgress(field=item_path, offset=reader.offset) }
   }

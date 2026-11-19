@@ -117,9 +117,16 @@ fn emit_reader(
     )
     .replace_all(
       old="  __ROOT__InvalidLength(field~ : String, offset~ : Int, length~ : Int64)\n",
-      new="",
+      new=if has_repeated_fields {
+        "  __ROOT__InvalidLength(field~ : String, offset~ : Int, length~ : Int64)\n"
+      } else {
+        ""
+      },
     )
-    .replace_all(old="  mut offset : Int", new="  offset : Int")
+    .replace_all(
+      old="  mut offset : Int",
+      new=if has_positions { "  mut offset : Int" } else { "  offset : Int" },
+    )
   }
   let header = if has_input {
     header

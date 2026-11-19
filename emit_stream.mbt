@@ -60,7 +60,7 @@ fn byte_read_code(
       Some(b) => b.to_int().to_string()
       None => "-1"
     }
-    "reader.read_bytes(\{length}, \{term}, \{pad}, \{options.keep_terminator}, \{options.consume}, \{options.eos_error}, \{unit}, \{big_endian}, \{path})"
+    "reader.read_bytes(\{length}, \{options.length is None}, \{term}, \{pad}, \{options.keep_terminator}, \{options.consume}, \{options.eos_error}, \{unit}, \{big_endian}, \{path})"
   }
 }
 

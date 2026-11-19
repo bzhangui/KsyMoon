@@ -69,8 +69,8 @@ fn SwitchManualIntElseReader::take(
 }
 
 ///|
-fn SwitchManualIntElseReader::read_bytes(self : SwitchManualIntElseReader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise SwitchManualIntElseParseError {
-  let bytes = if length == -1L {
+fn SwitchManualIntElseReader::read_bytes(self : SwitchManualIntElseReader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise SwitchManualIntElseParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -91,7 +91,7 @@ fn SwitchManualIntElseReader::read_bytes(self : SwitchManualIntElseReader, lengt
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -187,7 +187,7 @@ fn read_switch_manual_int_else_type_opcode_intval(reader : SwitchManualIntElseRe
 ///|
 fn read_switch_manual_int_else_type_opcode_strval(reader : SwitchManualIntElseReader, path : String) -> SwitchManualIntElse_opcode_strval raise SwitchManualIntElseParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 0, -1, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "ASCII", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "ASCII", path_value, text_start) }
   {
     value: v_value,
   }

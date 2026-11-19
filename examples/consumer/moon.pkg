@@ -47,4 +47,8 @@ import {
   "example/ksymoon-consumer/term_strz_utf16_v4",
   "example/ksymoon-consumer/str_pad_term_utf16",
   "example/ksymoon-consumer/str_encodings_utf16",
+  "example/ksymoon-consumer/reader_edges",
+  "example/ksymoon-consumer/pure_nested_value",
+  "example/ksymoon-consumer/pure_stream_value",
+  "example/ksymoon-consumer/pure_repeated_value",
 } for "wbtest"

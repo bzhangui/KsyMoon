@@ -41,7 +41,7 @@ def compile_references():
     manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
     schemas = {
         name: ROOT / "fixtures" / f"{name}.ksy"
-        for name in ("udp_datagram", "stl", "conditional_layout", "stream_control", "repeat_zero_progress")
+        for name in ("udp_datagram", "stl", "conditional_layout", "stream_control", "repeat_zero_progress", "reader_edges", "pure_nested_value", "pure_stream_value", "pure_repeated_value")
     }
     schemas.update({entry["schema"]: ROOT / "fixtures" / entry["source"] for entry in manifest["fixtures"]})
     subprocess.run(
@@ -284,6 +284,61 @@ def stream_tests(references):
                          f"  let frame = @stream_control.parse_stream_control({bytes_literal(data)})", *checks, "}"])
 
 
+def edge_tests(references):
+    data = b"\0A\0"
+    frame = references["reader_edges"].from_bytes(data)
+    assert frame.conditional_text is None
+    for name in ("sized_text", "padded_bytes"):
+        try:
+            getattr(frame, name)
+        except kaitaistruct.InvalidArgumentError:
+            pass
+        else:
+            raise AssertionError("official parser accepted a negative size")
+    yield "\n".join([
+        "///|", 'test "Kaitai reference negative sized byte options" {',
+        f"  let frame = @reader_edges.parse_reader_edges({bytes_literal(data)})",
+        "  assert_true(frame.conditional_text() is None)",
+        "  try frame.sized_text() catch { _ => () } noraise { _ => fail(\"negative terminated size\") }",
+        "  try frame.padded_bytes() catch { _ => () } noraise { _ => fail(\"negative padded size\") }", "}",
+    ])
+    data = b"\0A\0|\0B\0"
+    frame = references["reader_edges"].from_bytes(data)
+    checks = [f"  assert_eq(frame.{name}(), {json.dumps(getattr(frame, name))})"
+              for name in ("explicit_text", "explicit_strz", "explicit_sized", "unpositioned")]
+    checks.append(f"  assert_eq(frame.following().to_owned(), {bytes_literal(frame.following)})")
+    yield "\n".join(["///|", 'test "Kaitai reference explicit UTF16 byte terminators" {',
+                     f"  let frame = @reader_edges.parse_reader_edges({bytes_literal(data)})", *checks, "}"])
+    data = b"\0A\0B\0\0\0REST"
+    frame = references["reader_edges"].from_bytes(data)
+    yield "\n".join(["///|", 'test "Kaitai reference implicit UTF16 double byte terminator" {',
+                     f"  let frame = @reader_edges.parse_reader_edges({bytes_literal(data)})",
+                     f"  assert_eq(frame.implicit_strz(), {json.dumps(frame.implicit_strz)})", "}"])
+    frame = references["pure_nested_value"].from_bytes(b"")
+    yield "\n".join(["///|", 'test "Kaitai reference pure nested value record" {',
+                     '  let frame = @pure_nested_value.parse_pure_nested_value(b"")',
+                     f"  assert_eq(frame.header.number(), {frame.header.number}L)",
+                     f"  assert_eq(frame.header.label(), {json.dumps(frame.header.label)})", "}"])
+    for data in (b"", b"ABC"):
+        frame = references["pure_stream_value"].from_bytes(data)
+        checks = [f"  assert_eq(frame.peek().number(), {frame.peek.number}L)",
+                  f"  assert_eq(frame.peek().stream_size(), {frame.peek.stream_size}L)"]
+        if getattr(frame, "header", None) is None:
+            checks.append("  assert_true(frame.header is None)")
+        else:
+            checks.append(f"  assert_eq(frame.header.unwrap().stream_size(), {frame.header.stream_size}L)")
+        yield "\n".join(["///|", f'test "Kaitai reference pure stream input length {len(data)}" {{',
+                         f"  let frame = @pure_stream_value.parse_pure_stream_value({bytes_literal(data)})", *checks, "}"])
+    frame = references["pure_repeated_value"].from_bytes(b"")
+    yield "\n".join(["///|", 'test "Kaitai reference pure repeated and default branch records" {',
+                     '  let frame = @pure_repeated_value.parse_pure_repeated_value(b"")',
+                     f"  assert_eq(frame.headers.length(), {len(frame.headers)})",
+                     f"  assert_eq(frame.headers[0].number(), {frame.headers[0].number}L)",
+                     f"  assert_eq(frame.single().number(), {frame.single.number}L)",
+                     "  guard frame.choice() is Default(header)",
+                     f"  assert_eq(header.number(), {frame.choice.number}L)", "}"])
+
+
 def main():
     consumer = Path(sys.argv[1])
     if importlib.metadata.version("kaitaistruct") != VERSION:
@@ -302,7 +357,7 @@ def main():
     ]
     semantic_tests = list(compatibility_tests(references))
     tests.extend(semantic_tests)
-    stream_comparisons = list(stream_tests(references))
+    stream_comparisons = [*stream_tests(references), *edge_tests(references)]
     stream_output = ("// Expected values and prefix outcomes from official Kaitai Struct 0.11.\n"
                      "// Inputs, binary samples and Python specifications are pinned in fixtures/kaitai/manifest.json.\n"
                      "// Refresh: python scripts/kaitai-reference.py examples/consumer --refresh-stream-golden\n\n"

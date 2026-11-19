@@ -7,6 +7,7 @@ pub fn generate(source : String) -> String raise SchemaError {
   let root_type = pascal_case(id)
   let root_record_type = root_type + "Record"
   let records = [schema.root, ..schema.records]
+  let effects = read_effects(schema.records)
   let mut has_numeric_fields = false
   let mut has_uint64 = false
   let mut has_repeated_fields = false
@@ -45,18 +46,23 @@ pub fn generate(source : String) -> String raise SchemaError {
       }
     }
     for field in fields {
-      has_read_fields = true
       if field.condition is Some(condition) {
         has_arithmetic = has_arithmetic || expression_arithmetic(condition)
+        has_stream_size = has_stream_size || expression_stream_size(condition)
       }
       has_repeated_fields = has_repeated_fields || field.count is Some(_)
       if field.count is Some(ToEnd) {
         has_open_repeats = true
+        has_stream_size = true
       }
       if field.count is Some(Until(expression)) {
         has_arithmetic = has_arithmetic || expression_arithmetic(expression)
+        has_stream_size = has_stream_size || expression_stream_size(expression)
       }
       for kind in walk_kinds(field.kind) {
+        if !(kind is Nested(_)) && !(kind is Switch(_, _, _, _)) {
+          has_read_fields = true
+        }
         has_numeric_fields = has_numeric_fields ||
           kind is Unsigned(_, _) ||
           kind is Signed(_, _) ||
@@ -73,6 +79,7 @@ pub fn generate(source : String) -> String raise SchemaError {
           _ => ()
         }
         if kind is Switch(_, selector, cases, _) {
+          has_stream_size = has_stream_size || expression_stream_size(selector)
           has_arithmetic = has_arithmetic ||
             expression_arithmetic(selector) ||
             cases.iter().any(fn(c) { expression_arithmetic(c.0) })
@@ -108,7 +115,7 @@ pub fn generate(source : String) -> String raise SchemaError {
     has_positions~,
     has_arithmetic~,
     has_read_fields~,
-    has_input=has_read_fields || has_stream_size,
+    has_input=has_read_fields || has_stream_size || has_positions,
   )
   for record in schema.records {
     let name = nested_reader(id, record.name)
@@ -119,6 +126,7 @@ pub fn generate(source : String) -> String raise SchemaError {
       record,
       id,
       root_type,
+      effects,
     )
   }
   emit_record_reader(
@@ -128,16 +136,27 @@ pub fn generate(source : String) -> String raise SchemaError {
     schema.root,
     id,
     root_type,
+    effects,
   )
-  for record in records {
-    emit_instances(output, record, id, root_type, has_repeated_fields)
+  for index, record in records {
+    emit_instances(
+      output,
+      record,
+      id,
+      root_type,
+      has_repeated_fields,
+      effects,
+      is_root=index == 0,
+    )
   }
-  let effect = if schema.root.fields.is_empty() {
+  let effect = if !schema.root.fields
+    .iter()
+    .any(fn(field) { field_raises(field, effects) }) {
     ""
   } else {
     " raise \{root_type}ParseError"
   }
-  let input_arg = if has_read_fields || has_stream_size {
+  let input_arg = if has_read_fields || has_stream_size || has_positions {
     "input"
   } else {
     "_input"
@@ -150,7 +169,7 @@ pub fn generate(source : String) -> String raise SchemaError {
   } else {
     ""
   }
-  let input_state = if has_read_fields || has_stream_size {
+  let input_state = if has_read_fields || has_stream_size || has_positions {
     "input, "
   } else {
     ""
@@ -282,7 +301,11 @@ fn read_code(
         options,
         path,
         in_instance,
-        unit=if encoding.has_prefix("UTF-16") { 2 } else { 1 },
+        unit=if options.implicit_terminator && encoding.has_prefix("UTF-16") {
+          2
+        } else {
+          1
+        },
         big_endian=encoding == "UTF-16BE",
       )
       "{ let text_start = reader.offset; let text_bytes = \{bytes}; reader.decode_text(text_bytes, \{encoding.escape()}, \{path}, text_start) }"
@@ -324,8 +347,11 @@ fn emit_record_reader(
   record : RecordDef,
   id : String,
   root_type : String,
+  effects : Map[String, Bool],
 ) -> Unit {
-  let effect = if record.fields.is_empty() {
+  let effect = if !record.fields
+    .iter()
+    .any(fn(field) { field_raises(field, effects) }) {
     ""
   } else {
     " raise \{root_type}ParseError"

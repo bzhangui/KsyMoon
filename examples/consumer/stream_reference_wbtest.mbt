@@ -3284,3 +3284,60 @@ test "Kaitai reference bounded stream tag 99" {
   guard frame.choice is Raw(raw) else { fail("raw switch") }
   assert_eq(raw.to_owned(), b"\x52\x41\x57\x21")
 }
+
+///|
+test "Kaitai reference negative sized byte options" {
+  let frame = @reader_edges.parse_reader_edges(b"\x00\x41\x00")
+  assert_true(frame.conditional_text() is None)
+  try frame.sized_text() catch { _ => () } noraise { _ => fail("negative terminated size") }
+  try frame.padded_bytes() catch { _ => () } noraise { _ => fail("negative padded size") }
+}
+
+///|
+test "Kaitai reference explicit UTF16 byte terminators" {
+  let frame = @reader_edges.parse_reader_edges(b"\x00\x41\x00\x7C\x00\x42\x00")
+  assert_eq(frame.explicit_text(), "A")
+  assert_eq(frame.explicit_strz(), "A")
+  assert_eq(frame.explicit_sized(), "A")
+  assert_eq(frame.unpositioned(), "A")
+  assert_eq(frame.following().to_owned(), b"\x00\x42\x00")
+}
+
+///|
+test "Kaitai reference implicit UTF16 double byte terminator" {
+  let frame = @reader_edges.parse_reader_edges(b"\x00\x41\x00\x42\x00\x00\x00\x52\x45\x53\x54")
+  assert_eq(frame.implicit_strz(), "AB")
+}
+
+///|
+test "Kaitai reference pure nested value record" {
+  let frame = @pure_nested_value.parse_pure_nested_value(b"")
+  assert_eq(frame.header.number(), 42L)
+  assert_eq(frame.header.label(), "ok")
+}
+
+///|
+test "Kaitai reference pure stream input length 0" {
+  let frame = @pure_stream_value.parse_pure_stream_value(b"")
+  assert_eq(frame.peek().number(), 42L)
+  assert_eq(frame.peek().stream_size(), 0L)
+  assert_true(frame.header is None)
+}
+
+///|
+test "Kaitai reference pure stream input length 3" {
+  let frame = @pure_stream_value.parse_pure_stream_value(b"\x41\x42\x43")
+  assert_eq(frame.peek().number(), 42L)
+  assert_eq(frame.peek().stream_size(), 3L)
+  assert_eq(frame.header.unwrap().stream_size(), 3L)
+}
+
+///|
+test "Kaitai reference pure repeated and default branch records" {
+  let frame = @pure_repeated_value.parse_pure_repeated_value(b"")
+  assert_eq(frame.headers.length(), 2)
+  assert_eq(frame.headers[0].number(), 42L)
+  assert_eq(frame.single().number(), 42L)
+  guard frame.choice() is Default(header)
+  assert_eq(header.number(), 42L)
+}

@@ -66,8 +66,8 @@ fn StrEosPadTermReader::substream(_self : StrEosPadTermReader, bytes : BytesView
 }
 
 ///|
-fn StrEosPadTermReader::read_bytes(self : StrEosPadTermReader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise StrEosPadTermParseError {
-  let bytes = if length == -1L {
+fn StrEosPadTermReader::read_bytes(self : StrEosPadTermReader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise StrEosPadTermParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -88,7 +88,7 @@ fn StrEosPadTermReader::read_bytes(self : StrEosPadTermReader, length : Int64, t
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -142,7 +142,7 @@ fn StrEosPadTermReader::decode_text(_self : StrEosPadTermReader, bytes : BytesVi
 ///|
 fn read_str_eos_pad_term_type_str_pad_type(reader : StrEosPadTermReader, path : String) -> StrEosPadTerm_str_pad_type raise StrEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), -1, 64, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, -1, 64, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
   {
     value: v_value,
   }
@@ -151,7 +151,7 @@ fn read_str_eos_pad_term_type_str_pad_type(reader : StrEosPadTermReader, path : 
 ///|
 fn read_str_eos_pad_term_type_str_term_type(reader : StrEosPadTermReader, path : String) -> StrEosPadTerm_str_term_type raise StrEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), 64, -1, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, 64, -1, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
   {
     value: v_value,
   }
@@ -160,7 +160,7 @@ fn read_str_eos_pad_term_type_str_term_type(reader : StrEosPadTermReader, path :
 ///|
 fn read_str_eos_pad_term_type_str_term_and_pad_type(reader : StrEosPadTermReader, path : String) -> StrEosPadTerm_str_term_and_pad_type raise StrEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), 64, 43, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, 64, 43, false, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
   {
     value: v_value,
   }
@@ -169,7 +169,7 @@ fn read_str_eos_pad_term_type_str_term_and_pad_type(reader : StrEosPadTermReader
 ///|
 fn read_str_eos_pad_term_type_str_term_include_type(reader : StrEosPadTermReader, path : String) -> StrEosPadTerm_str_term_include_type raise StrEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), 64, -1, true, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, 64, -1, true, true, true, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
   {
     value: v_value,
   }

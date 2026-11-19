@@ -17,8 +17,8 @@ fn emit_stream_reader(
   if byte_options {
     let block =
       #|///|
-      #|fn __ROOT__Reader::read_bytes(self : __ROOT__Reader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise __ROOT__ParseError {
-      #|  let bytes = if length == -1L {
+      #|fn __ROOT__Reader::read_bytes(self : __ROOT__Reader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise __ROOT__ParseError {
+      #|  let bytes = if terminated {
       #|    let start = self.offset
       #|    let mut end = start
       #|    while end + unit <= self.input.length() {
@@ -39,7 +39,7 @@ fn emit_stream_reader(
       #|  let mut end = bytes.length()
       #|  if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
       #|  // A sized field is consumed completely even when a terminator occurs early.
-      #|  if length != -1L && terminator >= 0 {
+      #|  if !terminated && terminator >= 0 {
       #|    let mut i = 0
       #|    while i + unit <= end {
       #|      let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }

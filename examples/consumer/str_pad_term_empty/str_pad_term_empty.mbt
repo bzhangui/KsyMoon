@@ -41,8 +41,8 @@ fn StrPadTermEmptyReader::take(
 }
 
 ///|
-fn StrPadTermEmptyReader::read_bytes(self : StrPadTermEmptyReader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise StrPadTermEmptyParseError {
-  let bytes = if length == -1L {
+fn StrPadTermEmptyReader::read_bytes(self : StrPadTermEmptyReader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise StrPadTermEmptyParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -63,7 +63,7 @@ fn StrPadTermEmptyReader::read_bytes(self : StrPadTermEmptyReader, length : Int6
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -117,13 +117,13 @@ fn StrPadTermEmptyReader::decode_text(_self : StrPadTermEmptyReader, bytes : Byt
 ///|
 fn read_str_pad_term_empty_root(reader : StrPadTermEmptyReader, path : String) -> StrPadTermEmptyRecord raise StrPadTermEmptyParseError {
   let path_str_pad = path + ".str_pad"
-  let v_str_pad = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, -1, 64, false, true, true, 1, false, path_str_pad); reader.decode_text(text_bytes, "UTF-8", path_str_pad, text_start) }
+  let v_str_pad = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, false, -1, 64, false, true, true, 1, false, path_str_pad); reader.decode_text(text_bytes, "UTF-8", path_str_pad, text_start) }
   let path_str_term = path + ".str_term"
-  let v_str_term = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, 64, -1, false, true, true, 1, false, path_str_term); reader.decode_text(text_bytes, "UTF-8", path_str_term, text_start) }
+  let v_str_term = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, false, 64, -1, false, true, true, 1, false, path_str_term); reader.decode_text(text_bytes, "UTF-8", path_str_term, text_start) }
   let path_str_term_and_pad = path + ".str_term_and_pad"
-  let v_str_term_and_pad = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, 64, 43, false, true, true, 1, false, path_str_term_and_pad); reader.decode_text(text_bytes, "UTF-8", path_str_term_and_pad, text_start) }
+  let v_str_term_and_pad = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, false, 64, 43, false, true, true, 1, false, path_str_term_and_pad); reader.decode_text(text_bytes, "UTF-8", path_str_term_and_pad, text_start) }
   let path_str_term_include = path + ".str_term_include"
-  let v_str_term_include = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, 64, -1, true, true, true, 1, false, path_str_term_include); reader.decode_text(text_bytes, "UTF-8", path_str_term_include, text_start) }
+  let v_str_term_include = { let text_start = reader.offset; let text_bytes = reader.read_bytes(20L, false, 64, -1, true, true, true, 1, false, path_str_term_include); reader.decode_text(text_bytes, "UTF-8", path_str_term_include, text_start) }
   {
     str_pad: v_str_pad,
     str_term: v_str_term,

@@ -42,8 +42,8 @@ fn RepeatUntilS4Reader::take(
 }
 
 ///|
-fn RepeatUntilS4Reader::read_bytes(self : RepeatUntilS4Reader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise RepeatUntilS4ParseError {
-  let bytes = if length == -1L {
+fn RepeatUntilS4Reader::read_bytes(self : RepeatUntilS4Reader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise RepeatUntilS4ParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -64,7 +64,7 @@ fn RepeatUntilS4Reader::read_bytes(self : RepeatUntilS4Reader, length : Int64, t
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -198,7 +198,7 @@ fn read_repeat_until_s4_root(reader : RepeatUntilS4Reader, path : String) -> Rep
     if (item.to_int64() == reader.arithmetic("-", 0L, 1L, item_path)) { break }
   }
   let path_afterall = path + ".afterall"
-  let v_afterall = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 0, -1, false, true, true, 1, false, path_afterall); reader.decode_text(text_bytes, "ASCII", path_afterall, text_start) }
+  let v_afterall = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, true, true, 1, false, path_afterall); reader.decode_text(text_bytes, "ASCII", path_afterall, text_start) }
   {
     entries: v_entries,
     afterall: v_afterall,

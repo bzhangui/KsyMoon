@@ -65,8 +65,8 @@ fn BytesEosPadTermReader::substream(_self : BytesEosPadTermReader, bytes : Bytes
 }
 
 ///|
-fn BytesEosPadTermReader::read_bytes(self : BytesEosPadTermReader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise BytesEosPadTermParseError {
-  let bytes = if length == -1L {
+fn BytesEosPadTermReader::read_bytes(self : BytesEosPadTermReader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise BytesEosPadTermParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -87,7 +87,7 @@ fn BytesEosPadTermReader::read_bytes(self : BytesEosPadTermReader, length : Int6
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -101,7 +101,7 @@ fn BytesEosPadTermReader::read_bytes(self : BytesEosPadTermReader, length : Int6
 ///|
 fn read_bytes_eos_pad_term_type_str_pad_type(reader : BytesEosPadTermReader, path : String) -> BytesEosPadTerm_str_pad_type raise BytesEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), -1, 64, false, true, true, 1, false, path_value)
+  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, -1, 64, false, true, true, 1, false, path_value)
   {
     value: v_value,
   }
@@ -110,7 +110,7 @@ fn read_bytes_eos_pad_term_type_str_pad_type(reader : BytesEosPadTermReader, pat
 ///|
 fn read_bytes_eos_pad_term_type_str_term_type(reader : BytesEosPadTermReader, path : String) -> BytesEosPadTerm_str_term_type raise BytesEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), 64, -1, false, true, true, 1, false, path_value)
+  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, 64, -1, false, true, true, 1, false, path_value)
   {
     value: v_value,
   }
@@ -119,7 +119,7 @@ fn read_bytes_eos_pad_term_type_str_term_type(reader : BytesEosPadTermReader, pa
 ///|
 fn read_bytes_eos_pad_term_type_str_term_and_pad_type(reader : BytesEosPadTermReader, path : String) -> BytesEosPadTerm_str_term_and_pad_type raise BytesEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), 64, 43, false, true, true, 1, false, path_value)
+  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, 64, 43, false, true, true, 1, false, path_value)
   {
     value: v_value,
   }
@@ -128,7 +128,7 @@ fn read_bytes_eos_pad_term_type_str_term_and_pad_type(reader : BytesEosPadTermRe
 ///|
 fn read_bytes_eos_pad_term_type_str_term_include_type(reader : BytesEosPadTermReader, path : String) -> BytesEosPadTerm_str_term_include_type raise BytesEosPadTermParseError {
   let path_value = path + ".value"
-  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), 64, -1, true, true, true, 1, false, path_value)
+  let v_value = reader.read_bytes((reader.input.length() - reader.offset).to_int64(), false, 64, -1, true, true, true, 1, false, path_value)
   {
     value: v_value,
   }

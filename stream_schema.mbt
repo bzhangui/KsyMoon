@@ -56,6 +56,7 @@ fn parse_byte_options(
   {
     length,
     terminator,
+    implicit_terminator: strz && !field.contains("terminator"),
     padding,
     keep_terminator: boolean_option(field, "include", false, path),
     consume: boolean_option(field, "consume", true, path),

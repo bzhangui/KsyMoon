@@ -62,8 +62,8 @@ fn TermStrz4Reader::substream(_self : TermStrz4Reader, bytes : BytesView) -> Ter
 }
 
 ///|
-fn TermStrz4Reader::read_bytes(self : TermStrz4Reader, length : Int64, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise TermStrz4ParseError {
-  let bytes = if length == -1L {
+fn TermStrz4Reader::read_bytes(self : TermStrz4Reader, length : Int64, terminated : Bool, terminator : Int, padding : Int, keep_terminator : Bool, consume : Bool, eos_error : Bool, unit : Int, big_endian : Bool, field : String) -> BytesView raise TermStrz4ParseError {
+  let bytes = if terminated {
     let start = self.offset
     let mut end = start
     while end + unit <= self.input.length() {
@@ -84,7 +84,7 @@ fn TermStrz4Reader::read_bytes(self : TermStrz4Reader, length : Int64, terminato
   let mut end = bytes.length()
   if padding >= 0 { while end > 0 && bytes[end - 1].to_int() == padding { end -= 1 } }
   // A sized field is consumed completely even when a terminator occurs early.
-  if length != -1L && terminator >= 0 {
+  if !terminated && terminator >= 0 {
     let mut i = 0
     while i + unit <= end {
       let matches = if unit == 1 { bytes[i].to_int() == terminator } else if big_endian { bytes[i] == 0 && bytes[i + 1].to_int() == terminator } else { bytes[i].to_int() == terminator && bytes[i + 1] == 0 }
@@ -154,7 +154,7 @@ fn TermStrz4Reader::read_bits(
 ///|
 fn read_term_strz4_type_s1_type(reader : TermStrz4Reader, path : String) -> TermStrz4_s1_type raise TermStrz4ParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 124, -1, false, true, false, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 124, -1, false, true, false, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
   {
     value: v_value,
   }
@@ -163,7 +163,7 @@ fn read_term_strz4_type_s1_type(reader : TermStrz4Reader, path : String) -> Term
 ///|
 fn read_term_strz4_type_s2_type(reader : TermStrz4Reader, path : String) -> TermStrz4_s2_type raise TermStrz4ParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 124, -1, false, false, false, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 124, -1, false, false, false, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
   {
     value: v_value,
   }
@@ -172,7 +172,7 @@ fn read_term_strz4_type_s2_type(reader : TermStrz4Reader, path : String) -> Term
 ///|
 fn read_term_strz4_type_s3_type(reader : TermStrz4Reader, path : String) -> TermStrz4_s3_type raise TermStrz4ParseError {
   let path_value = path + ".value"
-  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, 64, -1, true, true, false, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
+  let v_value = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 64, -1, true, true, false, 1, false, path_value); reader.decode_text(text_bytes, "UTF-8", path_value, text_start) }
   {
     value: v_value,
   }
