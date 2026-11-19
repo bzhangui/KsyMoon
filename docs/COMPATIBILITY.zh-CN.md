@@ -84,3 +84,7 @@ python scripts/compatibility-report.py --runtime-report
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。第二条脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
 
 `generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。当前盘点为 **99 份生成、240 份待支持**，全部 339 份都保留结果。35 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P2—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
+
+## 发布内容核验
+
+`python scripts/package-check.py` 检查实际 ZIP，并用本地申报书占位文件覆盖未跟踪文件场景，确认申报书、参考生成旁路文件与构建目录被排除，必需源码及许可证完整。CI 上传 `_build/package-content-report.json`。本地草稿保留在项目目录，排除规则不修改其内容。该步骤未发布新版本，Mooncakes 当前仍为 `0.2.0`。

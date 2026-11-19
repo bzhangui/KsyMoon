@@ -44,9 +44,12 @@ jobs:
           fi
           node scripts/verify.mjs --kaitai-reference
           python scripts/compatibility-report.py --runtime-report
+          python scripts/package-check.py
       - name: Upload complete compatibility inventory
         uses: actions/upload-artifact@v4
         with:
           name: kaitai-compatibility-inventory
-          path: _build/compatibility-report.json
+          path: |
+            _build/compatibility-report.json
+            _build/package-content-report.json
           if-no-files-found: error

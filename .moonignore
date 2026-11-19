@@ -1,0 +1,11 @@
+# Build and dependency output. A .moonignore replaces the local .gitignore.
+_build/
+.mooncakes/
+target/
+
+# Keep the entrant-owned local draft out of registry archives.
+/项目申报书.md
+
+# Reference outputs generated locally, not the checked-in oracle assertions.
+/examples/consumer/kaitai_reference_wbtest.mbt
+/examples/consumer/oracle-cases.json
