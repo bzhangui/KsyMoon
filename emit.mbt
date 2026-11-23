@@ -2,6 +2,9 @@
 /// Compiles one supported Kaitai Struct description to self-contained MoonBit source.
 pub fn generate(source : String) -> String raise SchemaError {
   let schema = load_schema(source)
+  if schema.has_io {
+    return generate_context_schema(schema)
+  }
   let output = StringBuilder()
   let id = schema.root.name
   let root_type = pascal_case(id)
@@ -245,11 +248,16 @@ fn emit_record_type(
 }
 
 ///|
-fn length_code(expression : LengthExpr, in_instance~ : Bool = false) -> String {
+fn length_code(
+  expression : LengthExpr,
+  in_instance~ : Bool = false,
+  evaluate~ : ((Expr) -> String)? = None,
+) -> String {
   let prefix = if in_instance { "self." } else { "v_" }
   match expression {
     Constant(value) => "\{value}L"
     Remaining => "(reader.input.length() - reader.offset).to_int64()"
+    Calculated(value) => evaluate.unwrap()(value)
     EarlierField(name, 0L) => "\{prefix}\{name}.to_int64()"
     EarlierField(name, subtract) => "\{prefix}\{name}.to_int64() - \{subtract}L"
   }
@@ -270,6 +278,8 @@ fn read_code(
   path : String,
   in_instance~ : Bool = false,
   reference~ : (String) -> String = fn(name) { "v_\{name}.to_int64()" },
+  evaluate~ : ((Expr) -> String)? = None,
+  parent_context~ : String? = None,
 ) -> String {
   match kind {
     Unsigned(width, endian) =>
@@ -294,8 +304,14 @@ fn read_code(
         .collect()
       "reader.read_contents(Bytes::from_array([\{values.join(", ")}]), \{path})"
     }
-    Nested(name) => "\{nested_reader(id, name)}(reader, \{path})"
-    ByteField(options) => byte_read_code(options, path, in_instance)
+    Nested(name) => {
+      let extra = match parent_context {
+        Some(context) => ", arena, " + context
+        None => ""
+      }
+      "\{nested_reader(id, name)}(reader, \{path}\{extra})"
+    }
+    ByteField(options) => byte_read_code(options, path, in_instance, evaluate~)
     Text(options, encoding) => {
       let bytes = byte_read_code(
         options,
@@ -307,11 +323,12 @@ fn read_code(
           1
         },
         big_endian=encoding == "UTF-16BE",
+        evaluate~,
       )
       "{ let text_start = reader.offset; let text_bytes = \{bytes}; reader.decode_text(text_bytes, \{encoding.escape()}, \{path}, text_start) }"
     }
     Bounded(inner, options) => {
-      let bytes = byte_read_code(options, path, in_instance)
+      let bytes = byte_read_code(options, path, in_instance, evaluate~)
       let call = match inner {
         Switch(_, _, _, _) =>
           switch_read_code(
@@ -322,20 +339,43 @@ fn read_code(
             true,
             in_instance,
             selector_override=Some("ksy_selector"),
+            evaluate~,
+            parent_context~,
           )
-        _ => read_code(inner, id, path, in_instance~, reference~)
+        _ =>
+          read_code(
+            inner,
+            id,
+            path,
+            in_instance~,
+            reference~,
+            evaluate~,
+            parent_context~,
+          )
       }
       let selection = match inner {
         Switch(_, selector, cases, _) if !cases.is_empty() =>
           "let ksy_selector = " +
-          expression_code(selector, reference, path) +
+          (match evaluate {
+            Some(evaluate) => evaluate(selector)
+            None => expression_code(selector, reference, path)
+          }) +
           "; "
         _ => ""
       }
       "{ \{selection}let substream = reader.substream(\{bytes}); let reader = substream; \{call} }"
     }
     Switch(_, _, _, _) =>
-      switch_read_code(kind, id, path, reference, false, in_instance)
+      switch_read_code(
+        kind,
+        id,
+        path,
+        reference,
+        false,
+        in_instance,
+        evaluate~,
+        parent_context~,
+      )
   }
 }
 

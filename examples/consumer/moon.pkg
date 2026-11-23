@@ -51,4 +51,11 @@ import {
   "example/ksymoon-consumer/pure_nested_value",
   "example/ksymoon-consumer/pure_stream_value",
   "example/ksymoon-consumer/pure_repeated_value",
+  "example/ksymoon-consumer/instance_io_user",
+  "example/ksymoon-consumer/instance_io_user_earlier",
+  "example/ksymoon-consumer/nav_parent2",
+  "example/ksymoon-consumer/nav_parent3",
+  "example/ksymoon-consumer/io_partial_seq",
+  "example/ksymoon-consumer/io_partial_lazy",
+  "example/ksymoon-consumer/cross_stream_layout",
 } for "wbtest"

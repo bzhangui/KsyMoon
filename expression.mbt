@@ -4,18 +4,26 @@ priv enum Expr {
   Text(String)
   Boolean(Bool)
   Reference(String)
+  Member(Expr, String)
+  Index(Expr, Expr)
   StreamPosition
   StreamSize
   Unary(String, Expr)
   Binary(String, Expr, Expr)
   Choose(Expr, Expr, Expr)
-}
+} derive(Eq)
 
 ///|
 priv enum ExprType {
   Integer
   Boolean
   Text
+  Stream
+  Object(Array[String])
+  Sequence(ExprType)
+  Bytes
+  WideInteger
+  Real
 } derive(Eq)
 
 ///|
@@ -146,20 +154,21 @@ fn ExprParser::parse(
     "not" => Unary(token, self.parse(3))
     "true" => Boolean(true)
     "false" => Boolean(false)
-    "_io" => {
-      guard self.peek() == "." else {
-        invalid(self.path, "expected _io.pos or _io.size")
+    "_io" =>
+      if self.peek() != "." {
+        Reference("_io")
+      } else {
+        self.index += 1
+        let attribute = self.peek()
+        self.index += 1
+        match attribute {
+          "pos" => StreamPosition
+          "size" => StreamSize
+          "eof" => Binary("==", StreamPosition, StreamSize)
+          _ => invalid(self.path, "expected _io.pos or _io.size")
+        }
       }
-      self.index += 1
-      let attribute = self.peek()
-      self.index += 1
-      match attribute {
-        "pos" => StreamPosition
-        "size" => StreamSize
-        "eof" => Binary("==", StreamPosition, StreamSize)
-        _ => invalid(self.path, "expected _io.pos or _io.size")
-      }
-    }
+    "_root" | "_parent" => Reference(token)
     number if number[0] >= '0' && number[0] <= '9' =>
       Integer(
         @string.parse_int64(number[:]) catch {
@@ -183,6 +192,25 @@ fn ExprParser::parse(
       Reference(name)
     }
     _ => invalid(self.path, "unexpected expression token '\{token}'")
+  }
+  while self.peek() == "." || self.peek() == "[" {
+    let operation = self.peek()
+    self.index += 1
+    if operation == "." {
+      let attribute = self.peek()
+      if attribute != "_io" && attribute != "_root" && attribute != "_parent" {
+        check_identifier(attribute, self.path)
+      }
+      self.index += 1
+      left = Member(left, attribute)
+    } else {
+      let index = self.parse(1)
+      guard self.peek() == "]" else {
+        invalid(self.path, "expected ']' in array access")
+      }
+      self.index += 1
+      left = Index(left, index)
+    }
   }
   while expression_precedence(self.peek()) >= minimum {
     let op = self.peek()
@@ -238,6 +266,11 @@ fn check_expression_depth(
 ) -> Unit raise SchemaError {
   guard depth <= 64 else { invalid(path, "expression nesting exceeds 64") }
   match expression {
+    Member(value, _) => check_expression_depth(value, depth + 1, path)
+    Index(value, index) => {
+      check_expression_depth(value, depth + 1, path)
+      check_expression_depth(index, depth + 1, path)
+    }
     Unary(_, value) => check_expression_depth(value, depth + 1, path)
     Binary(_, left, right) => {
       check_expression_depth(left, depth + 1, path)
@@ -257,20 +290,26 @@ fn expression_type(
   expression : Expr,
   lookup : (String) -> ExprType raise SchemaError,
   path : String,
+  navigation~ : ((Expr) -> ExprType raise SchemaError)? = None,
 ) -> ExprType raise SchemaError {
   match expression {
     Integer(_) | StreamPosition | StreamSize => Integer
     Boolean(_) => Boolean
     Text(_) => Text
     Reference(name) => lookup(name)
+    Member(_, _) | Index(_, _) =>
+      match navigation {
+        Some(resolve) => resolve(expression)
+        None => invalid(path, "object navigation awaits implementation")
+      }
     Unary(op, value) => {
       let expected = if op == "not" { ExprType::Boolean } else { Integer }
-      require_expression_type(value, expected, lookup, path)
+      require_expression_type(value, expected, lookup, path, navigation~)
       expected
     }
     Binary(op, left, right) => {
-      let left_type = expression_type(left, lookup, path)
-      let right_type = expression_type(right, lookup, path)
+      let left_type = expression_type(left, lookup, path, navigation~)
+      let right_type = expression_type(right, lookup, path, navigation~)
       guard left_type == right_type else {
         invalid(path, "expression operands have different types")
       }
@@ -295,9 +334,9 @@ fn expression_type(
       }
     }
     Choose(condition, yes, no) => {
-      require_expression_type(condition, Boolean, lookup, path)
-      let result = expression_type(yes, lookup, path)
-      require_expression_type(no, result, lookup, path)
+      require_expression_type(condition, Boolean, lookup, path, navigation~)
+      let result = expression_type(yes, lookup, path, navigation~)
+      require_expression_type(no, result, lookup, path, navigation~)
       result
     }
   }
@@ -309,8 +348,9 @@ fn require_expression_type(
   expected : ExprType,
   lookup : (String) -> ExprType raise SchemaError,
   path : String,
+  navigation~ : ((Expr) -> ExprType raise SchemaError)? = None,
 ) -> Unit raise SchemaError {
-  guard expression_type(value, lookup, path) == expected else {
+  guard expression_type(value, lookup, path, navigation~) == expected else {
     invalid(
       path,
       if expected == Boolean {
@@ -338,38 +378,47 @@ fn expression_code(
   expression : Expr,
   reference : (String) -> String,
   path : String,
+  navigation~ : ((Expr) -> String)? = None,
+  stream_reader~ : String = "reader",
 ) -> String {
+  let child = fn(value) {
+    expression_code(value, reference, path, navigation~, stream_reader~)
+  }
   match expression {
     Integer(n) => "\{n}L"
     Text(value) => value.escape()
     Boolean(value) => if value { "true" } else { "false" }
     Reference(name) => reference(name)
-    StreamPosition => "reader.offset.to_int64()"
-    StreamSize => "reader.input.length().to_int64()"
-    Unary("not", value) => "(!\{expression_code(value, reference, path)})"
-    Unary("+", value) => expression_code(value, reference, path)
-    Unary("~", value) => "(\{expression_code(value, reference, path)}.lnot())"
+    Member(_, _) | Index(_, _) => navigation.unwrap()(expression)
+    StreamPosition => "\{stream_reader}.offset.to_int64()"
+    StreamSize => "\{stream_reader}.input.length().to_int64()"
+    Unary("not", value) => "(!\{child(value)})"
+    Unary("+", value) => child(value)
+    Unary("~", value) => "(\{child(value)}.lnot())"
     Unary(_, value) =>
-      "reader.arithmetic(\"-\", 0L, \{expression_code(value, reference, path)}, \{path})"
+      "\{stream_reader}.arithmetic(\"-\", 0L, \{child(value)}, \{path})"
     Binary(op, left, right) => {
-      let a = expression_code(left, reference, path)
-      let b = expression_code(right, reference, path)
+      let a = child(left)
+      let b = child(right)
       match op {
         "+" | "-" | "*" | "/" | "%" | "<<" | ">>" =>
-          "reader.arithmetic(\"\{op}\", \{a}, \{b}, \{path})"
+          "\{stream_reader}.arithmetic(\"\{op}\", \{a}, \{b}, \{path})"
         "and" => "(\{a} && \{b})"
         "or" => "(\{a} || \{b})"
         _ => "(\{a} \{op} \{b})"
       }
     }
     Choose(condition, yes, no) =>
-      "(if \{expression_code(condition, reference, path)} { \{expression_code(yes, reference, path)} } else { \{expression_code(no, reference, path)} })"
+      "(if \{child(condition)} { \{child(yes)} } else { \{child(no)} })"
   }
 }
 
 ///|
 fn expression_arithmetic(expression : Expr) -> Bool {
   match expression {
+    Member(value, _) => expression_arithmetic(value)
+    Index(value, index) =>
+      expression_arithmetic(value) || expression_arithmetic(index)
     Unary(op, value) => op == "-" || expression_arithmetic(value)
     Binary(op, a, b) =>
       ["+", "-", "*", "/", "%", "<<", ">>"].contains(op) ||
@@ -387,6 +436,10 @@ fn expression_arithmetic(expression : Expr) -> Bool {
 fn expression_stream_size(expression : Expr) -> Bool {
   match expression {
     StreamSize => true
+    Member(value, attribute) =>
+      attribute == "size" || expression_stream_size(value)
+    Index(value, index) =>
+      expression_stream_size(value) || expression_stream_size(index)
     Unary(_, value) => expression_stream_size(value)
     Binary(_, a, b) => expression_stream_size(a) || expression_stream_size(b)
     Choose(c, a, b) =>

@@ -9,6 +9,7 @@ priv struct Instance {
   name : String
   kind : InstanceKind
   condition : Expr?
+  io : Expr?
 }
 
 ///|
@@ -34,6 +35,7 @@ fn parse_instances(
   endian : Endian?,
   type_names : Array[String],
   path : String,
+  navigation~ : Bool = false,
 ) -> Array[Instance] raise SchemaError {
   let mapping = match value {
     None => return []
@@ -59,7 +61,7 @@ fn parse_instances(
       [
         "value", "pos", "if", "type", "size", "contents", "valid", "repeat", "repeat-expr",
         "doc", "doc-ref", "repeat-until", "size-eos", "encoding", "terminator", "pad-right",
-        "include", "consume", "eos-error",
+        "include", "consume", "eos-error", "io",
       ],
       path,
     )
@@ -67,6 +69,9 @@ fn parse_instances(
       None => None
       Some(value) => Some(parse_expression(value, path + ".if"))
     }
+    let io = properties
+      .get("io")
+      .map(fn(value) raise SchemaError { parse_expression(value, path + ".io") })
     let kind = match properties.get("value") {
       Some(value) => {
         check_keys(properties, ["value", "if", "doc", "doc-ref"], path)
@@ -79,6 +84,7 @@ fn parse_instances(
         }
         let read_properties = properties.copy()
         ignore(read_properties.remove("pos"))
+        ignore(read_properties.remove("io"))
         ignore(read_properties.remove("if"))
         read_properties["id"] = @yaml.String(name)
         let field = parse_field(
@@ -87,11 +93,12 @@ fn parse_instances(
           endian,
           type_names,
           path,
+          navigation~,
         )
         Parsed(field, position)
       }
     }
-    instances.push({ name, kind, condition, })
+    instances.push({ name, kind, condition, io, })
   }
   instances
 }

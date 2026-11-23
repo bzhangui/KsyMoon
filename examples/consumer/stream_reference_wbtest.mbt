@@ -3341,3 +3341,999 @@ test "Kaitai reference pure repeated and default branch records" {
   guard frame.choice() is Default(header)
   assert_eq(header.number(), 42L)
 }
+
+///|
+test "Kaitai reference cross-stream upstream instance_io_user" {
+  let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20\x69\x74\x20\x69\x73\x00")
+  assert_eq(frame.qty_entries, 3U)
+  assert_eq(frame.entries[0].name_ofs, 0U)
+  assert_eq(frame.entries[0].value, 4294967295U)
+  assert_eq(frame.entries[0].name(), "the")
+  assert_eq(frame.entries[0].name(), "the")
+  assert_eq(frame.entries[1].name_ofs, 4U)
+  assert_eq(frame.entries[1].value, 4278190079U)
+  assert_eq(frame.entries[1].name(), "rainy")
+  assert_eq(frame.entries[1].name(), "rainy")
+  assert_eq(frame.entries[2].name_ofs, 10U)
+  assert_eq(frame.entries[2].value, 4261412863U)
+  assert_eq(frame.entries[2].name(), "day it is")
+  assert_eq(frame.entries[2].name(), "day it is")
+  assert_eq(frame.strings.str, ["the", "rainy", "day it is"])
+}
+
+///|
+test "Kaitai reference lazy prefix outcomes instance_io_user" {
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 0") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 1") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 2") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 3") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 4") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 5") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 6") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 7") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 8") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 9") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 10") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 11") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 12") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 13") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 14") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 15") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 16") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 17") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 18") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 19") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 20") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 21") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 22") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 23") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 24") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 25") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 26") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 27") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 28") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 29") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 30") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 31") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 32") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 33") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 34") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 35") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 36") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 37") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 38") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 39") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 40") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 41") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 42") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20\x69")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 43") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20\x69\x74")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 44") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20\x69\x74\x20")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 45") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20\x69\x74\x20\x69")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 46") }
+  try {
+    let frame = @instance_io_user.parse_instance_io_user(b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20\x69\x74\x20\x69\x73")
+    for item in frame.entries { ignore(item.name()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user prefix 47") }
+}
+
+///|
+test "Kaitai reference cross-stream upstream instance_io_user_earlier" {
+  let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00\x59\xFE\xCA\x00\x00\x49\x07")
+  assert_eq(frame.a_mid(), 28527U)
+  assert_eq(frame.b_mid(), 0U)
+  assert_eq(frame.sized_a.content, Some(83U))
+  assert_eq(frame.sized_a.last(), Some(88U))
+  assert_eq(frame.sized_b.content, Some(66U))
+  assert_eq(frame.sized_b.last(), Some(254U))
+  assert_eq(frame.into_a.indicator, 0U)
+  assert_eq(frame.into_a.bar, Some(73U))
+  assert_eq(frame.into_a.inst().content, Some(102U))
+  assert_eq(frame.into_a.inst().last(), Some(0U))
+  assert_eq(frame.into_b.indicator, 202U)
+  assert_eq(frame.into_b.bar, None)
+  assert_eq(frame.into_b.inst().content, Some(0U))
+  assert_eq(frame.into_b.inst().last(), Some(89U))
+  assert_eq(frame.into_a_skipped.indicator, 0U)
+  assert_eq(frame.into_a_skipped.bar, None)
+  assert_eq(frame.into_a_skipped.inst().content, None)
+  assert_eq(frame.into_a_skipped.inst().last(), None)
+  assert_eq(frame.last_accessor.v, Some(7U))
+}
+
+///|
+test "Kaitai reference lazy prefix outcomes instance_io_user_earlier" {
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 0") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 1") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 2") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 3") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 4") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 5") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 6") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 7") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 8") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 9") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 10") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00\x59")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 11") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00\x59\xFE")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 12") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00\x59\xFE\xCA")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 13") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00\x59\xFE\xCA\x00")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 14") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00\x59\xFE\xCA\x00\x00")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 15") }
+  try {
+    let frame = @instance_io_user_earlier.parse_instance_io_user_earlier(b"\x53\x66\x6F\x6F\x00\x58\x42\x00\x00\x00\x59\xFE\xCA\x00\x00\x49")
+    ignore(frame.a_mid())
+    ignore(frame.b_mid())
+    ignore(frame.into_a.inst().last())
+    ignore(frame.into_b.inst().last())
+    ignore(frame.sized_a.last())
+    ignore(frame.sized_b.last())
+    ignore(frame.into_a_skipped.inst().last())
+  } catch { _ => () }
+  noraise { _ => fail("accepted instance_io_user_earlier prefix 16") }
+}
+
+///|
+test "Kaitai reference cross-stream upstream nav_parent2" {
+  let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72\x62\x61\x7A")
+  assert_eq(frame.ofs_tags, 8U)
+  assert_eq(frame.num_tags, 2U)
+  let tags = frame.tags
+  assert_eq(tags.length(), 2)
+  assert_eq(tags[0].name, "RAHC")
+  assert_eq(tags[0].ofs, 32U)
+  assert_eq(tags[0].num_items, 3U)
+  guard tags[0].tag_content() is Case0(body_0) else { fail("wrong tag branch") }
+  assert_eq(body_0.content, "foo")
+  assert_eq(tags[1].name, "RAHC")
+  assert_eq(tags[1].ofs, 35U)
+  assert_eq(tags[1].num_items, 6U)
+  guard tags[1].tag_content() is Case0(body_1) else { fail("wrong tag branch") }
+  assert_eq(body_1.content, "barbaz")
+}
+
+///|
+test "Kaitai reference lazy prefix outcomes nav_parent2" {
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 0") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 1") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 2") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 3") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 4") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 5") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 6") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 7") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 8") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 9") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 10") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 11") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 12") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 13") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 14") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 15") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 16") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 17") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 18") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 19") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 20") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 21") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 22") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 23") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 24") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 25") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 26") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 27") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 28") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 29") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 30") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 31") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 32") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 33") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 34") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 35") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 36") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 37") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 38") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72\x62")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 39") }
+  try {
+    let frame = @nav_parent2.parse_nav_parent2(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72\x62\x61")
+    for tag in frame.tags { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent2 prefix 40") }
+}
+
+///|
+test "Kaitai reference cross-stream upstream nav_parent3" {
+  let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72\x62\x61\x7A")
+  assert_eq(frame.ofs_tags, 8U)
+  assert_eq(frame.num_tags, 2U)
+  let tags = frame.tags()
+  assert_eq(tags.length(), 2)
+  assert_eq(tags[0].name, "RAHC")
+  assert_eq(tags[0].ofs, 32U)
+  assert_eq(tags[0].num_items, 3U)
+  guard tags[0].tag_content() is Case0(body_0) else { fail("wrong tag branch") }
+  assert_eq(body_0.content, "foo")
+  assert_eq(tags[1].name, "RAHC")
+  assert_eq(tags[1].ofs, 35U)
+  assert_eq(tags[1].num_items, 6U)
+  guard tags[1].tag_content() is Case0(body_1) else { fail("wrong tag branch") }
+  assert_eq(body_1.content, "barbaz")
+}
+
+///|
+test "Kaitai reference lazy prefix outcomes nav_parent3" {
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 0") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 1") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 2") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 3") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 4") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 5") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 6") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 7") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 8") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 9") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 10") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 11") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 12") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 13") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 14") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 15") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 16") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 17") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 18") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 19") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 20") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 21") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 22") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 23") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 24") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 25") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 26") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 27") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 28") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 29") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 30") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 31") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 32") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 33") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 34") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 35") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 36") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 37") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 38") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72\x62")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 39") }
+  try {
+    let frame = @nav_parent3.parse_nav_parent3(b"\x08\x00\x00\x00\x02\x00\x00\x00\x52\x41\x48\x43\x20\x00\x00\x00\x03\x00\x00\x00\x52\x41\x48\x43\x23\x00\x00\x00\x06\x00\x00\x00\x66\x6F\x6F\x62\x61\x72\x62\x61")
+    for tag in frame.tags() { ignore(tag.tag_content()) }
+  } catch { _ => () }
+  noraise { _ => fail("accepted nav_parent3 prefix 40") }
+}
+
+///|
+test "Kaitai reference cross stream selection 170" {
+  let frame = @cross_stream_layout.parse_cross_stream_layout(b"\xAA\x10\x11\x12\x13\x20\x21\x00\x23\x55")
+  assert_eq(frame.chosen(), 17U)
+  assert_eq(frame.positioned(), 19U)
+  assert_eq(frame.left.root_marker(), 170U)
+  assert_eq(frame.right.parent_marker(), 170U)
+  assert_eq(frame.pair().first, 17U)
+  assert_eq(frame.pair().second, 18U)
+  assert_eq(frame.pair().parent_marker(), 170U)
+  assert_eq(frame.eos_items(), [33U, 0U, 35U])
+  assert_eq(frame.until_items(), [33U, 0U])
+  assert_eq(frame.owner_position(), 10L)
+  assert_eq(frame.left_position(), 1L)
+  assert_eq(frame.right_position(), 1L)
+  assert_eq(frame.skipped(), None)
+  assert_eq(frame.next_left(), 17U)
+  assert_eq(frame.next_left(), 17U)
+  assert_eq(frame.left_remaining().to_owned(), b"\x12\x13")
+  guard frame.raw_switch() is Raw(raw) else { fail("wrong raw branch") }
+  assert_eq(raw.to_owned(), b"\x21\x00")
+}
+
+///|
+test "Kaitai reference cross stream selection 171" {
+  let frame = @cross_stream_layout.parse_cross_stream_layout(b"\xAB\x10\x11\x12\x13\x20\x21\x00\x23\x55")
+  assert_eq(frame.chosen(), 33U)
+  assert_eq(frame.positioned(), 19U)
+  assert_eq(frame.left.root_marker(), 171U)
+  assert_eq(frame.right.parent_marker(), 171U)
+  assert_eq(frame.pair().first, 17U)
+  assert_eq(frame.pair().second, 18U)
+  assert_eq(frame.pair().parent_marker(), 171U)
+  assert_eq(frame.eos_items(), [33U, 0U, 35U])
+  assert_eq(frame.until_items(), [33U, 0U])
+  assert_eq(frame.owner_position(), 10L)
+  assert_eq(frame.left_position(), 1L)
+  assert_eq(frame.right_position(), 1L)
+  assert_eq(frame.skipped(), None)
+  assert_eq(frame.next_left(), 17U)
+  assert_eq(frame.next_left(), 17U)
+  assert_eq(frame.left_remaining().to_owned(), b"\x12\x13")
+  guard frame.raw_switch() is Raw(raw) else { fail("wrong raw branch") }
+  assert_eq(raw.to_owned(), b"\x21\x00")
+}
+
+///|
+test "Kaitai reference partial array io_partial_seq" {
+  let frame = @io_partial_seq.parse_io_partial_seq(b"\x00\x11\x01\x22")
+  let entries = frame.entries
+  assert_eq(entries[0].value, None)
+  assert_eq(entries[1].value, Some(34U))
+}
+
+///|
+test "Kaitai reference partial array io_partial_lazy" {
+  let frame = @io_partial_lazy.parse_io_partial_lazy(b"\x00\x11\x01\x22")
+  let entries = frame.entries()
+  assert_eq(entries[0].value, None)
+  assert_eq(entries[1].value, Some(34U))
+}

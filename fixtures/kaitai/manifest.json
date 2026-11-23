@@ -335,6 +335,50 @@
       "sample_sha256": "534f74d40e37e00ee4e513bde43c8b9fef880498bd96eb88d15b4262ee7796bf",
       "spec": "kaitai/spec/test_str_encodings_utf16.py",
       "spec_sha256": "738dd23e0ca3bc32f55edec212946445ad4a4507b237408cf8241dbe20797467"
+    },
+    {
+      "schema": "instance_io_user",
+      "package": "instance_io_user",
+      "source": "kaitai/instance_io_user.ksy",
+      "sha256": "399732ec149e00657b6630377748f075722671cfcd9390cf775eb9f06a245bdc",
+      "sample": "kaitai/samples/instance_io.bin",
+      "sample_sha256": "1eab1c12ac66e5d01a224e20dee0141ea13dab46cfbf9b5db75b6d6cb398dbad",
+      "spec": "kaitai/spec/test_instance_io_user.py",
+      "spec_sha256": "3c73cf0325f58d8ff2fc21ac14816684604af6083bb1a42bf95ae5d94d3e8327",
+      "group": "io"
+    },
+    {
+      "schema": "instance_io_user_earlier",
+      "package": "instance_io_user_earlier",
+      "source": "kaitai/instance_io_user_earlier.ksy",
+      "sha256": "27826d8719b319211a6bc99767e49c06ba17c108190caf50e87c9c1febc05df1",
+      "sample": "kaitai/samples/switch_opcodes2.bin",
+      "sample_sha256": "c13c3770c75f9bc1b7f37217781c87542382263a57c9cce719cec0e8ed9fe9b2",
+      "spec": "kaitai/spec/test_instance_io_user_earlier.py",
+      "spec_sha256": "ae9e35445308ee255b196800c0c9f25c888cf01723e9eb22843dd7232c59b29d",
+      "group": "io"
+    },
+    {
+      "schema": "nav_parent2",
+      "package": "nav_parent2",
+      "source": "kaitai/nav_parent2.ksy",
+      "sha256": "03a44ee12b9b600fcfe0d5babf869bfc7a7c701195ffc0118f2b3b5bdaf8b6ca",
+      "sample": "kaitai/samples/nav_parent2.bin",
+      "sample_sha256": "48c7b3a5da9d05060f0c68c588fba912c8a7d5452821f7b674a49c2e32fb53b9",
+      "spec": "kaitai/spec/test_nav_parent2.py",
+      "spec_sha256": "a3554f7df0c35ca51c46f7c3a58611d5ce3c67d625628513ba07bbaed0402fac",
+      "group": "io"
+    },
+    {
+      "schema": "nav_parent3",
+      "package": "nav_parent3",
+      "source": "kaitai/nav_parent3.ksy",
+      "sha256": "744000d67c4746b56f895af5a516a281f0a6a77f61474d5d1623e49d44e95474",
+      "sample": "kaitai/samples/nav_parent2.bin",
+      "sample_sha256": "48c7b3a5da9d05060f0c68c588fba912c8a7d5452821f7b674a49c2e32fb53b9",
+      "spec": "kaitai/spec/test_nav_parent3.py",
+      "spec_sha256": "4cc2b2a2c6ea009a41e119fcb73b2d70ff6483ab1b08bcfbce2690aa635dd915",
+      "group": "io"
     }
   ]
 }

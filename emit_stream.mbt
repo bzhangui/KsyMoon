@@ -39,9 +39,10 @@ fn byte_read_code(
   instance : Bool,
   unit~ : Int32 = 1,
   big_endian~ : Bool = false,
+  evaluate~ : ((Expr) -> String)? = None,
 ) -> String {
   let length = match options.length {
-    Some(length) => length_code(length, in_instance=instance)
+    Some(length) => length_code(length, in_instance=instance, evaluate~)
     None => "-1L"
   }
   if options.terminator is None && options.padding is None {
@@ -113,6 +114,8 @@ fn switch_read_code(
   bounded : Bool,
   instance : Bool,
   selector_override~ : String? = None,
+  evaluate~ : ((Expr) -> String)? = None,
+  parent_context~ : String? = None,
 ) -> String {
   guard kind is Switch(name, selector, cases, fallback) else {
     abort("expected switch")
@@ -121,7 +124,10 @@ fn switch_read_code(
   let result = StringBuilder()
   // Selection uses the parent stream/fields, while case reads use the child stream.
   let selector_code = selector_override.unwrap_or(
-    expression_code(selector, reference, path),
+    match evaluate {
+      Some(evaluate) => evaluate(selector)
+      None => expression_code(selector, reference, path)
+    },
   )
   result.write_string(
     if cases.is_empty() {
@@ -132,12 +138,12 @@ fn switch_read_code(
   )
   for index, (tag, child) in cases {
     result.write_string(
-      "if selector == \{expression_code(tag, reference, path)} { \{type_name}::Case\{index}(\{read_code(child, id, path, in_instance=instance, reference~)}) } else ",
+      "if selector == \{expression_code(tag, reference, path)} { \{type_name}::Case\{index}(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}) } else ",
     )
   }
   if fallback is Some(child) {
     result.write_string(
-      "{ \{type_name}::Default(\{read_code(child, id, path, in_instance=instance, reference~)}) }",
+      "{ \{type_name}::Default(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}) }",
     )
   } else if bounded {
     result.write_string(
@@ -159,11 +165,14 @@ fn emit_field_read(
   path : String,
   reference : (String) -> String,
   instance : Bool,
+  evaluate~ : ((Expr) -> String)? = None,
+  parent_context~ : String? = None,
+  publish_items~ : (String, String)? = None,
 ) -> Unit {
   match field.count {
     None => {
       output.write_string(
-        "  let \{target} = \{read_code(field.kind, id, path, in_instance=instance, reference~)}\n",
+        "  let \{target} = \{read_code(field.kind, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}\n",
       )
       if field.validation is Some(check) {
         output.write_string(
@@ -175,11 +184,14 @@ fn emit_field_read(
       match repeat {
         Times(count) =>
           output.write_string(
-            "  let count_\{target} = reader.reserve_repeats(\{length_code(count, in_instance=instance)}, \{path})\n",
+            "  let count_\{target} = reader.reserve_repeats(\{length_code(count, in_instance=instance, evaluate~)}, \{path})\n",
           )
         _ => ()
       }
       output.write_string("  let \{target} = []\n")
+      if publish_items is Some((before, _)) {
+        output.write_string(before)
+      }
       match repeat {
         Times(_) =>
           output.write_string("  for index in 0..<count_\{target} {\n")
@@ -204,28 +216,35 @@ fn emit_field_read(
         output.write_string("    let before = reader.offset\n")
       }
       output.write_string(
-        "    let item = \{read_code(field.kind, id, "item_path", in_instance=instance, reference~)}\n    \{target}.push(item)\n",
+        "    let item = \{read_code(field.kind, id, "item_path", in_instance=instance, reference~, evaluate~, parent_context~)}\n    \{target}.push(item)\n",
       )
+      if publish_items is Some((_, after)) {
+        output.write_string(after)
+      }
       if repeat is Until(expression) {
-        let predicate = expression_code(
-          expression,
-          fn(name) {
-            if name == "_" {
-              if field.kind is Text(_, _) {
-                "item"
-              } else {
-                "item.to_int64()"
-              }
-            } else if name == "_index" {
-              "index.to_int64()"
-            } else if name.has_prefix("_.") {
-              "item." + name[2:].to_owned() + ".to_int64()"
-            } else {
-              reference(name)
-            }
-          },
-          "item_path",
-        )
+        let predicate = match evaluate {
+          Some(evaluate) => evaluate(expression)
+          None =>
+            expression_code(
+              expression,
+              fn(name) {
+                if name == "_" {
+                  if field.kind is Text(_, _) {
+                    "item"
+                  } else {
+                    "item.to_int64()"
+                  }
+                } else if name == "_index" {
+                  "index.to_int64()"
+                } else if name.has_prefix("_.") {
+                  "item." + name[2:].to_owned() + ".to_int64()"
+                } else {
+                  reference(name)
+                }
+              },
+              "item_path",
+            )
+        }
         output.write_string("    if \{predicate} { break }\n")
       }
       if repeat is ToEnd {

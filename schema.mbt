@@ -21,6 +21,7 @@ priv enum LengthExpr {
   Constant(Int64)
   EarlierField(String, Int64)
   Remaining
+  Calculated(Expr)
 }
 
 ///|
@@ -82,6 +83,7 @@ priv struct RecordDef {
 priv struct Schema {
   root : RecordDef
   records : Array[RecordDef]
+  has_io : Bool
 }
 
 ///|
@@ -229,7 +231,11 @@ fn parse_length(
   value : @yaml.Yaml,
   earlier : Map[String, Field],
   path : String,
+  navigation~ : Bool = false,
 ) -> LengthExpr raise SchemaError {
+  if navigation {
+    return Calculated(parse_expression(value, path))
+  }
   match value {
     @yaml.Integer(value) => {
       guard value >= 0L else { invalid(path, "length cannot be negative") }
@@ -391,6 +397,7 @@ fn parse_field(
   endian : Endian?,
   type_names : Array[String],
   path : String,
+  navigation~ : Bool = false,
 ) -> Field raise SchemaError {
   let field = as_mapping(value, path)
   check_keys(
@@ -410,35 +417,49 @@ fn parse_field(
   guard !earlier.contains(name) else {
     invalid(path + ".id", "duplicate field '\{name}'")
   }
-  let kind = parse_field_kind(field, earlier, endian, type_names, path)
+  let kind = parse_field_kind(
+    field,
+    earlier,
+    endian,
+    type_names,
+    path,
+    navigation~,
+  )
   let count = match
     (field.get("repeat"), field.get("repeat-expr"), field.get("repeat-until")) {
     (None, None, None) => None
     (Some(@yaml.String("expr")), Some(count), None) =>
-      Some(Times(parse_length(count, earlier, path + ".repeat-expr")))
+      Some(
+        Times(parse_length(count, earlier, path + ".repeat-expr", navigation~)),
+      )
     (Some(@yaml.String("eos")), None, None) => Some(ToEnd)
     (Some(@yaml.String("until")), None, Some(value)) => {
       let expression = parse_expression(value, path + ".repeat-until")
       // Member references are resolved against the complete type graph below.
-      require_expression_type(
-        expression,
-        Boolean,
-        fn(name) raise SchemaError {
-          if name == "_index" || name.has_prefix("_.") {
-            Integer
-          } else if name == "_" {
-            kind_expression_type(kind, path + ".repeat-until")
-          } else {
-            match earlier.get(name) {
-              Some(field) =>
-                field_expression_type(field, path + ".repeat-until")
-              None =>
-                invalid(path + ".repeat-until", "unknown field '" + name + "'")
+      if !navigation {
+        require_expression_type(
+          expression,
+          Boolean,
+          fn(name) raise SchemaError {
+            if name == "_index" || name.has_prefix("_.") {
+              Integer
+            } else if name == "_" {
+              kind_expression_type(kind, path + ".repeat-until")
+            } else {
+              match earlier.get(name) {
+                Some(field) =>
+                  field_expression_type(field, path + ".repeat-until")
+                None =>
+                  invalid(
+                    path + ".repeat-until",
+                    "unknown field '" + name + "'",
+                  )
+              }
             }
-          }
-        },
-        path + ".repeat-until",
-      )
+          },
+          path + ".repeat-until",
+        )
+      }
       Some(Until(expression))
     }
     _ =>
@@ -456,16 +477,22 @@ fn parse_field(
       Some(parse_scalar_check(value, kind, path + ".valid"))
     }
   }
-  let condition = parse_condition(
-    field.get("if"),
-    fn(name) raise SchemaError {
-      match earlier.get(name) {
-        Some(field) => field_expression_type(field, path + ".if")
-        None => invalid(path + ".if", "unknown or forward field '\{name}'")
-      }
-    },
-    path + ".if",
-  )
+  let condition = if navigation {
+    field
+    .get("if")
+    .map(fn(value) raise SchemaError { parse_expression(value, path + ".if") })
+  } else {
+    parse_condition(
+      field.get("if"),
+      fn(name) raise SchemaError {
+        match earlier.get(name) {
+          Some(field) => field_expression_type(field, path + ".if")
+          None => invalid(path + ".if", "unknown or forward field '\{name}'")
+        }
+      },
+      path + ".if",
+    )
+  }
   { name, kind, count, validation, condition, }
 }
 
@@ -477,6 +504,7 @@ fn parse_record(
   type_names : Array[String],
   path : String,
   instances : @yaml.Yaml?,
+  navigation~ : Bool = false,
 ) -> RecordDef raise SchemaError {
   guard value is @yaml.Array(sequence) else {
     invalid(path, "expected a sequence")
@@ -484,7 +512,14 @@ fn parse_record(
   let earlier : Map[String, Field] = Map([])
   let fields = []
   for i, item in sequence {
-    let field = parse_field(item, earlier, endian, type_names, "\{path}[\{i}]")
+    let field = parse_field(
+      item,
+      earlier,
+      endian,
+      type_names,
+      "\{path}[\{i}]",
+      navigation~,
+    )
     earlier[field.name] = field
     fields.push(field)
   }
@@ -497,11 +532,18 @@ fn parse_record(
     name,
     fields,
     instances: parse_instances(
-      instances, fields, endian, type_names, instance_path,
+      instances,
+      fields,
+      endian,
+      type_names,
+      instance_path,
+      navigation~,
     ),
   }
-  check_instances(record, instance_path)
-  guard !fields.is_empty() || !record.instances.is_empty() else {
+  if !navigation {
+    check_instances(record, instance_path)
+  }
+  guard navigation || !fields.is_empty() || !record.instances.is_empty() else {
     invalid(path, "expected at least one field or instance")
   }
   record
@@ -576,6 +618,7 @@ fn load_schema(source : String) -> Schema raise SchemaError {
   guard types.length() <= 64 else {
     invalid("types", "at most 64 nested type definitions are supported")
   }
+  let has_io = raw_uses_io(root, types, [])
   let names = types.keys().collect()
   let definitions : Map[String, RecordDef] = Map([])
   for name, value in types {
@@ -590,6 +633,7 @@ fn load_schema(source : String) -> Schema raise SchemaError {
       names,
       path + ".seq",
       mapping.get("instances"),
+      navigation=has_io,
     )
   }
   let root_record = parse_record(
@@ -599,11 +643,44 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     names,
     "seq",
     root.get("instances"),
+    navigation=has_io,
   )
   for record in [root_record, ..definitions.values().collect()] {
-    check_repeat_members(record, definitions)
+    if !has_io {
+      check_repeat_members(record, definitions)
+    }
   }
   let reachable : Map[String, RecordDef] = Map([])
   collect_records(root_record, definitions, [], reachable)
-  { root: root_record, records: reachable.values().collect(), }
+  let schema : Schema = {
+    root: root_record,
+    records: reachable.values().collect(),
+    has_io,
+  }
+  let all_definitions : Schema = {
+    root: root_record,
+    records: definitions.values().collect(),
+    has_io,
+  }
+  if has_io {
+    check_context_schema(all_definitions)
+  } else {
+    let graph = context_graph(all_definitions)
+    for owner, record in graph.records {
+      for instance in record.instances {
+        if instance.io is Some(expression) {
+          context_require(
+            context_scope(
+              graph,
+              owner,
+              owner + ".instances." + instance.name + ".io",
+            ),
+            expression,
+            Stream,
+          )
+        }
+      }
+    }
+  }
+  schema
 }

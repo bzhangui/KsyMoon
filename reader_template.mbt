@@ -16,6 +16,7 @@ fn emit_reader(
   has_arithmetic~ : Bool,
   has_read_fields~ : Bool,
   has_input~ : Bool,
+  has_context~ : Bool = false,
 ) -> Unit {
   let validation_error = if has_validation {
     "  __ROOT__InvalidValue(field~ : String, offset~ : Int, value~ : Int64, minimum~ : Int64, maximum~ : Int64)\n"
@@ -90,7 +91,12 @@ fn emit_reader(
     #|
   let header = header.replace_all(
     old="__ARITHMETIC_ERROR__",
-    new=(arithmetic_error +
+    new=((if has_context {
+        "  __ROOT__ContextError(field~ : String, offset~ : Int, message~ : String)\n"
+      } else {
+        ""
+      }) +
+      arithmetic_error +
       (if has_byte_options {
         "  __ROOT__MissingTerminator(field~ : String, offset~ : Int)\n"
       } else {
@@ -193,6 +199,14 @@ fn emit_reader(
       #|  count
       #|}
       #|
+    let repeat = if has_context {
+      repeat.replace_all(
+        old="  self.budget[0] -= count",
+        new="  self.budget[0] -= count\n  self.budget[self.budget[1]] += count",
+      )
+    } else {
+      repeat
+    }
     write_reader_block(output, repeat, root_type)
   }
   if has_contents {

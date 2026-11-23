@@ -33,6 +33,7 @@ fn instance_result_type(
         Integer => "Int64"
         Boolean => "Bool"
         Text => "String"
+        _ => invalid(instance.name, "value instance type awaits implementation")
       }
     }
   }

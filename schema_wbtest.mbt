@@ -256,3 +256,74 @@ test "scope flattening rejects colliding type names" {
     #|      - {id: data, type: u1}
   expect_schema_error(source, "types.a_b: flattened type name collision")
 }
+
+///|
+test "cross-stream selectors reject invalid objects and stream types" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: raw, size: 1}
+    #|  - {id: left, type: slot}
+    #|types:
+    #|  slot:
+    #|    seq:
+    #|      - {id: marker, type: u1}
+    #|instances:
+    #|  selected: {io: 'SELECTOR', type: u1}
+  for
+    selector in [
+      "1", "raw", "_parent._io", "_root.missing._io", "left.marker._io", "left._io[0]",
+      "left[true]._io", "left[0]._io", "true ? left._io : 0",
+    ] {
+    try generate(source.replace_all(old="SELECTOR", new=selector)) catch {
+      InvalidSchema(message) =>
+        assert_true(message.contains("instances.selected"))
+    } noraise {
+      _ => fail("accepted invalid io selector: " + selector)
+    }
+  }
+}
+
+///|
+test "unused io definitions and value instances remain validated" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: marker, type: u1}
+    #|types:
+    #|  unused:
+    #|    instances:
+    #|      selected: {io: 1, type: u1}
+  try generate(source) catch {
+    InvalidSchema(message) =>
+      assert_true(message.contains("instances.selected"))
+  } noraise {
+    _ => fail("accepted invalid unused stream selector")
+  }
+  let source =
+    #|meta: {id: example}
+    #|instances:
+    #|  selected: {io: _io, value: 1}
+  try generate(source) catch {
+    InvalidSchema(message) => assert_true(message.contains("io"))
+  } noraise {
+    _ => fail("accepted io on a value instance")
+  }
+}
+
+///|
+test "context navigation retains expression type and cycle checks" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: marker, type: u1}
+    #|instances:
+    #|  selected: {io: _io, type: u1}
+    #|  a: {value: b}
+    #|  b: {value: a}
+  try generate(source) catch {
+    InvalidSchema(message) => assert_true(message.contains("cyclic"))
+  } noraise {
+    _ => fail("accepted cyclic navigation values")
+  }
+}

@@ -29,6 +29,12 @@ const fixtures = [
   { schema: "pure_nested_value", package: "pure_nested_value" },
   { schema: "pure_stream_value", package: "pure_stream_value" },
   { schema: "pure_repeated_value", package: "pure_repeated_value" },
+  { schema: "io_lifecycle", package: "io_lifecycle" },
+  { schema: "io_budget", package: "io_budget" },
+  { schema: "io_partial_seq", package: "io_partial_seq" },
+  { schema: "io_partial_lazy", package: "io_partial_lazy" },
+  { schema: "cross_stream_layout", package: "cross_stream_layout" },
+
 
   {
     schema: "vp8_duck_ivf",
@@ -100,6 +106,7 @@ for (const name of [
   "ivf_wbtest.mbt",
   "conditional_wbtest.mbt",
   "stream_wbtest.mbt",
+  "io_wbtest.mbt",
   "reader_edges_wbtest.mbt",
   "stream_reference_wbtest.mbt",
 ]) {
@@ -118,6 +125,9 @@ for (const fixture of fixtures) {
   const outDir = join(independent, fixture.package);
   mkdirSync(outDir);
   copyFileSync(join(consumer, fixture.package, "moon.pkg"), join(outDir, "moon.pkg"));
+  for (const test of readdirSync(join(consumer, fixture.package)).filter(name => name.endsWith("_wbtest.mbt"))) {
+    copyFileSync(join(consumer, fixture.package, test), join(outDir, test));
+  }
   const name = `${fixture.schema}.mbt`;
   const output = join(outDir, name);
   moon(root, "run", "--frozen", "--target", "js", "--deny-warn", "cmd/ksymoon", "--",

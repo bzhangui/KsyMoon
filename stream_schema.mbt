@@ -32,9 +32,11 @@ fn parse_byte_options(
   earlier : Map[String, Field],
   path : String,
   strz : Bool,
+  navigation~ : Bool = false,
 ) -> ByteOptions raise SchemaError {
   let length = match (field.get("size"), field.get("size-eos")) {
-    (Some(value), None) => Some(parse_length(value, earlier, path + ".size"))
+    (Some(value), None) =>
+      Some(parse_length(value, earlier, path + ".size", navigation~))
     (None, Some(@yaml.Boolean(true))) => Some(Remaining)
     (None, None) | (None, Some(@yaml.Boolean(false))) => None
     _ =>
@@ -86,6 +88,7 @@ fn parse_field_kind(
   endian : Endian?,
   type_names : Array[String],
   path : String,
+  navigation~ : Bool = false,
 ) -> FieldKind raise SchemaError {
   if field.get("contents") is Some(value) {
     for
@@ -100,7 +103,10 @@ fn parse_field_kind(
     return Contents(parse_contents(value, path + ".contents"))
   }
   let kind = match field.get("type") {
-    None => return ByteField(parse_byte_options(field, earlier, path, false))
+    None =>
+      return ByteField(
+        parse_byte_options(field, earlier, path, false, navigation~),
+      )
     Some(@yaml.String("str")) | Some(@yaml.String("strz")) => {
       let encoding = as_string(
         get_required(field, "encoding", path),
@@ -120,6 +126,7 @@ fn parse_field_kind(
           earlier,
           path,
           field.get("type") == Some(@yaml.String("strz")),
+          navigation~,
         ),
         encoding,
       )
@@ -172,12 +179,14 @@ fn parse_field_kind(
               "case must be a constant integer, string or boolean",
             )
           }
-          require_expression_type(
-            tag,
-            expression_type(selector, lookup, path),
-            lookup,
-            path,
-          )
+          if !navigation {
+            require_expression_type(
+              tag,
+              expression_type(selector, lookup, path),
+              lookup,
+              path,
+            )
+          }
           result.push((tag, kind))
         }
       }
@@ -206,7 +215,7 @@ fn parse_field_kind(
     guard kind is Nested(_) || kind is Switch(_, _, _, _) else {
       invalid(path, "byte bounds/options require a user or switch type")
     }
-    Bounded(kind, parse_byte_options(field, earlier, path, false))
+    Bounded(kind, parse_byte_options(field, earlier, path, false, navigation~))
   } else {
     kind
   }

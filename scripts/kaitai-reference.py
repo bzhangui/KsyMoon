@@ -41,7 +41,7 @@ def compile_references():
     manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
     schemas = {
         name: ROOT / "fixtures" / f"{name}.ksy"
-        for name in ("udp_datagram", "stl", "conditional_layout", "stream_control", "repeat_zero_progress", "reader_edges", "pure_nested_value", "pure_stream_value", "pure_repeated_value")
+        for name in ("udp_datagram", "stl", "conditional_layout", "stream_control", "repeat_zero_progress", "reader_edges", "pure_nested_value", "pure_stream_value", "pure_repeated_value", "cross_stream_layout", "io_partial_seq", "io_partial_lazy")
     }
     schemas.update({entry["schema"]: ROOT / "fixtures" / entry["source"] for entry in manifest["fixtures"]})
     subprocess.run(
@@ -180,7 +180,7 @@ def compatibility_tests(references):
 def stream_tests(references):
     manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
     for entry in manifest["fixtures"]:
-        if "sample" not in entry:
+        if "sample" not in entry or entry.get("group") == "io":
             continue
         name = entry["schema"]
         data = (ROOT / "fixtures" / entry["sample"]).read_bytes()
@@ -339,6 +339,133 @@ def edge_tests(references):
                      f"  assert_eq(header.number(), {frame.choice.number}L)", "}"])
 
 
+
+def io_tests(references):
+    """Compare untouched upstream schemas, including lazy reads on every prefix."""
+    manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
+    for entry in manifest["fixtures"]:
+        if entry.get("group") != "io":
+            continue
+        name = entry["schema"]
+        data = (ROOT / "fixtures" / entry["sample"]).read_bytes()
+
+        def exercise(frame):
+            if name == "instance_io_user":
+                return [item.name for item in frame.entries]
+            if name == "instance_io_user_earlier":
+                return [frame.a_mid, frame.b_mid, frame.into_a.inst.last,
+                        frame.into_b.inst.last, frame.sized_a.last, frame.sized_b.last,
+                        frame.into_a_skipped.inst.last]
+            return [tag.tag_content.content for tag in frame.tags]
+
+        def moon_reads(base):
+            if name == "instance_io_user":
+                return [f"for item in {base}.entries {{ ignore(item.name()) }}"]
+            if name == "instance_io_user_earlier":
+                return [f"ignore({base}.{expr})" for expr in (
+                    "a_mid()", "b_mid()", "into_a.inst().last()", "into_b.inst().last()",
+                    "sized_a.last()", "sized_b.last()", "into_a_skipped.inst().last()")]
+            tags = f"{base}.tags()" if name == "nav_parent3" else f"{base}.tags"
+            return [f"for tag in {tags} {{ ignore(tag.tag_content()) }}"]
+
+        frame = references[name].from_bytes(data)
+        exercise(frame)
+        checks = []
+        def scalar(path, value, optional=False):
+            if value is None:
+                checks.append(f"  assert_eq({path}, None)")
+            else:
+                text = json.dumps(value, ensure_ascii=False) if isinstance(value, str) else f"{value}U"
+                checks.append(f"  assert_eq({path}, {'Some(' + text + ')' if optional else text})")
+        if name == "instance_io_user":
+            scalar("frame.qty_entries", frame.qty_entries)
+            for index, item in enumerate(frame.entries):
+                scalar(f"frame.entries[{index}].name_ofs", item.name_ofs)
+                scalar(f"frame.entries[{index}].value", item.value)
+                scalar(f"frame.entries[{index}].name()", item.name)
+                scalar(f"frame.entries[{index}].name()", item.name)
+            checks.append(f"  assert_eq(frame.strings.str, {json.dumps(frame.strings.str)})")
+        elif name == "instance_io_user_earlier":
+            for field in ("a_mid", "b_mid"):
+                scalar(f"frame.{field}()", getattr(frame, field))
+            for field in ("sized_a", "sized_b"):
+                slot = getattr(frame, field)
+                scalar(f"frame.{field}.content", getattr(slot, "content", None), True)
+                scalar(f"frame.{field}.last()", slot.last, True)
+            for field in ("into_a", "into_b", "into_a_skipped"):
+                foo = getattr(frame, field)
+                scalar(f"frame.{field}.indicator", foo.indicator)
+                scalar(f"frame.{field}.bar", getattr(foo, "bar", None), True)
+                scalar(f"frame.{field}.inst().content", getattr(foo.inst, "content", None), True)
+                scalar(f"frame.{field}.inst().last()", getattr(foo.inst, "last", None), True)
+            scalar("frame.last_accessor.v", frame.last_accessor.v, True)
+        else:
+            scalar("frame.ofs_tags", frame.ofs_tags)
+            scalar("frame.num_tags", frame.num_tags)
+            tags = "frame.tags()" if name == "nav_parent3" else "frame.tags"
+            checks.append(f"  let tags = {tags}")
+            checks.append(f"  assert_eq(tags.length(), {len(frame.tags)})")
+            for index, tag in enumerate(frame.tags):
+                for field in ("name", "ofs", "num_items"):
+                    scalar(f"tags[{index}].{field}", getattr(tag, field))
+                checks.append(f'  guard tags[{index}].tag_content() is Case0(body_{index}) else {{ fail("wrong tag branch") }}')
+                scalar(f"body_{index}.content", tag.tag_content.content)
+        yield "\n".join(["///|", f'test "Kaitai reference cross-stream upstream {name}" {{',
+                         f"  let frame = @{name}.parse_{name}({bytes_literal(data)})", *checks, "}"])
+        prefix_checks = []
+        for cut in range(len(data)):
+            partial = data[:cut]
+            try:
+                exercise(references[name].from_bytes(partial))
+            except (EOFError, UnicodeError, kaitaistruct.KaitaiStructError):
+                prefix_checks.extend(["  try {", f"    let frame = @{name}.parse_{name}({bytes_literal(partial)})",
+                                      *("    " + line for line in moon_reads("frame")), "  } catch { _ => () }",
+                                      f'  noraise {{ _ => fail("accepted {name} prefix {cut}") }}'])
+            else:
+                prefix_checks.extend(["  {", f"    let frame = @{name}.parse_{name}({bytes_literal(partial)})",
+                                      *("    " + line for line in moon_reads("frame")), "  }"])
+        yield "\n".join(["///|", f'test "Kaitai reference lazy prefix outcomes {name}" {{', *prefix_checks, "}"])
+
+    # Mixed repeat, switch, cache and conditional stream operations on one schema.
+    for head in (0xAA, 0xAB):
+        data = bytes([head, 16, 17, 18, 19, 32, 33, 0, 35, 85])
+        frame = references["cross_stream_layout"].from_bytes(data)
+        checks = []
+        for expr in ("chosen", "positioned", "left.root_marker", "right.parent_marker",
+                     "pair.first", "pair.second", "pair.parent_marker", "eos_items",
+                     "until_items", "owner_position", "left_position", "right_position",
+                     "skipped", "next_left", "next_left", "left_remaining", "raw_switch"):
+            value = frame
+            moon = "frame"
+            for part in expr.split("."):
+                value = getattr(value, part)
+                moon += "." + part + ("()" if part not in ("left", "right", "first", "second") else "")
+            if value is None:
+                expect = "None"
+            elif isinstance(value, bytes):
+                if expr == "raw_switch":
+                    checks.append(f'  guard {moon} is Raw(raw) else {{ fail("wrong raw branch") }}')
+                    moon = "raw.to_owned()"
+                else:
+                    moon += ".to_owned()"
+                expect = bytes_literal(value)
+            elif isinstance(value, list):
+                expect = "[" + ", ".join(str(item) + "U" for item in value) + "]"
+            else:
+                expect = str(value) + ("L" if expr.endswith("position") else "U")
+            checks.append(f"  assert_eq({moon}, {expect})")
+        yield "\n".join(["///|", f'test "Kaitai reference cross stream selection {head}" {{',
+                         f"  let frame = @cross_stream_layout.parse_cross_stream_layout({bytes_literal(data)})", *checks, "}"])
+    for name in ("io_partial_seq", "io_partial_lazy"):
+        frame = references[name].from_bytes(b"\x00\x11\x01\x22")
+        values = [getattr(item, "value", None) for item in frame.entries]
+        tags = "frame.entries()" if name == "io_partial_lazy" else "frame.entries"
+        yield "\n".join(["///|", f'test "Kaitai reference partial array {name}" {{',
+                         f"  let frame = @{name}.parse_{name}(b\"\\x00\\x11\\x01\\x22\")",
+                         f"  let entries = {tags}",
+                         *(f"  assert_eq(entries[{i}].value, {'None' if value is None else 'Some(' + str(value) + 'U)'})" for i,value in enumerate(values)), "}"])
+
+
 def main():
     consumer = Path(sys.argv[1])
     if importlib.metadata.version("kaitaistruct") != VERSION:
@@ -357,7 +484,7 @@ def main():
     ]
     semantic_tests = list(compatibility_tests(references))
     tests.extend(semantic_tests)
-    stream_comparisons = [*stream_tests(references), *edge_tests(references)]
+    stream_comparisons = [*stream_tests(references), *edge_tests(references), *io_tests(references)]
     stream_output = ("// Expected values and prefix outcomes from official Kaitai Struct 0.11.\n"
                      "// Inputs, binary samples and Python specifications are pinned in fixtures/kaitai/manifest.json.\n"
                      "// Refresh: python scripts/kaitai-reference.py examples/consumer --refresh-stream-golden\n\n"
@@ -375,7 +502,7 @@ def main():
         "upstream_schemas": [entry["schema"] + ".ksy" for entry in manifest["fixtures"]],
         "upstream_specs": sum("spec" in entry for entry in manifest["fixtures"]),
         "upstream_proper_prefixes": sum(len((ROOT / "fixtures" / entry["sample"]).read_bytes()) for entry in manifest["fixtures"] if "sample" in entry),
-        "prefixes_rejected": stream_output.count('} noraise { _ => fail("accepted '),
+        "prefixes_rejected": stream_output.count('fail("accepted '),
         "comparison_tests": len(tests) + len(stream_comparisons),
     }, indent=2) + "\n", encoding="utf-8")
     print(f"Kaitai reference {VERSION}: verified {len(tests) + len(stream_comparisons)} comparisons "
