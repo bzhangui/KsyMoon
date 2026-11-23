@@ -34,6 +34,7 @@ const fixtures = [
   { schema: "io_partial_seq", package: "io_partial_seq" },
   { schema: "io_partial_lazy", package: "io_partial_lazy" },
   { schema: "cross_stream_layout", package: "cross_stream_layout" },
+  { schema: "cast_navigation", package: "cast_navigation" },
 
 
   {

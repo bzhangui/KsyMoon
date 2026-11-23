@@ -239,7 +239,7 @@ fn NavParent3Value::attribute(self : NavParent3Value, arena : NavParent3Arena, n
       "eof" => Flag(reader.offset == reader.input.length())
       _ => Absent
     }
-    Selected(_, value) => value.attribute(arena, name, field)
+    Selected(tag, value) => { ignore(tag); value.attribute(arena, name, field) }
     Items(value) if name == "length" => Number(value.length().to_int64())
     StringValue(value) => { ignore(value); Absent }
     Items(_) => Absent
@@ -288,8 +288,8 @@ fn instance_nav_parent3_root_tags(arena : NavParent3Arena, context : Int) -> Nav
     reader.budget[1] = account
     defer { reader.budget[1] = previous_account; ignore(reader.budget.pop()); ignore(reader.budget.pop()) }
     errdefer { reader.budget[0] += reader.budget[account]; arena.release_account(reader.budget[account - 1]) }
-    reader.seek((match arena.attribute(context, "ofs_tags", field) { NavParent3Value::Number(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
-  let count_result = reader.reserve_repeats((match arena.attribute(context, "num_tags", field) { NavParent3Value::Number(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
+    reader.seek((match NavParent3Value::ObjectId(context).attribute(arena, "ofs_tags", field) { NavParent3Value::Number(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
+  let count_result = reader.reserve_repeats((match NavParent3Value::ObjectId(context).attribute(arena, "num_tags", field) { NavParent3Value::Number(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
   let result = []
     let metadata_result : Array[NavParent3Value] = []
     frame.partial["tags"] = NavParent3Value::Items(metadata_result)
@@ -317,7 +317,7 @@ pub fn NavParent3Record::tags(self : NavParent3Record) -> Array[NavParent3_tag] 
   let frame = arena.frame(context, "tags")
   let reader = frame.reader
   let field = frame.path + ".tags"
-  let raw = arena.attribute(context, "tags", field)
+  let raw = NavParent3Value::ObjectId(context).attribute(arena, "tags", field)
   let result = { let value = raw; (match value { NavParent3Value::Items(items) => items.map(fn(item) raise NavParent3ParseError { (match item { NavParent3Value::ObjectId(value) => hydrate_NavParent3_tag(arena, value, field); _ => { raise NavParent3ContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }); _ => { raise NavParent3ContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_tags = Some(result)
   result
@@ -379,8 +379,8 @@ fn instance_nav_parent3_type_tag_tag_content(arena : NavParent3Arena, context : 
     reader.budget[1] = account
     defer { reader.budget[1] = previous_account; ignore(reader.budget.pop()); ignore(reader.budget.pop()) }
     errdefer { reader.budget[0] += reader.budget[account]; arena.release_account(reader.budget[account - 1]) }
-    reader.seek((match arena.attribute(context, "ofs", field) { NavParent3Value::Number(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
-  let result = { let selector = (match arena.attribute(context, "name", field) { NavParent3Value::StringValue(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }); if selector == "RAHC" { NavParent3_switch_types_tag_instances_tag_content::Case0(read_nav_parent3_type_tag_tag_char(reader, field, arena, context)) } else { NavParent3_switch_types_tag_instances_tag_content::Unknown } }
+    reader.seek((match NavParent3Value::ObjectId(context).attribute(arena, "ofs", field) { NavParent3Value::Number(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
+  let result = { let selector = (match NavParent3Value::ObjectId(context).attribute(arena, "name", field) { NavParent3Value::StringValue(value) => value; _ => { raise NavParent3ContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }); if selector == "RAHC" { NavParent3_switch_types_tag_instances_tag_content::Case0(read_nav_parent3_type_tag_tag_char(reader, field, arena, context)) } else { NavParent3_switch_types_tag_instances_tag_content::Unknown } }
     for index = 3; index < account; index = index + 2 {
       if reader.budget[index - 1] == frame.account { reader.budget[index] += reader.budget[account]; break }
     }
@@ -398,7 +398,7 @@ pub fn NavParent3_tag::tag_content(self : NavParent3_tag) -> NavParent3_switch_t
   let frame = arena.frame(context, "tag_content")
   let reader = frame.reader
   let field = frame.path + ".tag_content"
-  let raw = arena.attribute(context, "tag_content", field)
+  let raw = NavParent3Value::ObjectId(context).attribute(arena, "tag_content", field)
   let result = { let value = raw; (match value { NavParent3Value::Selected(tag, payload) => match tag { 0 => NavParent3_switch_types_tag_instances_tag_content::Case0((match payload { NavParent3Value::ObjectId(value) => hydrate_NavParent3_tag_tag_char(arena, value, field); _ => { raise NavParent3ContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } })); _ => NavParent3_switch_types_tag_instances_tag_content::Unknown; }; _ => { raise NavParent3ContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_tag_content = Some(result)
   result

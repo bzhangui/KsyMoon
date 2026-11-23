@@ -228,7 +228,7 @@ fn read_io_partial_seq_type_entry(reader : IoPartialSeqReader, path : String, ar
   let v_link = reader.read_bits(1, false, path_link)
   arena.frames[context].unwrap().fields["link"] = IoPartialSeqValue::Number(v_link.to_int64())
   let path_value = path + ".value"
-  let v_value = if (((match arena.attribute(context, "link", path_value) { IoPartialSeqValue::Number(value) => value; _ => { raise IoPartialSeqContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) != 0L) && ((match arena.attribute(context, "previous", path_value) { IoPartialSeqValue::Number(value) => value; _ => { raise IoPartialSeqContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) == 17L)) {
+  let v_value = if (((match IoPartialSeqValue::ObjectId(context).attribute(arena, "link", path_value) { IoPartialSeqValue::Number(value) => value; _ => { raise IoPartialSeqContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) != 0L) && ((match IoPartialSeqValue::ObjectId(context).attribute(arena, "previous", path_value) { IoPartialSeqValue::Number(value) => value; _ => { raise IoPartialSeqContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) == 17L)) {
   let v_value = reader.read_bits(1, false, path_value)
     Some(v_value)
   } else { None }
@@ -281,7 +281,7 @@ pub fn IoPartialSeq_entry::previous(self : IoPartialSeq_entry) -> UInt raise IoP
   let frame = arena.frame(context, "previous")
   let reader = frame.reader
   let field = frame.path + ".previous"
-  let raw = arena.attribute(context, "previous", field)
+  let raw = IoPartialSeqValue::ObjectId(context).attribute(arena, "previous", field)
   let result = { let value = raw; (match value { IoPartialSeqValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise IoPartialSeqContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_previous = Some(result)
   result

@@ -17,7 +17,7 @@ fn context_unpack_expression(
   reader : String,
 ) -> String {
   let variant = match kind {
-    Integer => "Number"
+    Integer | Enum(_) => "Number"
     Boolean => "Flag"
     Text => "StringValue"
     Stream => "Source"
@@ -44,7 +44,30 @@ fn context_value_code(
     Reference("_") => context_pack_kind(scope.item.unwrap(), "item", root)
     Reference(name) if name.has_prefix("_.") =>
       "\{context_pack_kind(scope.item.unwrap(), "item", root)}.attribute(arena, \{name[2:].escape()}, \{path})"
-    Reference(name) => "arena.attribute(context, \{name.escape()}, \{path})"
+    Reference(name) =>
+      "\{root}Value::ObjectId(context).attribute(arena, \{name.escape()}, \{path})"
+    Cast(base, target) => {
+      let name = context_cast_target(scope, target)
+      let tag = scope.graph.tags[name]
+      let source = context_value_code(scope, base, root, path, owner_reader)
+      let error = context_error(
+        root,
+        path,
+        reader=owner_reader,
+        message="record is not of type " + target,
+      )
+      "(match \{source}.object_id() { Some(object) => { guard arena.frame(object, \{path}).tag == \{tag} else { \{error} }; \{root}Value::ObjectId(object) }; None => { \{error} } })"
+    }
+    EnumLiteral(name, label) => {
+      let (_, value) = context_enum_label(scope, name, label)
+      "\{root}Value::Number(\{value}L)"
+    }
+    ToEnum(value, _) =>
+      context_value_code(scope, value, root, path, owner_reader)
+    Member(base, "to_i") if context_expression_type(scope, base) is Enum(_) =>
+      context_value_code(scope, base, root, path, owner_reader)
+    Member(base, "to_s") if context_expression_type(scope, base) is Integer =>
+      "\{root}Value::StringValue(\{context_expression_code(scope, base, root, path, owner_reader~)}.to_string())"
     Member(base, name) =>
       "\{context_value_code(scope, base, root, path, owner_reader)}.attribute(arena, \{name.escape()}, \{path})"
     Index(base, index) =>
@@ -60,7 +83,7 @@ fn context_value_code(
         owner_reader~,
       )
       let variant = match context_expression_type(scope, expression) {
-        Integer => "Number"
+        Integer | Enum(_) => "Number"
         Boolean => "Flag"
         Text => "StringValue"
         _ => invalid(scope.path, "value expression type awaits implementation")
@@ -80,7 +103,12 @@ fn context_expression_code(
 ) -> String raise SchemaError {
   let kind = context_expression_type(scope, expression)
   match expression {
-    Reference(_) | Member(_, _) | Index(_, _) =>
+    Reference(_)
+    | Member(_, _)
+    | Index(_, _)
+    | Cast(_, _)
+    | EnumLiteral(_, _)
+    | ToEnum(_, _) =>
       context_unpack_expression(
         kind,
         context_value_code(scope, expression, root, path, owner_reader),
@@ -118,12 +146,14 @@ fn context_pack_kind(
 ) -> String {
   match kind {
     Unsigned(_, _) | Signed(_, _) => "\{root}Value::Number(\{value}.to_int64())"
+    Enumerated(_, _) => "\{root}Value::Number(\{value}.to_i())"
     Unsigned64(_) => "\{root}Value::Wide(\{value})"
     Float32(_) => "\{root}Value::FloatValue(\{value})"
     Text(_, _) => "\{root}Value::StringValue(\{value})"
     ByteField(_) | Contents(_) => "\{root}Value::Binary(\{value})"
     Bounded(inner, _) => context_pack_kind(inner, value, root, bounded=true)
-    Nested(_) => "\{root}Value::ObjectId(\{value}._ksy_context)"
+    Nested(_) | Application(_, _) =>
+      "\{root}Value::ObjectId(\{value}._ksy_context)"
     Switch(_, _, cases, fallback) => {
       let output = StringBuilder()
       output.write_string("(match \{value} { ")
@@ -185,12 +215,17 @@ fn context_unpack_kind(
   match kind {
     Unsigned(_, _) => scalar("Number", "value.to_int().reinterpret_as_uint()")
     Signed(_, _) => scalar("Number", "value.to_int()")
+    Enumerated(_, name) =>
+      scalar("Number", generated_enum_type(root, name) + "::from_code(value)")
     Unsigned64(_) => scalar("Wide", "value")
     Float32(_) => scalar("FloatValue", "value")
     Text(_, _) => scalar("StringValue", "value")
     ByteField(_) | Contents(_) => scalar("Binary", "value")
-    Nested(name) =>
-      scalar("ObjectId", "hydrate_\{root}_\{name}(arena, value, \{path})")
+    Nested(name) | Application(name, _) =>
+      scalar(
+        "ObjectId",
+        "\{context_hydrate_name(root, name)}(arena, value, \{path})",
+      )
     Bounded(inner, _) =>
       context_unpack_kind(inner, value, root, path, reader~, bounded=true)
     Switch(name, _, cases, fallback) => {
@@ -253,17 +288,19 @@ fn context_instance_result(
 ) -> String raise SchemaError {
   let result = match instance.kind {
     Parsed(field, _) => field_result_type(field, root)
-    Value(expression) =>
-      match
-        context_expression_type(
-          context_scope(graph, owner, instance.name),
-          expression,
-        ) {
+    Value(expression) => {
+      let scope = context_scope(graph, owner, instance.name)
+      match context_expression_type(scope, expression) {
         Integer => "Int64"
         Boolean => "Bool"
         Text => "String"
+        Stream => root + "Stream"
+        Enum(name) => generated_enum_type(root, name)
+        Object([name]) => context_type_name(root, name)
+        Object(_) => context_choice_type(root, owner, instance.name)
         _ => invalid(instance.name, "value instance type awaits implementation")
       }
+    }
   }
   if instance.condition is Some(_) {
     "Option[\{result}]"
@@ -273,9 +310,66 @@ fn context_instance_result(
 }
 
 ///|
+fn context_choice_type(root : String, owner : String, name : String) -> String {
+  let scope = if owner == "@root" { "root" } else { "type_" + owner }
+  root + "_choice_" + scope + "_" + name
+}
+
+///|
+fn context_hydrate_name(root : String, name : String) -> String {
+  if name == "@root" {
+    "hydrate_" + root + "_root_record"
+  } else {
+    "hydrate_" + root + "_" + name
+  }
+}
+
+///|
+fn context_decode_value(
+  scope : ContextScope,
+  expression : Expr,
+  root : String,
+  instance : String,
+) -> String raise SchemaError {
+  match context_expression_type(scope, expression) {
+    Stream =>
+      "(\{root}Stream::{ reader: \{context_unpack_expression(Stream, "value", root, "field", "reader")} })"
+    Object(names) => {
+      let error = context_error(root, "field")
+      let object = "(match value.object_id() { Some(object) => object; None => { \{error} } })"
+      if names is [name] {
+        "\{context_hydrate_name(root, name)}(arena, \{object}, field)"
+      } else {
+        let output = StringBuilder()
+        let result = context_choice_type(root, scope.owner, instance)
+        output.write_string(
+          "{ let object = \{object}; match arena.frame(object, field).tag { ",
+        )
+        for index, name in names {
+          let tag = scope.graph.tags[name]
+          output.write_string(
+            "\{tag} => \{result}::Case\{index}(\{context_hydrate_name(root, name)}(arena, object, field)); ",
+          )
+        }
+        output.write_string("_ => { \{error} } } }")
+        output.to_string()
+      }
+    }
+    Enum(name) =>
+      "\{generated_enum_type(root, name)}::from_code(\{context_unpack_expression(Enum(name), "value", root, "field", "reader")})"
+    kind => context_unpack_expression(kind, "value", root, "field", "reader")
+  }
+}
+
+///|
 fn context_has_reference(expression : Expr) -> Bool {
   match expression {
-    Reference(_) | Member(_, _) | Index(_, _) => true
+    Reference(_)
+    | Member(_, _)
+    | Index(_, _)
+    | Cast(_, _)
+    | EnumLiteral(_, _)
+    | ToEnum(_, _) => true
     Unary(_, child) => context_has_reference(child)
     Binary(_, a, b) => context_has_reference(a) || context_has_reference(b)
     Choose(a, b, c) =>
@@ -295,7 +389,10 @@ fn context_read_effects(schema : Schema) -> Map[String, Bool] {
   }
   for _ in 0..<graph.records.length() {
     for owner, record in graph.records {
-      effects[owner] = record.fields
+      effects[owner] = record.parameters
+        .iter()
+        .any(fn(p) { p.range is Some(_) }) ||
+        record.fields
         .iter()
         .any(fn(field) {
           field.count is Some(_) ||
@@ -315,6 +412,11 @@ fn context_read_effects(schema : Schema) -> Map[String, Bool] {
 fn context_kind_raises(kind : FieldKind, effects : Map[String, Bool]) -> Bool {
   match kind {
     Nested(name) => effects[name]
+    Application(name, args) =>
+      effects[name] ||
+      args
+      .iter()
+      .any(fn(arg) { context_has_reference(arg) || expression_arithmetic(arg) })
     Switch(_, expression, cases, fallback) =>
       (
         !cases.is_empty() &&
@@ -345,7 +447,11 @@ fn context_expression_parts(
         path,
         reader,
       )
-    Member(_, _) | Index(_, _) =>
+    Member(_, _)
+    | Index(_, _)
+    | Cast(_, _)
+    | EnumLiteral(_, _)
+    | ToEnum(_, _) =>
       navigation.push(
         (
           expression,
@@ -390,6 +496,7 @@ fn context_kind_expressions(kind : FieldKind) -> Array[Expr] {
   let expressions = []
   for kind in walk_kinds(kind) {
     match kind {
+      Application(_, args) => expressions.append(args)
       ByteField(options) | Text(options, _) | Bounded(_, options) =>
         if options.length is Some(Calculated(value)) {
           expressions.push(value)
@@ -430,4 +537,15 @@ fn context_field_evaluator(
     )
   })
   fn(value) { codes.iter().find_first(fn(pair) { pair.0 == value }).unwrap().1 }
+}
+
+///|
+fn context_instance_read_raises(
+  field : Field,
+  position : Expr?,
+  effects : Map[String, Bool],
+) -> Bool {
+  position is Some(_) ||
+  field.count is Some(_) ||
+  context_kind_raises(field.kind, effects)
 }

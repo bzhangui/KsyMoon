@@ -261,7 +261,7 @@ pub fn IoPartialLazyRecord::entries(self : IoPartialLazyRecord) -> Array[IoParti
   let frame = arena.frame(context, "entries")
   let reader = frame.reader
   let field = frame.path + ".entries"
-  let raw = arena.attribute(context, "entries", field)
+  let raw = IoPartialLazyValue::ObjectId(context).attribute(arena, "entries", field)
   let result = { let value = raw; (match value { IoPartialLazyValue::Items(items) => items.map(fn(item) raise IoPartialLazyParseError { (match item { IoPartialLazyValue::ObjectId(value) => hydrate_IoPartialLazy_entry(arena, value, field); _ => { raise IoPartialLazyContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }); _ => { raise IoPartialLazyContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_entries = Some(result)
   result
@@ -275,7 +275,7 @@ fn read_io_partial_lazy_type_entry(reader : IoPartialLazyReader, path : String, 
   let v_link = reader.read_bits(1, false, path_link)
   arena.frames[context].unwrap().fields["link"] = IoPartialLazyValue::Number(v_link.to_int64())
   let path_value = path + ".value"
-  let v_value = if (((match arena.attribute(context, "link", path_value) { IoPartialLazyValue::Number(value) => value; _ => { raise IoPartialLazyContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) != 0L) && ((match arena.attribute(context, "previous", path_value) { IoPartialLazyValue::Number(value) => value; _ => { raise IoPartialLazyContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) == 17L)) {
+  let v_value = if (((match IoPartialLazyValue::ObjectId(context).attribute(arena, "link", path_value) { IoPartialLazyValue::Number(value) => value; _ => { raise IoPartialLazyContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) != 0L) && ((match IoPartialLazyValue::ObjectId(context).attribute(arena, "previous", path_value) { IoPartialLazyValue::Number(value) => value; _ => { raise IoPartialLazyContextError(field=path_value, offset=reader.offset, message="value is unavailable or has the wrong type") } }) == 17L)) {
   let v_value = reader.read_bits(1, false, path_value)
     Some(v_value)
   } else { None }
@@ -328,7 +328,7 @@ pub fn IoPartialLazy_entry::previous(self : IoPartialLazy_entry) -> UInt raise I
   let frame = arena.frame(context, "previous")
   let reader = frame.reader
   let field = frame.path + ".previous"
-  let raw = arena.attribute(context, "previous", field)
+  let raw = IoPartialLazyValue::ObjectId(context).attribute(arena, "previous", field)
   let result = { let value = raw; (match value { IoPartialLazyValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise IoPartialLazyContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_previous = Some(result)
   result

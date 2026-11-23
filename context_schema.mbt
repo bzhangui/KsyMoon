@@ -1,5 +1,5 @@
 ///|
-fn raw_uses_io(
+fn raw_uses_context(
   record : Map[String, @yaml.Yaml],
   types : Map[String, @yaml.Yaml],
   active : Array[String],
@@ -16,16 +16,68 @@ fn raw_uses_io(
       fields.push(value)
     }
   }
+  let objects = []
+  for field in fields {
+    if field is @yaml.Map(properties) &&
+      properties.get("id") is Some(@yaml.String(name)) &&
+      properties.get("type") is Some(@yaml.String(kind)) &&
+      types.contains(kind) {
+      objects.push(name)
+    }
+  }
+  if record.get("instances") is Some(@yaml.Map(instances)) {
+    for name, value in instances {
+      if value is @yaml.Map(properties) &&
+        properties.get("type") is Some(@yaml.String(kind)) &&
+        types.contains(kind) {
+        objects.push(name)
+      }
+    }
+  }
   for field in fields {
     if field is @yaml.Map(properties) {
+      if properties.contains("enum") {
+        return true
+      }
+      let expressions = [
+        "if", "pos", "size", "repeat-expr", "repeat-until", "value",
+      ]
+      for key in expressions {
+        if properties.get(key) is Some(source) {
+          let expression = parse_expression(source, key) catch {
+            _ => Expr::Integer(0L)
+          }
+          if expression_needs_context(expression) ||
+            (key == "value" && expression_returns_record(expression, objects)) {
+            return true
+          }
+        }
+      }
+      if properties.get("type") is Some(@yaml.Map(kind)) &&
+        kind.get("switch-on") is Some(source) &&
+        expression_needs_context(
+          parse_expression(source, "switch-on") catch {
+            _ => Expr::Integer(0L)
+          },
+        ) {
+        return true
+      }
       let names = match properties.get("type") {
-        Some(@yaml.String(name)) => [name]
+        Some(@yaml.String(name)) => {
+          if name.contains("(") {
+            return true
+          }
+          [name]
+        }
         Some(@yaml.Map(kind)) =>
           match kind.get("cases") {
             Some(@yaml.Map(cases)) => {
               let names = []
               for _, value in cases {
                 if value is @yaml.String(name) {
+                  if name.contains("(") {
+                    return true
+                  }
                   names.push(name)
                 }
               }
@@ -38,7 +90,7 @@ fn raw_uses_io(
       for name in names {
         if !active.contains(name) &&
           types.get(name) is Some(@yaml.Map(nested)) &&
-          raw_uses_io(nested, types, [..active, name]) {
+          raw_uses_context(nested, types, [..active, name]) {
           return true
         }
       }
@@ -48,9 +100,47 @@ fn raw_uses_io(
 }
 
 ///|
+fn expression_needs_context(expression : Expr) -> Bool {
+  match expression {
+    Member(_, _)
+    | Index(_, _)
+    | Cast(_, _)
+    | EnumLiteral(_, _)
+    | ToEnum(_, _) => true
+    Reference("_root" | "_parent" | "_io") => true
+    Unary(_, value) => expression_needs_context(value)
+    Binary(_, left, right) =>
+      expression_needs_context(left) || expression_needs_context(right)
+    Choose(condition, yes, no) =>
+      expression_needs_context(condition) ||
+      expression_needs_context(yes) ||
+      expression_needs_context(no)
+    _ => false
+  }
+}
+
+///|
+fn expression_returns_record(
+  expression : Expr,
+  objects : Array[String],
+) -> Bool {
+  match expression {
+    Reference(name) => objects.contains(name)
+    Choose(_, yes, no) =>
+      expression_returns_record(yes, objects) ||
+      expression_returns_record(no, objects)
+    _ => false
+  }
+}
+
+///|
 priv struct ContextGraph {
   records : Map[String, RecordDef]
   parents : Map[String, Array[String]]
+  tags : Map[String, Int32]
+  type_scopes : Map[String, Map[String, String]]
+  enum_scopes : Map[String, Map[String, String]]
+  enums : Map[String, EnumDef]
 }
 
 ///|
@@ -68,8 +158,10 @@ priv struct ContextScope {
 fn context_graph(schema : Schema) -> ContextGraph {
   let records = Map([])
   records["@root"] = schema.root
-  for record in schema.records {
+  let tags = Map([("@root", 0)])
+  for index, record in schema.records {
     records[record.name] = record
+    tags[record.name] = index + 1
   }
   let parents : Map[String, Array[String]] = Map([])
   for name, _ in records {
@@ -90,7 +182,14 @@ fn context_graph(schema : Schema) -> ContextGraph {
       }
     }
   }
-  { records, parents, }
+  {
+    records,
+    parents,
+    tags,
+    type_scopes: schema.type_scopes,
+    enum_scopes: schema.enum_scopes,
+    enums: schema.enums,
+  }
 }
 
 ///|
@@ -146,7 +245,8 @@ fn context_kind_type(
     Contents(_) | ByteField(_) => Bytes
     Text(_, _) => Text
     Bounded(inner, _) => context_kind_type(inner, path)
-    Nested(name) => Object([name])
+    Enumerated(_, name) => Enum(name)
+    Nested(name) | Application(name, _) => Object([name])
     Switch(_, _, cases, fallback) => {
       let kinds = cases.map(fn(item) raise SchemaError {
         context_kind_type(item.1, path)
@@ -180,6 +280,11 @@ fn context_attribute_type(
 ) -> ExprType raise SchemaError {
   guard scope.graph.records.get(owner) is Some(record) else {
     invalid(scope.path, "parent type is not known for this attribute")
+  }
+  for parameter in record.parameters {
+    if parameter.name == name {
+      return parameter.kind
+    }
   }
   for index, field in record.fields {
     if field.name == name {
@@ -270,6 +375,8 @@ fn context_member_type(
       )
     }
     Sequence(_) | Bytes if name == "length" => Integer
+    Enum(_) if name == "to_i" => Integer
+    Integer if name == "to_s" => Text
     _ =>
       invalid(
         scope.path,
@@ -279,11 +386,45 @@ fn context_member_type(
 }
 
 ///|
+fn context_cast_target(
+  scope : ContextScope,
+  target : String,
+) -> String raise SchemaError {
+  let names = target.split("::").map(fn(part) { part.to_owned() }).collect()
+  let visible = scope.graph.type_scopes[scope.owner]
+  guard visible.get(names[0]) is Some(first) else {
+    invalid(scope.path, "unknown cast target '" + target + "'")
+  }
+  let name = [first, ..names[1:].to_owned()].join("_")
+  guard scope.graph.records.contains(name) else {
+    invalid(scope.path, "unknown cast target '" + target + "'")
+  }
+  name
+}
+
+///|
 fn context_expression_type(
   scope : ContextScope,
   expression : Expr,
 ) -> ExprType raise SchemaError {
   match expression {
+    EnumLiteral(name, label) => Enum(context_enum_label(scope, name, label).0)
+    ToEnum(value, name) => {
+      ignore(context_enum(scope, name))
+      context_require(scope, value, Integer)
+      Enum(name)
+    }
+    Cast(base, target) => {
+      let name = context_cast_target(scope, target)
+      let source = context_expression_type(scope, base)
+      guard source is Object(owners) && owners.contains(name) else {
+        invalid(
+          scope.path,
+          "cast target '" + target + "' is not a possible object type",
+        )
+      }
+      Object([name])
+    }
     Member(base, name) =>
       context_member_type(scope, context_expression_type(scope, base), name)
     Index(base, index) => {
@@ -327,7 +468,10 @@ fn context_expression_type(
     }
     Binary("==" | "!=", left, right) => {
       let kind = context_expression_type(scope, left)
-      guard kind == Integer || kind == Boolean || kind == Text else {
+      guard kind == Integer ||
+        kind == Boolean ||
+        kind == Text ||
+        kind is Enum(_) else {
         invalid(
           scope.path,
           "comparison of this value type awaits implementation",
@@ -363,6 +507,10 @@ fn context_require(
         "expected a stream expression"
       } else if expected == Boolean {
         "expected a boolean expression"
+      } else if expected == Text {
+        "expected a string expression"
+      } else if expected is Enum(name) {
+        "expected enum '" + name + "'"
       } else {
         "expected an integer expression"
       },
@@ -376,6 +524,21 @@ fn check_context_kind(
   kind : FieldKind,
 ) -> Unit raise SchemaError {
   match kind {
+    Nested(name) => {
+      guard scope.graph.records[name].parameters.is_empty() else {
+        invalid(scope.path, "type '" + name + "' requires arguments")
+      }
+    }
+    Application(name, arguments) => {
+      let parameters = scope.graph.records[name].parameters
+      guard arguments.length() == parameters.length() else {
+        invalid(scope.path, "wrong number of arguments for type '" + name + "'")
+      }
+      for index, argument in arguments {
+        context_require(scope, argument, parameters[index].kind)
+      }
+    }
+    Enumerated(_, name) => ignore(context_enum(scope, name))
     ByteField(options) | Text(options, _) =>
       check_context_length(scope, options.length)
     Bounded(inner, options) => {
@@ -384,8 +547,12 @@ fn check_context_kind(
     }
     Switch(_, selector, cases, _) => {
       let expected = context_expression_type(scope, selector)
-      for (tag, _) in cases {
+      for (tag, branch) in cases {
         context_require(scope, tag, expected)
+        check_context_kind(scope, branch)
+      }
+      if kind is Switch(_, _, _, Some(branch)) {
+        check_context_kind(scope, branch)
       }
     }
     _ => ()
@@ -468,7 +635,12 @@ fn check_context_schema(schema : Schema) -> Unit raise SchemaError {
       match instance.kind {
         Value(expression) => {
           let kind = context_expression_type(scope, expression)
-          guard kind == Integer || kind == Boolean || kind == Text else {
+          guard kind == Integer ||
+            kind == Boolean ||
+            kind == Text ||
+            kind is Stream ||
+            kind is Object(_) ||
+            kind is Enum(_) else {
             invalid(scope.path, "value instance type awaits implementation")
           }
         }

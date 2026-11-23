@@ -173,6 +173,7 @@ fn parse_field_kind(
           guard tag is Integer(_) ||
             tag is Text(_) ||
             tag is Boolean(_) ||
+            tag is EnumLiteral(_, _) ||
             tag is Unary("-", Integer(_)) else {
             invalid(
               path + ".type.cases." + key,
@@ -191,11 +192,7 @@ fn parse_field_kind(
         }
       }
       // Stable public variant numbering across hash-map iteration orders.
-      result.sort_by(fn(a, b) {
-        expression_code(a.0, fn(n) { n }, "").compare(
-          expression_code(b.0, fn(n) { n }, ""),
-        )
-      })
+      result.sort_by(fn(a, b) { case_sort_key(a.0).compare(case_sort_key(b.0)) })
       let suffix = path
         .replace_all(old=".", new="_")
         .replace_all(old="[", new="_")
@@ -212,7 +209,9 @@ fn parse_field_kind(
     invalid(path + ".encoding", "encoding requires a string type")
   }
   if has_options {
-    guard kind is Nested(_) || kind is Switch(_, _, _, _) else {
+    guard kind is Nested(_) ||
+      kind is Application(_, _) ||
+      kind is Switch(_, _, _, _) else {
       invalid(path, "byte bounds/options require a user or switch type")
     }
     Bounded(kind, parse_byte_options(field, earlier, path, false, navigation~))
@@ -224,7 +223,7 @@ fn parse_field_kind(
 ///|
 fn kind_references(kind : FieldKind) -> Array[String] {
   match kind {
-    Nested(name) => [name]
+    Nested(name) | Application(name, _) => [name]
     Bounded(inner, _) => kind_references(inner)
     Switch(_, _, cases, fallback) => {
       let names = []
@@ -246,6 +245,10 @@ fn flatten_types(
   prefix : String,
   inherited : Map[String, String],
   definitions : Map[String, @yaml.Yaml],
+  type_scopes : Map[String, Map[String, String]],
+  inherited_enums : Map[String, String],
+  enum_scopes : Map[String, Map[String, String]],
+  enums : Map[String, EnumDef],
 ) -> Map[String, @yaml.Yaml] raise SchemaError {
   let types = match mapping.get("types") {
     Some(value) => as_mapping(value, "types")
@@ -256,6 +259,27 @@ fn flatten_types(
     check_identifier(name, "types." + name)
     visible[name] = prefix + name
   }
+  let owner = if prefix == "" {
+    "@root"
+  } else {
+    prefix[:prefix.length() - 1].to_owned()
+  }
+  type_scopes[owner] = visible
+  let visible_enums = inherited_enums.copy()
+  if mapping.get("enums") is Some(raw_enums) {
+    for enum_name, raw_values in as_mapping(raw_enums, owner + ".enums") {
+      let path = owner + ".enums." + enum_name
+      check_identifier(enum_name, path)
+      let name = if owner == "@root" {
+        enum_name
+      } else {
+        owner + "__" + enum_name
+      }
+      visible_enums[enum_name] = name
+      enums[name] = parse_enum(raw_values, path)
+    }
+  }
+  enum_scopes[owner] = visible_enums
   for name, value in types {
     let full = prefix + name
     guard !definitions.contains(full) else {
@@ -267,6 +291,10 @@ fn flatten_types(
         full + "_",
         visible,
         definitions,
+        type_scopes,
+        visible_enums,
+        enum_scopes,
+        enums,
       ),
     )
   }
@@ -275,14 +303,14 @@ fn flatten_types(
   if result.get("seq") is Some(@yaml.Array(fields)) {
     result["seq"] = @yaml.Array(
       fields.map(fn(value) raise SchemaError {
-        rewrite_field_type(value, visible)
+        rewrite_field_type(value, visible, visible_enums)
       }),
     )
   }
   if result.get("instances") is Some(@yaml.Map(instances)) {
     let rewritten = Map([])
     for name, value in instances {
-      rewritten[name] = rewrite_field_type(value, visible)
+      rewritten[name] = rewrite_field_type(value, visible, visible_enums)
     }
     result["instances"] = @yaml.Map(rewritten)
   }
@@ -293,23 +321,50 @@ fn flatten_types(
 }
 
 ///|
+fn scoped_type_name(name : String, visible : Map[String, String]) -> String {
+  if name.split_once("(") is Some((base, arguments)) {
+    return scoped_type_name(base.trim().to_owned(), visible) +
+      "(" +
+      arguments.to_owned()
+  }
+  if visible.get(name) is Some(full) {
+    full
+  } else if name.split_once("::") is Some((prefix, suffix)) &&
+    visible.get(prefix.to_owned()) is Some(full) {
+    full + "_" + suffix.replace_all(old="::", new="_").to_owned()
+  } else {
+    name
+  }
+}
+
+///|
 fn rewrite_field_type(
   value : @yaml.Yaml,
   visible : Map[String, String],
+  visible_enums : Map[String, String],
 ) -> @yaml.Yaml raise SchemaError {
   let field = as_mapping(value, "field").copy()
+  if field.get("enum") is Some(@yaml.String(name)) {
+    let resolved = if visible_enums.get(name) is Some(full) {
+      full
+    } else if name.split_once("::") is Some((owner, label_name)) &&
+      visible.get(owner.to_owned()) is Some(full) {
+      full + "__" + label_name.to_owned()
+    } else {
+      "@" + name
+    }
+    field["enum"] = @yaml.String(resolved)
+  }
   match field.get("type") {
     Some(@yaml.String(name)) =>
-      if visible.get(name) is Some(full) {
-        field["type"] = @yaml.String(full)
-      }
+      field["type"] = @yaml.String(scoped_type_name(name, visible))
     Some(@yaml.Map(mapping)) => {
       let mapping = mapping.copy()
       if mapping.get("cases") is Some(@yaml.Map(cases)) {
         let cases = cases.copy()
         for tag, kind in cases {
-          if kind is @yaml.String(name) && visible.get(name) is Some(full) {
-            cases[tag] = @yaml.String(full)
+          if kind is @yaml.String(name) {
+            cases[tag] = @yaml.String(scoped_type_name(name, visible))
           }
         }
         mapping["cases"] = @yaml.Map(cases)

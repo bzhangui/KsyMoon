@@ -58,4 +58,12 @@ import {
   "example/ksymoon-consumer/io_partial_seq",
   "example/ksymoon-consumer/io_partial_lazy",
   "example/ksymoon-consumer/cross_stream_layout",
+  "example/ksymoon-consumer/io_local_var",
+  "example/ksymoon-consumer/expr_io_ternary",
+  "example/ksymoon-consumer/enum_if",
+  "example/ksymoon-consumer/enum_of_value_inst",
+  "example/ksymoon-consumer/enum_to_i",
+  "example/ksymoon-consumer/params_call",
+  "example/ksymoon-consumer/params_def",
+  "example/ksymoon-consumer/params_call_extra_parens",
 } for "wbtest"

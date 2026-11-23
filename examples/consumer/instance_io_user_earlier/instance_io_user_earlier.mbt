@@ -266,7 +266,7 @@ fn instance_instance_io_user_earlier_root_a_mid(arena : InstanceIoUserEarlierAre
   frame.busy["a_mid"] = true
   defer { frame.busy["a_mid"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "into_a", field).attribute(arena, "inst", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "into_a", field).attribute(arena, "inst", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     reader.seek(1L, field)
@@ -285,7 +285,7 @@ pub fn InstanceIoUserEarlierRecord::a_mid(self : InstanceIoUserEarlierRecord) ->
   let frame = arena.frame(context, "a_mid")
   let reader = frame.reader
   let field = frame.path + ".a_mid"
-  let raw = arena.attribute(context, "a_mid", field)
+  let raw = InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "a_mid", field)
   let result = { let value = raw; (match value { InstanceIoUserEarlierValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise InstanceIoUserEarlierContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_a_mid = Some(result)
   result
@@ -300,7 +300,7 @@ fn instance_instance_io_user_earlier_root_b_mid(arena : InstanceIoUserEarlierAre
   frame.busy["b_mid"] = true
   defer { frame.busy["b_mid"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "into_b", field).attribute(arena, "inst", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "into_b", field).attribute(arena, "inst", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     reader.seek(1L, field)
@@ -319,7 +319,7 @@ pub fn InstanceIoUserEarlierRecord::b_mid(self : InstanceIoUserEarlierRecord) ->
   let frame = arena.frame(context, "b_mid")
   let reader = frame.reader
   let field = frame.path + ".b_mid"
-  let raw = arena.attribute(context, "b_mid", field)
+  let raw = InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "b_mid", field)
   let result = { let value = raw; (match value { InstanceIoUserEarlierValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise InstanceIoUserEarlierContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_b_mid = Some(result)
   result
@@ -373,7 +373,7 @@ pub fn InstanceIoUserEarlier_slot::last(self : InstanceIoUserEarlier_slot) -> Op
   let frame = arena.frame(context, "last")
   let reader = frame.reader
   let field = frame.path + ".last"
-  let raw = arena.attribute(context, "last", field)
+  let raw = InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "last", field)
   let result = (match raw { InstanceIoUserEarlierValue::Absent => None; value => Some((match value { InstanceIoUserEarlierValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise InstanceIoUserEarlierContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } })) })
   self._ksy_cache_last = Some(result)
   result
@@ -387,7 +387,7 @@ fn read_instance_io_user_earlier_type_foo(reader : InstanceIoUserEarlierReader, 
   let v_indicator = reader.read_bits(1, false, path_indicator)
   arena.frames[context].unwrap().fields["indicator"] = InstanceIoUserEarlierValue::Number(v_indicator.to_int64())
   let path_bar = path + ".bar"
-  let v_bar = if (((match arena.attribute(context, "inst", path_bar).attribute(arena, "_io", path_bar).attribute(arena, "size", path_bar) { InstanceIoUserEarlierValue::Number(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=path_bar, offset=reader.offset, message="value is unavailable or has the wrong type") } }) != 0L) && ((match arena.attribute(context, "inst", path_bar).attribute(arena, "content", path_bar) { InstanceIoUserEarlierValue::Number(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=path_bar, offset=reader.offset, message="value is unavailable or has the wrong type") } }) == 102L)) {
+  let v_bar = if (((match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "inst", path_bar).attribute(arena, "_io", path_bar).attribute(arena, "size", path_bar) { InstanceIoUserEarlierValue::Number(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=path_bar, offset=reader.offset, message="value is unavailable or has the wrong type") } }) != 0L) && ((match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "inst", path_bar).attribute(arena, "content", path_bar) { InstanceIoUserEarlierValue::Number(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=path_bar, offset=reader.offset, message="value is unavailable or has the wrong type") } }) == 102L)) {
   let v_bar = reader.read_bits(1, false, path_bar)
     Some(v_bar)
   } else { None }
@@ -410,7 +410,7 @@ fn instance_instance_io_user_earlier_type_foo_inst(arena : InstanceIoUserEarlier
   frame.busy["inst"] = true
   defer { frame.busy["inst"] = false }
   let value = {
-    let reader = (if ((match arena.attribute(context, "indicator", field) { InstanceIoUserEarlierValue::Number(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) == 202L) { (match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "_parent", field).attribute(arena, "sized_b", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) } else { (match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "_parent", field).attribute(arena, "sized_a", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) })
+    let reader = (if ((match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "indicator", field) { InstanceIoUserEarlierValue::Number(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) == 202L) { (match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "_parent", field).attribute(arena, "sized_b", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) } else { (match InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "_parent", field).attribute(arena, "sized_a", field).attribute(arena, "_io", field) { InstanceIoUserEarlierValue::Source(value) => value; _ => { raise InstanceIoUserEarlierContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) })
     let saved = reader.offset
     defer { reader.offset = saved }
     reader.seek(1L, field)
@@ -429,7 +429,7 @@ pub fn InstanceIoUserEarlier_foo::inst(self : InstanceIoUserEarlier_foo) -> Inst
   let frame = arena.frame(context, "inst")
   let reader = frame.reader
   let field = frame.path + ".inst"
-  let raw = arena.attribute(context, "inst", field)
+  let raw = InstanceIoUserEarlierValue::ObjectId(context).attribute(arena, "inst", field)
   let result = { let value = raw; (match value { InstanceIoUserEarlierValue::ObjectId(value) => hydrate_InstanceIoUserEarlier_slot(arena, value, field); _ => { raise InstanceIoUserEarlierContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_inst = Some(result)
   result

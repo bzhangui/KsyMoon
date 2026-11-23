@@ -327,3 +327,53 @@ test "context navigation retains expression type and cycle checks" {
     _ => fail("accepted cyclic navigation values")
   }
 }
+
+///|
+test "type applications validate argument count, type, and name conflicts" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: item, type: 'entry(true)'}
+    #|types:
+    #|  entry:
+    #|    params: [{id: enabled, type: bool}]
+    #|    seq: [{id: marker, type: u1, if: enabled}]
+  ignore(generate(source))
+  expect_schema_error(
+    source.replace_all(old="entry(true)", new="entry(1)"),
+    "@root.seq.item: expected a boolean expression",
+  )
+  expect_schema_error(
+    source.replace_all(old="entry(true)", new="entry()"),
+    "@root.seq.item: wrong number of arguments for type 'entry'",
+  )
+  expect_schema_error(
+    source.replace_all(old="entry(true)", new="entry"),
+    "@root.seq.item: type 'entry' requires arguments",
+  )
+}
+
+///|
+test "enums reject undefined labels and incompatible enum comparisons" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - {id: opcode, type: u1, enum: kinds}
+    #|  - {id: data, type: u1, if: 'opcode == kinds::known'}
+    #|enums:
+    #|  kinds: {1: known}
+    #|  other: {1: known}
+  ignore(generate(source))
+  expect_schema_error(
+    source.replace_all(old="kinds::known", new="kinds::missing"),
+    "@root.seq.data: unknown enum label 'kinds::missing'",
+  )
+  expect_schema_error(
+    source.replace_all(old="kinds::known", new="other::known"),
+    "@root.seq.data: expected enum 'kinds'",
+  )
+  expect_schema_error(
+    source.replace_all(old="enum: kinds", new="enum: missing"),
+    "@root.seq.opcode: unknown enum 'missing'",
+  )
+}

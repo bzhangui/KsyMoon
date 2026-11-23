@@ -4337,3 +4337,230 @@ test "Kaitai reference partial array io_partial_lazy" {
   assert_eq(entries[0].value, None)
   assert_eq(entries[1].value, Some(34U))
 }
+
+///|
+test "Kaitai reference navigation prefix outcomes io_local_var" {
+  let input = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2A\x2B\x2C\x2D\x2E\x2F\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3A\x3B\x3C\x3D\x3E\x3F\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4A\x4B\x4C\x4D\x4E\x4F\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5A\x5B\x5C\x5D\x5E\x5F\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6A\x6B\x6C\x6D\x6E\x6F\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7A\x7B\x7C\x7D\x7E\x7F\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8A\x8B\x8C\x8D\x8E\x8F\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9A\x9B\x9C\x9D\x9E\x9F\xA0\xA1\xA2\xA3\xA4\xA5\xA6\xA7\xA8\xA9\xAA\xAB\xAC\xAD\xAE\xAF\xB0\xB1\xB2\xB3\xB4\xB5\xB6\xB7\xB8\xB9\xBA\xBB\xBC\xBD\xBE\xBF\xC0\xC1\xC2\xC3\xC4\xC5\xC6\xC7\xC8\xC9\xCA\xCB\xCC\xCD\xCE\xCF\xD0\xD1\xD2\xD3\xD4\xD5\xD6\xD7\xD8\xD9\xDA\xDB\xDC\xDD\xDE\xDF\xE0\xE1\xE2\xE3\xE4\xE5\xE6\xE7\xE8\xE9\xEA\xEB\xEC\xED\xEE\xEF\xF0\xF1\xF2\xF3\xF4\xF5\xF6\xF7\xF8\xF9\xFA\xFB\xFC\xFD\xFE\xFF"
+  let rejected = b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+  for cut in 0..<input.length() {
+    let failed = try {
+      let frame = @io_local_var.parse_io_local_var(input[:cut].to_owned())
+      ignore(frame.mess_up())
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference positioned cast retains the parent cursor" {
+  let frame = @io_local_var.parse_io_local_var(b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2A\x2B\x2C\x2D\x2E\x2F\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3A\x3B\x3C\x3D\x3E\x3F\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4A\x4B\x4C\x4D\x4E\x4F\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5A\x5B\x5C\x5D\x5E\x5F\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6A\x6B\x6C\x6D\x6E\x6F\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7A\x7B\x7C\x7D\x7E\x7F\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8A\x8B\x8C\x8D\x8E\x8F\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9A\x9B\x9C\x9D\x9E\x9F\xA0\xA1\xA2\xA3\xA4\xA5\xA6\xA7\xA8\xA9\xAA\xAB\xAC\xAD\xAE\xAF\xB0\xB1\xB2\xB3\xB4\xB5\xB6\xB7\xB8\xB9\xBA\xBB\xBC\xBD\xBE\xBF\xC0\xC1\xC2\xC3\xC4\xC5\xC6\xC7\xC8\xC9\xCA\xCB\xCC\xCD\xCE\xCF\xD0\xD1\xD2\xD3\xD4\xD5\xD6\xD7\xD8\xD9\xDA\xDB\xDC\xDD\xDE\xDF\xE0\xE1\xE2\xE3\xE4\xE5\xE6\xE7\xE8\xE9\xEA\xEB\xEC\xED\xEE\xEF\xF0\xF1\xF2\xF3\xF4\xF5\xF6\xF7\xF8\xF9\xFA\xFB\xFC\xFD\xFE\xFF")
+  assert_eq(frame.skip.to_owned(), b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10\x11\x12\x13")
+  assert_eq(frame.always_null, None)
+  assert_eq(frame.followup, 20U)
+  assert_true(frame.mess_up() is Case1(_))
+}
+
+///|
+test "Kaitai reference navigation prefix outcomes expr_io_ternary" {
+  let input = b"\x53\x03\x66\x6F\x6F\x54\x42\x43\x53\x03\x62\x61\x72"
+  let rejected = b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+  for cut in 0..<input.length() {
+    let failed = try {
+      let frame = @expr_io_ternary.parse_expr_io_ternary(input[:cut].to_owned())
+      ignore(frame.one_or_two_io_size2())
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference typed object and stream selection 83" {
+  let frame = @expr_io_ternary.parse_expr_io_ternary(b"\x53\x03\x66\x6F\x6F\x54\x42\x43\x53\x03\x62\x61\x72")
+  guard frame.one_or_two_obj() is Case1(item) else { fail("wrong object") }
+  assert_eq(item.two, 84U)
+  let stream = frame.one_or_two_io()
+  assert_eq(stream.pos(), 1L)
+  assert_eq(stream.size(), 8L)
+  assert_eq(stream.eof(), false)
+  assert_eq(frame.one_or_two_io_size1(), 8L)
+  assert_eq(frame.one_or_two_io_size2(), 8L)
+  assert_eq(frame.one_or_two_io_size_add_3(), 11L)
+}
+
+///|
+test "Kaitai reference typed object and stream selection 64" {
+  let frame = @expr_io_ternary.parse_expr_io_ternary(b"\x40\x03\x66\x6F\x6F\x54\x42\x43\x53\x03\x62\x61\x72")
+  guard frame.one_or_two_obj() is Case0(item) else { fail("wrong object") }
+  assert_eq(item.one, 3U)
+  let stream = frame.one_or_two_io()
+  assert_eq(stream.pos(), 1L)
+  assert_eq(stream.size(), 4L)
+  assert_eq(stream.eof(), false)
+  assert_eq(frame.one_or_two_io_size1(), 4L)
+  assert_eq(frame.one_or_two_io_size2(), 4L)
+  assert_eq(frame.one_or_two_io_size_add_3(), 7L)
+}
+
+///|
+test "Kaitai reference typed schema prefixes enum_if" {
+  let input = b"\x53\x03\x66\x6F\x6F\x54\x42\x43\x53\x03\x62\x61\x72"
+  let rejected = b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+  for cut in 0..<input.length() {
+    let failed = try {
+      ignore(@enum_if.parse_enum_if(input[:cut].to_owned()))
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference typed schema enum_if upstream" {
+  let frame = @enum_if.parse_enum_if(b"\x53\x03\x66\x6F\x6F\x54\x42\x43\x53\x03\x62\x61\x72")
+  assert_eq(frame.op1.opcode.to_i(), 83L)
+  guard frame.op1.arg_str is Some(value_arg_str_1) else { fail("missing arg_str") }
+  assert_eq(value_arg_str_1.str, "foo")
+  assert_true(frame.op1.arg_tuple is None)
+  assert_eq(frame.op2.opcode.to_i(), 84L)
+  assert_true(frame.op2.arg_str is None)
+  guard frame.op2.arg_tuple is Some(value_arg_tuple_2) else { fail("missing arg_tuple") }
+  assert_eq(value_arg_tuple_2.num1.to_int64(), 66L)
+  assert_eq(value_arg_tuple_2.num2.to_int64(), 67L)
+  assert_eq(frame.op3.opcode.to_i(), 83L)
+  guard frame.op3.arg_str is Some(value_arg_str_3) else { fail("missing arg_str") }
+  assert_eq(value_arg_str_3.str, "bar")
+  assert_true(frame.op3.arg_tuple is None)
+}
+
+///|
+test "Kaitai reference typed schema enum_if unknown codes" {
+  let frame = @enum_if.parse_enum_if(b"\xFF\xFE\xFD")
+  assert_eq(frame.op1.opcode.to_i(), 255L)
+  assert_true(frame.op1.opcode is UnknownCode(255L))
+  assert_true(frame.op1.arg_str is None)
+  assert_true(frame.op1.arg_tuple is None)
+  assert_eq(frame.op2.opcode.to_i(), 254L)
+  assert_true(frame.op2.opcode is UnknownCode(254L))
+  assert_true(frame.op2.arg_str is None)
+  assert_true(frame.op2.arg_tuple is None)
+  assert_eq(frame.op3.opcode.to_i(), 253L)
+  assert_true(frame.op3.opcode is UnknownCode(253L))
+  assert_true(frame.op3.arg_str is None)
+  assert_true(frame.op3.arg_tuple is None)
+}
+
+///|
+test "Kaitai reference typed schema prefixes enum_of_value_inst" {
+  let input = b"\x07\x00\x00\x00\x0C\x00\x00\x00"
+  let rejected = b"\x01\x01\x01\x01\x01\x01\x01\x01"
+  for cut in 0..<input.length() {
+    let failed = try {
+      ignore(@enum_of_value_inst.parse_enum_of_value_inst(input[:cut].to_owned()))
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference typed schema enum_of_value_inst upstream" {
+  let frame = @enum_of_value_inst.parse_enum_of_value_inst(b"\x07\x00\x00\x00\x0C\x00\x00\x00")
+  assert_eq(frame.pet_1.to_i(), 7L)
+  assert_eq(frame.pet_2.to_i(), 12L)
+  assert_eq(frame.pet_3().to_i(), 4L)
+  assert_eq(frame.pet_4().to_i(), 4L)
+}
+
+///|
+test "Kaitai reference typed schema prefixes enum_to_i" {
+  let input = b"\x07\x00\x00\x00\x0C\x00\x00\x00"
+  let rejected = b"\x01\x01\x01\x01\x01\x01\x01\x01"
+  for cut in 0..<input.length() {
+    let failed = try {
+      ignore(@enum_to_i.parse_enum_to_i(input[:cut].to_owned()))
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference typed schema enum_to_i upstream" {
+  let frame = @enum_to_i.parse_enum_to_i(b"\x07\x00\x00\x00\x0C\x00\x00\x00")
+  assert_eq(frame.pet_1.to_i(), 7L)
+  assert_eq(frame.pet_2.to_i(), 12L)
+  assert_eq(frame.pet_1_i(), 7L)
+  assert_eq(frame.pet_1_i_to_s(), "7")
+  assert_eq(frame.pet_1_mod(), 32775L)
+  assert_eq(frame.one_lt_two(), true)
+  assert_eq(frame.pet_1_eq_int(), true)
+  assert_eq(frame.pet_2_eq_int(), false)
+}
+
+///|
+test "Kaitai reference typed schema prefixes params_call" {
+  let input = b"\x66\x6F\x6F\x7C\x62\x61\x72\x7C\x62\x61\x7A\x40"
+  let rejected = b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x00"
+  for cut in 0..<input.length() {
+    let failed = try {
+      ignore(@params_call.parse_params_call(input[:cut].to_owned()))
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference typed schema params_call upstream" {
+  let frame = @params_call.parse_params_call(b"\x66\x6F\x6F\x7C\x62\x61\x72\x7C\x62\x61\x7A\x40")
+  assert_eq(frame.buf1.len, 5L)
+  assert_eq(frame.buf1.body, "foo|b")
+  assert_eq(frame.buf2.len, 5L)
+  assert_eq(frame.buf2.body, "ar|ba")
+  assert_eq(frame.buf2.has_trailer, true)
+  assert_eq(frame.buf2.trailer, Some(122U))
+}
+
+///|
+test "Kaitai reference typed schema prefixes params_def" {
+  let input = b"\x66\x6F\x6F\x7C\x62\x61\x72\x7C\x62\x61\x7A\x40"
+  let rejected = b"\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00"
+  for cut in 0..<input.length() {
+    let failed = try {
+      ignore(@params_def.parse_params_def(input[:cut].to_owned(), 5L, true))
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference typed schema params_def upstream" {
+  let frame = @params_def.parse_params_def(b"\x66\x6F\x6F\x7C\x62\x61\x72\x7C\x62\x61\x7A\x40", 5L, true)
+  assert_eq(frame.len, 5L)
+  assert_eq(frame.has_trailer, true)
+  assert_eq(frame.buf, "foo|b")
+  assert_eq(frame.trailer, Some(97U))
+}
+
+///|
+test "Kaitai reference typed schema prefixes params_call_extra_parens" {
+  let input = b"\x66\x6F\x6F\x7C\x62\x61\x72\x7C\x62\x61\x7A\x40"
+  let rejected = b"\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00"
+  for cut in 0..<input.length() {
+    let failed = try {
+      ignore(@params_call_extra_parens.parse_params_call_extra_parens(input[:cut].to_owned()))
+      false
+    } catch { _ => true }
+    assert_eq(failed, rejected[cut] == 1)
+  }
+}
+
+///|
+test "Kaitai reference typed schema params_call_extra_parens upstream" {
+  let frame = @params_call_extra_parens.parse_params_call_extra_parens(b"\x66\x6F\x6F\x7C\x62\x61\x72\x7C\x62\x61\x7A\x40")
+  assert_eq(frame.buf1.len, 5L)
+  assert_eq(frame.buf1.body, "foo|b")
+}

@@ -4,6 +4,11 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
   let add = fn(name) { if !flags.contains(name) { flags.push(name) } }
   let graph = context_graph(schema)
   for owner, record in graph.records {
+    for parameter in record.parameters {
+      if parameter.kind == Text {
+        add("text")
+      }
+    }
     let fields = record.fields.copy()
     for instance in record.instances {
       match instance.kind {
@@ -45,8 +50,11 @@ fn context_emit_runtime(
   root : String,
   flags : Array[String],
   release : Bool,
-  repeated : Bool,
+  has_instances : Bool,
+  accounting : Bool,
+  rollback : Bool,
   index : Bool,
+  objects : Bool,
 ) -> Unit {
   output.write_string(
     "///|\npriv enum \{root}Value {\n  Number(Int64)\n  Flag(Bool)\n  ObjectId(Int)\n  Source(\{root}Reader)\n  Absent\n",
@@ -71,12 +79,12 @@ fn context_emit_runtime(
     #|  tag : Int
     #|  parent : Int
     #|  reader : __ROOT__Reader
-    #|  path : String
+    #|__PATH_FIELD__
     #|  children : Array[Int]
     #|  fields : Map[String, __ROOT__Value]
     #|  cache : Map[String, __ROOT__Value]
     #|  partial : Map[String, __ROOT__Value]
-    #|  busy : Map[String, Bool]
+    #|__BUSY_FIELD__
     #|__ACCOUNT_FIELD__}
     #|
     #|///|
@@ -94,8 +102,8 @@ fn context_emit_runtime(
     #|}
     #|
     #|///|
-    #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, path : String) -> Int {
-    #|  let frame : __ROOT__Context = { tag, parent, reader, path, children: [], fields: Map([]), cache: Map([]), partial: Map([]), busy: Map([])__ACCOUNT_INIT__ }
+    #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, __PATH_ARG__ : String) -> Int {
+    #|  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____ACCOUNT_INIT__ }
     #|  let context = match self.free.pop() {
     #|    Some(context) => { self.frames[context] = Some(frame); context }
     #|    None => { self.frames.push(Some(frame)); self.frames.length() - 1 }
@@ -106,16 +114,36 @@ fn context_emit_runtime(
     #|
   let block = block
     .replace_all(
+      old="__PATH_FIELD__\n",
+      new=if has_instances { "  path : String\n" } else { "" },
+    )
+    .replace_all(
+      old="__BUSY_FIELD__\n",
+      new=if has_instances { "  busy : Map[String, Bool]\n" } else { "" },
+    )
+    .replace_all(
+      old="__PATH_ARG__",
+      new=if has_instances { "path" } else { "_path" },
+    )
+    .replace_all(
+      old="__PATH_INIT__",
+      new=if has_instances { "path, " } else { "" },
+    )
+    .replace_all(
+      old="__BUSY_INIT__",
+      new=if has_instances { ", busy: Map([])" } else { "" },
+    )
+    .replace_all(
       old="__ACCOUNT_FIELD__",
-      new=if repeated { "  account : Int\n" } else { "" },
+      new=if accounting { "  account : Int\n" } else { "" },
     )
     .replace_all(
       old="__ACCOUNT_COUNTER__",
-      new=if repeated { "  mut next_account : Int\n" } else { "" },
+      new=if accounting { "  mut next_account : Int\n" } else { "" },
     )
     .replace_all(
       old="__ACCOUNT_INIT__",
-      new=if repeated {
+      new=if accounting {
         ", account: reader.budget[reader.budget[1] - 1]"
       } else {
         ""
@@ -138,7 +166,7 @@ fn context_emit_runtime(
       #|}
       #|
     write_reader_block(output, block, root)
-    if repeated {
+    if rollback {
       let cleanup =
         #|///|
         #|fn __ROOT__Arena::release_account(self : __ROOT__Arena, account : Int) -> Unit {
@@ -178,7 +206,7 @@ fn context_emit_runtime(
   let extra = StringBuilder()
   if flags.contains("selected") {
     extra.write_string(
-      "    Selected(_, value) => value.attribute(arena, name, field)\n",
+      "    Selected(tag, value) => { ignore(tag); value.attribute(arena, name, field) }\n",
     )
   }
   if flags.contains("binary") {
@@ -211,6 +239,16 @@ fn context_emit_runtime(
     block.replace_all(old="__EXTRA_CASES__", new=extra.to_string()[:]),
     root,
   )
+  if objects {
+    let selected = if flags.contains("selected") {
+      "    Selected(_, value) => value.object_id()\n"
+    } else {
+      ""
+    }
+    output.write_string(
+      "///|\nfn \{root}Value::object_id(self : \{root}Value) -> Int? {\n  match self {\n    ObjectId(id) => Some(id)\n\{selected}    _ => None\n  }\n}\n\n",
+    )
+  }
   if index {
     let block =
       #|///|
@@ -229,7 +267,8 @@ fn context_emit_runtime(
 fn context_contains_index(expression : Expr) -> Bool {
   match expression {
     Index(_, _) => true
-    Member(base, _) | Unary(_, base) => context_contains_index(base)
+    Member(base, _) | Cast(base, _) | ToEnum(base, _) | Unary(_, base) =>
+      context_contains_index(base)
     Binary(_, a, b) => context_contains_index(a) || context_contains_index(b)
     Choose(a, b, c) =>
       context_contains_index(a) ||
@@ -274,4 +313,46 @@ fn context_all_expressions(schema : Schema) -> Array[Expr] {
     }
   }
   expressions
+}
+
+///|
+fn context_contains_cast(expression : Expr) -> Bool {
+  match expression {
+    Cast(_, _) => true
+    Member(base, _) | ToEnum(base, _) | Unary(_, base) =>
+      context_contains_cast(base)
+    Index(base, index) | Binary(_, base, index) =>
+      context_contains_cast(base) || context_contains_cast(index)
+    Choose(a, b, c) =>
+      context_contains_cast(a) ||
+      context_contains_cast(b) ||
+      context_contains_cast(c)
+    _ => false
+  }
+}
+
+///|
+fn context_emit_stream_value(output : StringBuilder, root : String) -> Unit {
+  let block =
+    #|///|
+    #|pub struct __ROOT__Stream {
+    #|  priv reader : __ROOT__Reader
+    #|}
+    #|
+    #|///|
+    #|pub fn __ROOT__Stream::pos(self : __ROOT__Stream) -> Int64 {
+    #|  self.reader.offset.to_int64()
+    #|}
+    #|
+    #|///|
+    #|pub fn __ROOT__Stream::size(self : __ROOT__Stream) -> Int64 {
+    #|  self.reader.input.length().to_int64()
+    #|}
+    #|
+    #|///|
+    #|pub fn __ROOT__Stream::eof(self : __ROOT__Stream) -> Bool {
+    #|  self.reader.offset == self.reader.input.length()
+    #|}
+    #|
+  write_reader_block(output, block, root)
 }

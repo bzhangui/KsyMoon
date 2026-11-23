@@ -190,7 +190,7 @@ fn instance_io_lifecycle_root_failed(arena : IoLifecycleArena, context : Int) ->
   frame.busy["failed"] = true
   defer { frame.busy["failed"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "source", field).attribute(arena, "_io", field) { IoLifecycleValue::Source(value) => value; _ => { raise IoLifecycleContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match IoLifecycleValue::ObjectId(context).attribute(arena, "source", field).attribute(arena, "_io", field) { IoLifecycleValue::Source(value) => value; _ => { raise IoLifecycleContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     reader.seek(0L, field)
@@ -209,7 +209,7 @@ pub fn IoLifecycleRecord::failed(self : IoLifecycleRecord) -> IoLifecycle_broken
   let frame = arena.frame(context, "failed")
   let reader = frame.reader
   let field = frame.path + ".failed"
-  let raw = arena.attribute(context, "failed", field)
+  let raw = IoLifecycleValue::ObjectId(context).attribute(arena, "failed", field)
   let result = { let value = raw; (match value { IoLifecycleValue::ObjectId(value) => hydrate_IoLifecycle_broken(arena, value, field); _ => { raise IoLifecycleContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_failed = Some(result)
   result

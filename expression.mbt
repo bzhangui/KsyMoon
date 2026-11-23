@@ -6,6 +6,9 @@ priv enum Expr {
   Reference(String)
   Member(Expr, String)
   Index(Expr, Expr)
+  Cast(Expr, String)
+  EnumLiteral(String, String)
+  ToEnum(Expr, String)
   StreamPosition
   StreamSize
   Unary(String, Expr)
@@ -23,6 +26,7 @@ priv enum ExprType {
   Sequence(ExprType)
   Bytes
   WideInteger
+  Enum(String)
   Real
 } derive(Eq)
 
@@ -94,6 +98,7 @@ fn expression_tokens(
             (ch == '=' || ch == '!' || ch == '<' || ch == '>') &&
             chars[i] == '='
           ) ||
+          (ch == ':' && chars[i] == ':') ||
           (ch == '<' && chars[i] == '<') ||
           (ch == '>' && chars[i] == '>')
         ) {
@@ -189,7 +194,20 @@ fn ExprParser::parse(
       }
     name if name[0] >= 'a' && name[0] <= 'z' => {
       check_identifier(name, self.path)
-      Reference(name)
+      if self.peek() == "::" {
+        let parts = [name]
+        while self.peek() == "::" {
+          self.index += 1
+          let part = self.peek()
+          check_identifier(part, self.path)
+          self.index += 1
+          parts.push(part)
+        }
+        let label = parts.pop().unwrap()
+        EnumLiteral(parts.join("::"), label)
+      } else {
+        Reference(name)
+      }
     }
     _ => invalid(self.path, "unexpected expression token '\{token}'")
   }
@@ -198,11 +216,31 @@ fn ExprParser::parse(
     self.index += 1
     if operation == "." {
       let attribute = self.peek()
-      if attribute != "_io" && attribute != "_root" && attribute != "_parent" {
-        check_identifier(attribute, self.path)
-      }
       self.index += 1
-      left = Member(left, attribute)
+      if attribute == "as" && self.peek() == "<" {
+        self.index += 1
+        let parts = []
+        while true {
+          let name = self.peek()
+          check_identifier(name, self.path)
+          self.index += 1
+          parts.push(name)
+          if self.peek() != "::" {
+            break
+          }
+          self.index += 1
+        }
+        guard self.peek() == ">" else {
+          invalid(self.path, "expected '>' after cast target")
+        }
+        self.index += 1
+        left = Cast(left, parts.join("::"))
+      } else {
+        if attribute != "_io" && attribute != "_root" && attribute != "_parent" {
+          check_identifier(attribute, self.path)
+        }
+        left = Member(left, attribute)
+      }
     } else {
       let index = self.parse(1)
       guard self.peek() == "]" else {
@@ -266,7 +304,8 @@ fn check_expression_depth(
 ) -> Unit raise SchemaError {
   guard depth <= 64 else { invalid(path, "expression nesting exceeds 64") }
   match expression {
-    Member(value, _) => check_expression_depth(value, depth + 1, path)
+    Member(value, _) | Cast(value, _) | ToEnum(value, _) =>
+      check_expression_depth(value, depth + 1, path)
     Index(value, index) => {
       check_expression_depth(value, depth + 1, path)
       check_expression_depth(index, depth + 1, path)
@@ -297,7 +336,11 @@ fn expression_type(
     Boolean(_) => Boolean
     Text(_) => Text
     Reference(name) => lookup(name)
-    Member(_, _) | Index(_, _) =>
+    Member(_, _)
+    | Index(_, _)
+    | Cast(_, _)
+    | EnumLiteral(_, _)
+    | ToEnum(_, _) =>
       match navigation {
         Some(resolve) => resolve(expression)
         None => invalid(path, "object navigation awaits implementation")
@@ -389,7 +432,11 @@ fn expression_code(
     Text(value) => value.escape()
     Boolean(value) => if value { "true" } else { "false" }
     Reference(name) => reference(name)
-    Member(_, _) | Index(_, _) => navigation.unwrap()(expression)
+    Member(_, _)
+    | Index(_, _)
+    | Cast(_, _)
+    | EnumLiteral(_, _)
+    | ToEnum(_, _) => navigation.unwrap()(expression)
     StreamPosition => "\{stream_reader}.offset.to_int64()"
     StreamSize => "\{stream_reader}.input.length().to_int64()"
     Unary("not", value) => "(!\{child(value)})"
@@ -416,7 +463,8 @@ fn expression_code(
 ///|
 fn expression_arithmetic(expression : Expr) -> Bool {
   match expression {
-    Member(value, _) => expression_arithmetic(value)
+    Member(value, _) | Cast(value, _) | ToEnum(value, _) =>
+      expression_arithmetic(value)
     Index(value, index) =>
       expression_arithmetic(value) || expression_arithmetic(index)
     Unary(op, value) => op == "-" || expression_arithmetic(value)
@@ -436,6 +484,7 @@ fn expression_arithmetic(expression : Expr) -> Bool {
 fn expression_stream_size(expression : Expr) -> Bool {
   match expression {
     StreamSize => true
+    Cast(value, _) | ToEnum(value, _) => expression_stream_size(value)
     Member(value, attribute) =>
       attribute == "size" || expression_stream_size(value)
     Index(value, index) =>

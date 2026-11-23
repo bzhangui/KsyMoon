@@ -50,6 +50,8 @@ priv enum FieldKind {
   Float32(Endian)
   Contents(Bytes)
   Nested(String)
+  Application(String, Array[Expr])
+  Enumerated(FieldKind, String)
   ByteField(ByteOptions)
   Text(ByteOptions, String)
   Bounded(FieldKind, ByteOptions)
@@ -76,6 +78,7 @@ priv struct ScalarCheck {
 priv struct RecordDef {
   name : String
   fields : Array[Field]
+  parameters : Array[Parameter]
   instances : Array[Instance]
 }
 
@@ -83,7 +86,10 @@ priv struct RecordDef {
 priv struct Schema {
   root : RecordDef
   records : Array[RecordDef]
-  has_io : Bool
+  has_context : Bool
+  type_scopes : Map[String, Map[String, String]]
+  enum_scopes : Map[String, Map[String, String]]
+  enums : Map[String, EnumDef]
 }
 
 ///|
@@ -279,6 +285,13 @@ fn parse_kind(
   type_names : Array[String],
   path : String,
 ) -> FieldKind raise SchemaError {
+  if type_name.split_once("(") is Some((base, args)) {
+    let base = base.trim().to_owned()
+    guard type_names.contains(base) else {
+      invalid(path, "unknown parameterized type '" + base + "'")
+    }
+    return Application(base, parse_type_application(args.to_owned(), path))
+  }
   match type_name {
     "u1" => Unsigned(1, Big)
     "u2" => Unsigned(2, default_endian(endian, path))
@@ -404,8 +417,8 @@ fn parse_field(
     field,
     [
       "id", "type", "size", "contents", "valid", "repeat", "repeat-expr", "doc",
-      "doc-ref", "if", "repeat-until", "size-eos", "encoding", "terminator", "pad-right",
-      "include", "consume", "eos-error",
+      "enum", "doc-ref", "if", "repeat-until", "size-eos", "encoding", "terminator",
+      "pad-right", "include", "consume", "eos-error",
     ],
     path,
   )
@@ -493,6 +506,17 @@ fn parse_field(
       path + ".if",
     )
   }
+  let kind = if field.get("enum") is Some(raw) {
+    guard kind is Unsigned(_, _) || kind is Signed(_, _) else {
+      invalid(
+        path + ".enum",
+        "enum requires a signed or unsigned integer field of at most 32 bits",
+      )
+    }
+    Enumerated(kind, as_string(raw, path + ".enum"))
+  } else {
+    kind
+  }
   { name, kind, count, validation, condition, }
 }
 
@@ -504,6 +528,7 @@ fn parse_record(
   type_names : Array[String],
   path : String,
   instances : @yaml.Yaml?,
+  params~ : @yaml.Yaml? = None,
   navigation~ : Bool = false,
 ) -> RecordDef raise SchemaError {
   guard value is @yaml.Array(sequence) else {
@@ -528,17 +553,31 @@ fn parse_record(
   } else {
     path[:path.length() - 3].to_owned() + "instances"
   }
+  let parameters = parse_parameters(params, path + ".params")
+  let parsed_instances = parse_instances(
+    instances,
+    fields,
+    endian,
+    type_names,
+    instance_path,
+    navigation~,
+  )
+  for parameter in parameters {
+    guard !earlier.contains(parameter.name) &&
+      !parsed_instances
+      .iter()
+      .any(fn(instance) { instance.name == parameter.name }) else {
+      invalid(
+        path + ".params",
+        "parameter '" + parameter.name + "' conflicts with a field or instance",
+      )
+    }
+  }
   let record : RecordDef = {
     name,
     fields,
-    instances: parse_instances(
-      instances,
-      fields,
-      endian,
-      type_names,
-      instance_path,
-      navigation~,
-    ),
+    parameters,
+    instances: parsed_instances,
   }
   if !navigation {
     check_instances(record, instance_path)
@@ -587,7 +626,7 @@ fn load_schema(source : String) -> Schema raise SchemaError {
   let root = as_mapping(document, "schema")
   check_keys(
     root,
-    ["meta", "seq", "types", "instances", "doc", "doc-ref"],
+    ["meta", "seq", "types", "instances", "doc", "doc-ref", "enums", "params"],
     "schema",
   )
   let meta = as_mapping(get_required(root, "meta", "schema"), "meta")
@@ -607,8 +646,20 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     Some(@yaml.String("be")) => Some(Big)
     _ => invalid("meta.endian", "expected 'le' or 'be'")
   }
+  let type_scopes = Map([])
+  let enum_scopes = Map([])
+  let enums = Map([])
   let root = inherit_encoding(
-    flatten_types(root, "", Map([]), Map([])),
+    flatten_types(
+      root,
+      "",
+      Map([]),
+      Map([]),
+      type_scopes,
+      Map([]),
+      enum_scopes,
+      enums,
+    ),
     meta.get("encoding"),
   )
   let types = match root.get("types") {
@@ -618,14 +669,25 @@ fn load_schema(source : String) -> Schema raise SchemaError {
   guard types.length() <= 64 else {
     invalid("types", "at most 64 nested type definitions are supported")
   }
-  let has_io = raw_uses_io(root, types, [])
+  let has_context = !enums.is_empty() ||
+    root.contains("params") ||
+    types
+    .values()
+    .any(fn(value) {
+      value is @yaml.Map(properties) && properties.contains("params")
+    }) ||
+    raw_uses_context(root, types, [])
   let names = types.keys().collect()
   let definitions : Map[String, RecordDef] = Map([])
   for name, value in types {
     let path = "types.\{name}"
     check_identifier(name, path)
     let mapping = as_mapping(value, path)
-    check_keys(mapping, ["seq", "instances", "doc", "doc-ref"], path)
+    check_keys(
+      mapping,
+      ["seq", "instances", "doc", "doc-ref", "enums", "params"],
+      path,
+    )
     definitions[name] = parse_record(
       name,
       mapping.get("seq").unwrap_or(@yaml.Array([])),
@@ -633,7 +695,8 @@ fn load_schema(source : String) -> Schema raise SchemaError {
       names,
       path + ".seq",
       mapping.get("instances"),
-      navigation=has_io,
+      params=mapping.get("params"),
+      navigation=has_context,
     )
   }
   let root_record = parse_record(
@@ -643,10 +706,11 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     names,
     "seq",
     root.get("instances"),
-    navigation=has_io,
+    params=root.get("params"),
+    navigation=has_context,
   )
   for record in [root_record, ..definitions.values().collect()] {
-    if !has_io {
+    if !has_context {
       check_repeat_members(record, definitions)
     }
   }
@@ -655,14 +719,20 @@ fn load_schema(source : String) -> Schema raise SchemaError {
   let schema : Schema = {
     root: root_record,
     records: reachable.values().collect(),
-    has_io,
+    has_context,
+    type_scopes,
+    enum_scopes,
+    enums,
   }
   let all_definitions : Schema = {
     root: root_record,
     records: definitions.values().collect(),
-    has_io,
+    has_context,
+    type_scopes,
+    enum_scopes,
+    enums,
   }
-  if has_io {
+  if has_context {
     check_context_schema(all_definitions)
   } else {
     let graph = context_graph(all_definitions)

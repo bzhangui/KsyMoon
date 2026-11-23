@@ -229,7 +229,7 @@ fn instance_io_budget_root_cached(arena : IoBudgetArena, context : Int) -> IoBud
     defer { reader.budget[1] = previous_account; ignore(reader.budget.pop()); ignore(reader.budget.pop()) }
     errdefer { reader.budget[0] += reader.budget[account]; arena.release_account(reader.budget[account - 1]) }
     reader.seek(0L, field)
-  let count_result = reader.reserve_repeats((match arena.attribute(context, "quantity", field) { IoBudgetValue::Number(value) => value; _ => { raise IoBudgetContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
+  let count_result = reader.reserve_repeats((match IoBudgetValue::ObjectId(context).attribute(arena, "quantity", field) { IoBudgetValue::Number(value) => value; _ => { raise IoBudgetContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
   let result = []
     let metadata_result : Array[IoBudgetValue] = []
     frame.partial["cached"] = IoBudgetValue::Items(metadata_result)
@@ -257,7 +257,7 @@ pub fn IoBudgetRecord::cached(self : IoBudgetRecord) -> Array[UInt] raise IoBudg
   let frame = arena.frame(context, "cached")
   let reader = frame.reader
   let field = frame.path + ".cached"
-  let raw = arena.attribute(context, "cached", field)
+  let raw = IoBudgetValue::ObjectId(context).attribute(arena, "cached", field)
   let result = { let value = raw; (match value { IoBudgetValue::Items(items) => items.map(fn(item) raise IoBudgetParseError { (match item { IoBudgetValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise IoBudgetContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }); _ => { raise IoBudgetContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_cached = Some(result)
   result
@@ -284,7 +284,7 @@ fn instance_io_budget_root_failing(arena : IoBudgetArena, context : Int) -> IoBu
     defer { reader.budget[1] = previous_account; ignore(reader.budget.pop()); ignore(reader.budget.pop()) }
     errdefer { reader.budget[0] += reader.budget[account]; arena.release_account(reader.budget[account - 1]) }
     reader.seek(0L, field)
-  let count_result = reader.reserve_repeats((match arena.attribute(context, "cached", field).attribute(arena, "length", field) { IoBudgetValue::Number(value) => value; _ => { raise IoBudgetContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
+  let count_result = reader.reserve_repeats((match IoBudgetValue::ObjectId(context).attribute(arena, "cached", field).attribute(arena, "length", field) { IoBudgetValue::Number(value) => value; _ => { raise IoBudgetContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
   let result = []
     let metadata_result : Array[IoBudgetValue] = []
     frame.partial["failing"] = IoBudgetValue::Items(metadata_result)
@@ -312,7 +312,7 @@ pub fn IoBudgetRecord::failing(self : IoBudgetRecord) -> Array[UInt] raise IoBud
   let frame = arena.frame(context, "failing")
   let reader = frame.reader
   let field = frame.path + ".failing"
-  let raw = arena.attribute(context, "failing", field)
+  let raw = IoBudgetValue::ObjectId(context).attribute(arena, "failing", field)
   let result = { let value = raw; (match value { IoBudgetValue::Items(items) => items.map(fn(item) raise IoBudgetParseError { (match item { IoBudgetValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise IoBudgetContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }); _ => { raise IoBudgetContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_failing = Some(result)
   result
@@ -367,7 +367,7 @@ pub fn IoBudgetRecord::small(self : IoBudgetRecord) -> Array[UInt] raise IoBudge
   let frame = arena.frame(context, "small")
   let reader = frame.reader
   let field = frame.path + ".small"
-  let raw = arena.attribute(context, "small", field)
+  let raw = IoBudgetValue::ObjectId(context).attribute(arena, "small", field)
   let result = { let value = raw; (match value { IoBudgetValue::Items(items) => items.map(fn(item) raise IoBudgetParseError { (match item { IoBudgetValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise IoBudgetContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }); _ => { raise IoBudgetContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_small = Some(result)
   result

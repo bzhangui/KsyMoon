@@ -287,7 +287,7 @@ fn read_instance_io_user_root(reader : InstanceIoUserReader, path : String, aren
   let v_qty_entries = reader.read_bits(4, true, path_qty_entries)
   arena.frames[context].unwrap().fields["qty_entries"] = InstanceIoUserValue::Number(v_qty_entries.to_int64())
   let path_entries = path + ".entries"
-  let count_v_entries = reader.reserve_repeats((match arena.attribute(context, "qty_entries", path_entries) { InstanceIoUserValue::Number(value) => value; _ => { raise InstanceIoUserContextError(field=path_entries, offset=reader.offset, message="value is unavailable or has the wrong type") } }), path_entries)
+  let count_v_entries = reader.reserve_repeats((match InstanceIoUserValue::ObjectId(context).attribute(arena, "qty_entries", path_entries) { InstanceIoUserValue::Number(value) => value; _ => { raise InstanceIoUserContextError(field=path_entries, offset=reader.offset, message="value is unavailable or has the wrong type") } }), path_entries)
   let v_entries = []
   let metadata_entries : Array[InstanceIoUserValue] = []
   arena.frames[context].unwrap().fields["entries"] = InstanceIoUserValue::Items(metadata_entries)
@@ -346,7 +346,7 @@ fn instance_instance_io_user_type_entry_name(arena : InstanceIoUserArena, contex
     reader.budget[1] = account
     defer { reader.budget[1] = previous_account; ignore(reader.budget.pop()); ignore(reader.budget.pop()) }
     errdefer { reader.budget[0] += reader.budget[account]; arena.release_account(reader.budget[account - 1]) }
-    reader.seek((match arena.attribute(context, "name_ofs", field) { InstanceIoUserValue::Number(value) => value; _ => { raise InstanceIoUserContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
+    reader.seek((match InstanceIoUserValue::ObjectId(context).attribute(arena, "name_ofs", field) { InstanceIoUserValue::Number(value) => value; _ => { raise InstanceIoUserContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), field)
   let result = { let text_start = reader.offset; let text_bytes = reader.read_bytes(-1L, true, 0, -1, false, true, true, 1, false, field); reader.decode_text(text_bytes, "UTF-8", field, text_start) }
     for index = 3; index < account; index = index + 2 {
       if reader.budget[index - 1] == frame.account { reader.budget[index] += reader.budget[account]; break }
@@ -365,7 +365,7 @@ pub fn InstanceIoUser_entry::name(self : InstanceIoUser_entry) -> String raise I
   let frame = arena.frame(context, "name")
   let reader = frame.reader
   let field = frame.path + ".name"
-  let raw = arena.attribute(context, "name", field)
+  let raw = InstanceIoUserValue::ObjectId(context).attribute(arena, "name", field)
   let result = { let value = raw; (match value { InstanceIoUserValue::StringValue(value) => value; _ => { raise InstanceIoUserContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_name = Some(result)
   result

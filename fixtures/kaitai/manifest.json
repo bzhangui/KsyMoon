@@ -379,6 +379,94 @@
       "spec": "kaitai/spec/test_nav_parent3.py",
       "spec_sha256": "4cc2b2a2c6ea009a41e119fcb73b2d70ff6483ab1b08bcfbce2690aa635dd915",
       "group": "io"
+    },
+    {
+      "schema": "io_local_var",
+      "package": "io_local_var",
+      "group": "navigation",
+      "source": "kaitai/io_local_var.ksy",
+      "sha256": "87b20cfaed723a769d034234be308abd3582a31ac1c1c6f090416c460b324375",
+      "sample": "kaitai/samples/full256.bin",
+      "sample_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+      "spec": "kaitai/spec/test_io_local_var.py",
+      "spec_sha256": "a02bc37f36c9c19bfe1df77be20b0dfc28b290ad2bf19648534fd05c9cecb4c2"
+    },
+    {
+      "schema": "expr_io_ternary",
+      "package": "expr_io_ternary",
+      "group": "navigation",
+      "source": "kaitai/expr_io_ternary.ksy",
+      "sha256": "0ce1cdd766705ecfbb20c94438eb908f65b00cc216ca989503570cf3a1663a09",
+      "sample": "kaitai/samples/if_struct.bin",
+      "sample_sha256": "0e11b1367c260baa9d70be2a70d62ac218b54eb4df33b647b39b5ae05813dac1",
+      "spec": "kaitai/spec/test_expr_io_ternary.py",
+      "spec_sha256": "59e7fa2c4ee30d0436dfd49d20072a20ba42358bd859fe4d3f79fe6f080e368c"
+    },
+    {
+      "schema": "enum_if",
+      "package": "enum_if",
+      "group": "types",
+      "source": "kaitai/enum_if.ksy",
+      "sha256": "952cddae5f5b18b946f5c3924857c861f0165a05ad3be6e0625915735571f542",
+      "sample": "kaitai/samples/if_struct.bin",
+      "sample_sha256": "0e11b1367c260baa9d70be2a70d62ac218b54eb4df33b647b39b5ae05813dac1",
+      "spec": "kaitai/spec/test_enum_if.py",
+      "spec_sha256": "7fd1375646779178f6fbe9d04d393a4b3b811bdb6fe82abff1a34888c66b7d7c"
+    },
+    {
+      "schema": "enum_of_value_inst",
+      "package": "enum_of_value_inst",
+      "group": "types",
+      "source": "kaitai/enum_of_value_inst.ksy",
+      "sha256": "fb9dc38a8e9a2028665999e44fe5c079812df64eda6d15cce005ca4ae29a133e",
+      "sample": "kaitai/samples/enum_0.bin",
+      "sample_sha256": "8350694dc4c5858329921b521cda040f4abc90ab3ca4de5b6b052dfdda4a37d8",
+      "spec": "kaitai/spec/test_enum_of_value_inst.py",
+      "spec_sha256": "ebeb2619e99c1c2f4d04a580ebd108d10f0484f91dca3032cfc4cf12c0aa9a02"
+    },
+    {
+      "schema": "enum_to_i",
+      "package": "enum_to_i",
+      "group": "types",
+      "source": "kaitai/enum_to_i.ksy",
+      "sha256": "4420161b462a6dff01fedda83e5554df611b396629165b77f981f5827ac2fd88",
+      "sample": "kaitai/samples/enum_0.bin",
+      "sample_sha256": "8350694dc4c5858329921b521cda040f4abc90ab3ca4de5b6b052dfdda4a37d8",
+      "spec": "kaitai/spec/test_enum_to_i.py",
+      "spec_sha256": "959a977de64f4b2c652a617392904f7c1a92540af7ba23ff7fbc88b173da6709"
+    },
+    {
+      "schema": "params_call",
+      "package": "params_call",
+      "group": "types",
+      "source": "kaitai/params_call.ksy",
+      "sha256": "0c17e03a52d5dbf789e63257db73acbc767be133fc5ba7fe34de39ff81dfa941",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_params_call.py",
+      "spec_sha256": "7f0176685f52439a36f22e57f2157b305e53d6abf748e63f688c5ec4c561c702"
+    },
+    {
+      "schema": "params_def",
+      "package": "params_def",
+      "group": "types",
+      "source": "kaitai/params_def.ksy",
+      "sha256": "3dce409c81e94668bfe2006f12c690028cb92a81124841ab498dfd0bf253e2ef",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_params_def.py",
+      "spec_sha256": "9c2765ac470eef670b96ede6e434ad9661dc186d53ec340027287f13c64d4c26"
+    },
+    {
+      "schema": "params_call_extra_parens",
+      "package": "params_call_extra_parens",
+      "group": "types",
+      "source": "kaitai/params_call_extra_parens.ksy",
+      "sha256": "cfddd1fc359e02b8a36a9492f1ead3750012d4eef2ddd83527ebfef977db2ea3",
+      "sample": "kaitai/samples/term_strz.bin",
+      "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
+      "spec": "kaitai/spec/test_params_call_extra_parens.py",
+      "spec_sha256": "98a727f732bf5a3021c78b12cdd2cffe7f7502e4a8930150e275262b173cf592"
     }
   ]
 }

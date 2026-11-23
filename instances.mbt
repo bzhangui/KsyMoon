@@ -61,7 +61,7 @@ fn parse_instances(
       [
         "value", "pos", "if", "type", "size", "contents", "valid", "repeat", "repeat-expr",
         "doc", "doc-ref", "repeat-until", "size-eos", "encoding", "terminator", "pad-right",
-        "include", "consume", "eos-error", "io",
+        "include", "consume", "eos-error", "io", "enum",
       ],
       path,
     )
@@ -74,8 +74,13 @@ fn parse_instances(
       .map(fn(value) raise SchemaError { parse_expression(value, path + ".io") })
     let kind = match properties.get("value") {
       Some(value) => {
-        check_keys(properties, ["value", "if", "doc", "doc-ref"], path)
-        Value(parse_expression(value, path + ".value"))
+        check_keys(properties, ["value", "if", "doc", "doc-ref", "enum"], path)
+        let expression = parse_expression(value, path + ".value")
+        if properties.get("enum") is Some(raw) {
+          Value(ToEnum(expression, as_string(raw, path + ".enum")))
+        } else {
+          Value(expression)
+        }
       }
       None => {
         let position = match properties.get("pos") {

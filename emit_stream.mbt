@@ -2,7 +2,7 @@
 fn walk_kinds(kind : FieldKind) -> Array[FieldKind] {
   let result = [kind]
   match kind {
-    Bounded(inner, _) => result.append(walk_kinds(inner))
+    Bounded(inner, _) | Enumerated(inner, _) => result.append(walk_kinds(inner))
     Switch(_, _, cases, fallback) => {
       for (_, child) in cases {
         result.append(walk_kinds(child))
@@ -137,8 +137,12 @@ fn switch_read_code(
     },
   )
   for index, (tag, child) in cases {
+    let tag = match evaluate {
+      Some(resolve) => resolve(tag)
+      None => expression_code(tag, reference, path)
+    }
     result.write_string(
-      "if selector == \{expression_code(tag, reference, path)} { \{type_name}::Case\{index}(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}) } else ",
+      "if selector == \{tag} { \{type_name}::Case\{index}(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}) } else ",
     )
   }
   if fallback is Some(child) {

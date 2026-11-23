@@ -260,7 +260,7 @@ fn CrossStreamLayoutValue::attribute(self : CrossStreamLayoutValue, arena : Cros
       "eof" => Flag(reader.offset == reader.input.length())
       _ => Absent
     }
-    Selected(_, value) => value.attribute(arena, name, field)
+    Selected(tag, value) => { ignore(tag); value.attribute(arena, name, field) }
     Binary(value) if name == "length" => Number(value.length().to_int64())
     Items(value) if name == "length" => Number(value.length().to_int64())
     Binary(_) => Absent
@@ -327,7 +327,7 @@ fn instance_cross_stream_layout_root_chosen(arena : CrossStreamLayoutArena, cont
   frame.busy["chosen"] = true
   defer { frame.busy["chosen"] = false }
   let value = {
-    let reader = (if (owner_reader.arithmetic("+", (match arena.attribute(context, "head", field) { CrossStreamLayoutValue::Number(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), 1L, field) == 171L) { (match arena.attribute(context, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) } else { (match arena.attribute(context, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) })
+    let reader = (if (owner_reader.arithmetic("+", (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "head", field) { CrossStreamLayoutValue::Number(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }), 1L, field) == 171L) { (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) } else { (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }) })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -357,7 +357,7 @@ pub fn CrossStreamLayoutRecord::chosen(self : CrossStreamLayoutRecord) -> UInt r
   let frame = arena.frame(context, "chosen")
   let reader = frame.reader
   let field = frame.path + ".chosen"
-  let raw = arena.attribute(context, "chosen", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "chosen", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_chosen = Some(result)
   result
@@ -372,7 +372,7 @@ fn instance_cross_stream_layout_root_next_left(arena : CrossStreamLayoutArena, c
   frame.busy["next_left"] = true
   defer { frame.busy["next_left"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let previous_account = reader.budget[1]
     let account = reader.budget.length() + 1
     reader.budget.push(arena.next_account)
@@ -399,7 +399,7 @@ pub fn CrossStreamLayoutRecord::next_left(self : CrossStreamLayoutRecord) -> UIn
   let frame = arena.frame(context, "next_left")
   let reader = frame.reader
   let field = frame.path + ".next_left"
-  let raw = arena.attribute(context, "next_left", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "next_left", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_next_left = Some(result)
   result
@@ -414,7 +414,7 @@ fn instance_cross_stream_layout_root_positioned(arena : CrossStreamLayoutArena, 
   frame.busy["positioned"] = true
   defer { frame.busy["positioned"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -444,7 +444,7 @@ pub fn CrossStreamLayoutRecord::positioned(self : CrossStreamLayoutRecord) -> UI
   let frame = arena.frame(context, "positioned")
   let reader = frame.reader
   let field = frame.path + ".positioned"
-  let raw = arena.attribute(context, "positioned", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "positioned", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_positioned = Some(result)
   result
@@ -473,7 +473,7 @@ pub fn CrossStreamLayoutRecord::owner_position(self : CrossStreamLayoutRecord) -
   let frame = arena.frame(context, "owner_position")
   let reader = frame.reader
   let field = frame.path + ".owner_position"
-  let raw = arena.attribute(context, "owner_position", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "owner_position", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_owner_position = Some(result)
   result
@@ -488,7 +488,7 @@ fn instance_cross_stream_layout_root_left_position(arena : CrossStreamLayoutAren
   frame.busy["left_position"] = true
   defer { frame.busy["left_position"] = false }
   let value = {
-    arena.attribute(context, "left", field).attribute(arena, "_io", field).attribute(arena, "pos", field)
+    CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left", field).attribute(arena, "_io", field).attribute(arena, "pos", field)
   }
   frame.cache["left_position"] = value
   value
@@ -502,7 +502,7 @@ pub fn CrossStreamLayoutRecord::left_position(self : CrossStreamLayoutRecord) ->
   let frame = arena.frame(context, "left_position")
   let reader = frame.reader
   let field = frame.path + ".left_position"
-  let raw = arena.attribute(context, "left_position", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left_position", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_left_position = Some(result)
   result
@@ -517,7 +517,7 @@ fn instance_cross_stream_layout_root_right_position(arena : CrossStreamLayoutAre
   frame.busy["right_position"] = true
   defer { frame.busy["right_position"] = false }
   let value = {
-    arena.attribute(context, "right", field).attribute(arena, "_io", field).attribute(arena, "pos", field)
+    CrossStreamLayoutValue::ObjectId(context).attribute(arena, "right", field).attribute(arena, "_io", field).attribute(arena, "pos", field)
   }
   frame.cache["right_position"] = value
   value
@@ -531,7 +531,7 @@ pub fn CrossStreamLayoutRecord::right_position(self : CrossStreamLayoutRecord) -
   let frame = arena.frame(context, "right_position")
   let reader = frame.reader
   let field = frame.path + ".right_position"
-  let raw = arena.attribute(context, "right_position", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "right_position", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_right_position = Some(result)
   result
@@ -546,7 +546,7 @@ fn instance_cross_stream_layout_root_left_remaining(arena : CrossStreamLayoutAre
   frame.busy["left_remaining"] = true
   defer { frame.busy["left_remaining"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let previous_account = reader.budget[1]
     let account = reader.budget.length() + 1
     reader.budget.push(arena.next_account)
@@ -573,7 +573,7 @@ pub fn CrossStreamLayoutRecord::left_remaining(self : CrossStreamLayoutRecord) -
   let frame = arena.frame(context, "left_remaining")
   let reader = frame.reader
   let field = frame.path + ".left_remaining"
-  let raw = arena.attribute(context, "left_remaining", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left_remaining", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Binary(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_left_remaining = Some(result)
   result
@@ -588,7 +588,7 @@ fn instance_cross_stream_layout_root_pair(arena : CrossStreamLayoutArena, contex
   frame.busy["pair"] = true
   defer { frame.busy["pair"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -618,7 +618,7 @@ pub fn CrossStreamLayoutRecord::pair(self : CrossStreamLayoutRecord) -> CrossStr
   let frame = arena.frame(context, "pair")
   let reader = frame.reader
   let field = frame.path + ".pair"
-  let raw = arena.attribute(context, "pair", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "pair", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::ObjectId(value) => hydrate_CrossStreamLayout_pair(arena, value, field); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_pair = Some(result)
   result
@@ -633,7 +633,7 @@ fn instance_cross_stream_layout_root_eos_items(arena : CrossStreamLayoutArena, c
   frame.busy["eos_items"] = true
   defer { frame.busy["eos_items"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -676,7 +676,7 @@ pub fn CrossStreamLayoutRecord::eos_items(self : CrossStreamLayoutRecord) -> Arr
   let frame = arena.frame(context, "eos_items")
   let reader = frame.reader
   let field = frame.path + ".eos_items"
-  let raw = arena.attribute(context, "eos_items", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "eos_items", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Items(items) => items.map(fn(item) raise CrossStreamLayoutParseError { (match item { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_eos_items = Some(result)
   result
@@ -691,7 +691,7 @@ fn instance_cross_stream_layout_root_until_items(arena : CrossStreamLayoutArena,
   frame.busy["until_items"] = true
   defer { frame.busy["until_items"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -733,7 +733,7 @@ pub fn CrossStreamLayoutRecord::until_items(self : CrossStreamLayoutRecord) -> A
   let frame = arena.frame(context, "until_items")
   let reader = frame.reader
   let field = frame.path + ".until_items"
-  let raw = arena.attribute(context, "until_items", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "until_items", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Items(items) => items.map(fn(item) raise CrossStreamLayoutParseError { (match item { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_until_items = Some(result)
   result
@@ -749,7 +749,7 @@ fn instance_cross_stream_layout_root_skipped(arena : CrossStreamLayoutArena, con
   defer { frame.busy["skipped"] = false }
   let value = {
     if false {
-    let reader = (match arena.attribute(context, "absent", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "absent", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -780,7 +780,7 @@ pub fn CrossStreamLayoutRecord::skipped(self : CrossStreamLayoutRecord) -> Optio
   let frame = arena.frame(context, "skipped")
   let reader = frame.reader
   let field = frame.path + ".skipped"
-  let raw = arena.attribute(context, "skipped", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "skipped", field)
   let result = (match raw { CrossStreamLayoutValue::Absent => None; value => Some((match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } })) })
   self._ksy_cache_skipped = Some(result)
   result
@@ -795,7 +795,7 @@ fn instance_cross_stream_layout_root_invalid(arena : CrossStreamLayoutArena, con
   frame.busy["invalid"] = true
   defer { frame.busy["invalid"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "absent", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "absent", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let previous_account = reader.budget[1]
     let account = reader.budget.length() + 1
     reader.budget.push(arena.next_account)
@@ -822,7 +822,7 @@ pub fn CrossStreamLayoutRecord::invalid(self : CrossStreamLayoutRecord) -> UInt 
   let frame = arena.frame(context, "invalid")
   let reader = frame.reader
   let field = frame.path + ".invalid"
-  let raw = arena.attribute(context, "invalid", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "invalid", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_invalid = Some(result)
   result
@@ -837,7 +837,7 @@ fn instance_cross_stream_layout_root_out_of_bounds(arena : CrossStreamLayoutAren
   frame.busy["out_of_bounds"] = true
   defer { frame.busy["out_of_bounds"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "left", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -867,7 +867,7 @@ pub fn CrossStreamLayoutRecord::out_of_bounds(self : CrossStreamLayoutRecord) ->
   let frame = arena.frame(context, "out_of_bounds")
   let reader = frame.reader
   let field = frame.path + ".out_of_bounds"
-  let raw = arena.attribute(context, "out_of_bounds", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "out_of_bounds", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_out_of_bounds = Some(result)
   result
@@ -882,7 +882,7 @@ fn instance_cross_stream_layout_root_raw_switch(arena : CrossStreamLayoutArena, 
   frame.busy["raw_switch"] = true
   defer { frame.busy["raw_switch"] = false }
   let value = {
-    let reader = (match arena.attribute(context, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "right", field).attribute(arena, "_io", field) { CrossStreamLayoutValue::Source(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]
@@ -894,7 +894,7 @@ fn instance_cross_stream_layout_root_raw_switch(arena : CrossStreamLayoutArena, 
     defer { reader.budget[1] = previous_account; ignore(reader.budget.pop()); ignore(reader.budget.pop()) }
     errdefer { reader.budget[0] += reader.budget[account]; arena.release_account(reader.budget[account - 1]) }
     reader.seek(1L, field)
-  let result = { let ksy_selector = (match arena.attribute(context, "head", field) { CrossStreamLayoutValue::Number(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }); let substream = reader.substream(reader.take(2L, field)); let reader = substream; { let selector = ksy_selector; if selector == 1L { CrossStreamLayout_switch_instances_raw_switch::Case0(reader.read_bits(1, false, field)) } else { CrossStreamLayout_switch_instances_raw_switch::Raw(reader.take((reader.input.length() - reader.offset).to_int64(), field)) } } }
+  let result = { let ksy_selector = (match CrossStreamLayoutValue::ObjectId(context).attribute(arena, "head", field) { CrossStreamLayoutValue::Number(value) => value; _ => { raise CrossStreamLayoutContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } }); let substream = reader.substream(reader.take(2L, field)); let reader = substream; { let selector = ksy_selector; if selector == 1L { CrossStreamLayout_switch_instances_raw_switch::Case0(reader.read_bits(1, false, field)) } else { CrossStreamLayout_switch_instances_raw_switch::Raw(reader.take((reader.input.length() - reader.offset).to_int64(), field)) } } }
     for index = 3; index < account; index = index + 2 {
       if reader.budget[index - 1] == frame.account { reader.budget[index] += reader.budget[account]; break }
     }
@@ -912,7 +912,7 @@ pub fn CrossStreamLayoutRecord::raw_switch(self : CrossStreamLayoutRecord) -> Cr
   let frame = arena.frame(context, "raw_switch")
   let reader = frame.reader
   let field = frame.path + ".raw_switch"
-  let raw = arena.attribute(context, "raw_switch", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "raw_switch", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Selected(tag, payload) => match tag { 0 => CrossStreamLayout_switch_instances_raw_switch::Case0((match payload { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } })); -3 => CrossStreamLayout_switch_instances_raw_switch::Raw((match payload { CrossStreamLayoutValue::Binary(bytes) => bytes; _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } })); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") }; }; _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_raw_switch = Some(result)
   result
@@ -973,7 +973,7 @@ pub fn CrossStreamLayout_slot::root_marker(self : CrossStreamLayout_slot) -> UIn
   let frame = arena.frame(context, "root_marker")
   let reader = frame.reader
   let field = frame.path + ".root_marker"
-  let raw = arena.attribute(context, "root_marker", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "root_marker", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_root_marker = Some(result)
   result
@@ -1018,7 +1018,7 @@ pub fn CrossStreamLayout_slot::parent_marker(self : CrossStreamLayout_slot) -> U
   let frame = arena.frame(context, "parent_marker")
   let reader = frame.reader
   let field = frame.path + ".parent_marker"
-  let raw = arena.attribute(context, "parent_marker", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "parent_marker", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_parent_marker = Some(result)
   result
@@ -1082,7 +1082,7 @@ pub fn CrossStreamLayout_pair::parent_marker(self : CrossStreamLayout_pair) -> U
   let frame = arena.frame(context, "parent_marker")
   let reader = frame.reader
   let field = frame.path + ".parent_marker"
-  let raw = arena.attribute(context, "parent_marker", field)
+  let raw = CrossStreamLayoutValue::ObjectId(context).attribute(arena, "parent_marker", field)
   let result = { let value = raw; (match value { CrossStreamLayoutValue::Number(value) => value.to_int().reinterpret_as_uint(); _ => { raise CrossStreamLayoutContextError(field=field, offset=reader.offset, message="value is unavailable or has the wrong type") } }) }
   self._ksy_cache_parent_marker = Some(result)
   result
