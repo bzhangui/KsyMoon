@@ -2,7 +2,7 @@
 
 KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进制解析器。生成的源码只依赖 MoonBit 标准库。
 
-项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。当前开发版为 `0.3.0-dev.4`，已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支和字符串解析。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
+项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。当前开发版为 `0.3.0-dev.5`，已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
 
 ## 从 Mooncakes 安装
 
@@ -41,9 +41,9 @@ moon -C examples/consumer run --target js .
 node scripts/verify.mjs
 ```
 
-脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局、流控制布局与 39 份原样上游兼容描述均重新生成，并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
+脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局、流控制布局与 47 份原样上游兼容描述均重新生成，并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
 
-安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 35 个原样上游 Python 测试及 94 项比较测试。对 35 组上游样本检查了 1,095 个真前缀，跨流用例也触发惰性实例读取。四后端每个目标通过 22 项生成器测试和 158 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
+安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 43 个原样上游 Python 测试及 112 项比较测试。对 43 组上游样本检查了 1,429 个真前缀，部分用例同时触发惰性实例读取。四后端每个目标通过 24 项生成器测试和 177 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
 ```powershell
 python -m pip install kaitaistruct==0.11
@@ -84,17 +84,19 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 - `instances.io` 可选择当前流、根流、父对象流、字段或实例的子流，也支持按数组索引和条件选流。`pos` 相对所选流定位，实例表达式中的 `_io` 保持为所属对象的流。无 `pos` 时推进所选流，成功结果按需缓存。 [跨流用例](examples/consumer/io_wbtest.mbt)
 - `if/value/pos` 的有类型整数、布尔及基础字符串字面量表达式，支持括号、算术、比较、位运算、逻辑短路、条件表达式、实例依赖和 `_io.pos/_io.size`。当前数字引用为 32 位以内非可选字段，计算类型为 Int64。 [新增回归](examples/consumer/conditional_wbtest.mbt)
 - 生成的解析器读取描述指定的前缀。UDP 校验和作为字段返回，由调用者按使用场景校验。
-- 当前尚待实现的标准语义包括 imports、参数、枚举、通用对象和集合表达式、类型转换、位域、更多编码与处理器，按 P3—P5 的门禁推进。遇到尚未实现的语法会返回描述诊断。运行时错误包含字段路径和字节偏移。单次顺序解析及实例读取共享 1,000,000 个重复项的预算，失败的实例读取会归还本次预留，嵌套数组计入同一预算。 [完整兼容终点](docs/COMPATIBILITY.zh-CN.md)
+- 对象、数组和流属性也可用于无 `io` 的描述。对象或流可作为惰性值实例返回，`.as<T>` 可将对象分支转换为确定的本地记录类型，类型不匹配时报告错误。
+- 支持 32 位以内整数枚举、枚举字面量、条件与分支、值实例枚举及 `to_i`。未知枚举码保留在 `UnknownCode(Int64)` 中。支持整数、布尔和字符串参数，包含根解析入口及参数化本地类型调用。
+- 待实现能力包括 imports、更多参数与数值类型、完整集合表达式、受限递归、位域、更多编码与处理器。未支持的描述返回诊断。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
 
 ## 来源与许可
 
 KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy) · [IVF 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/vp8_duck_ivf.ksy)
 
-39 份兼容描述与其中 35 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
+47 份兼容描述与其中 43 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
 
-跨流实例的实现由 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45185761258) 验证。固定语料的 339 份描述中，103 份可生成并在四后端构建，236 份保留待支持诊断。39 份上游描述有运行对照。 [公开完整报告](docs/reports/kaitai-0.11-p2-io-2026-11-23.json)
+本轮 P3 实现由 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45191577558) 验证。固定语料的 339 份描述中，143 份可生成并在四后端构建，196 份保留待支持诊断，47 份有运行对照。 [公开完整报告](docs/reports/kaitai-0.11-p3-2026-11-23.json)
 
-定位实例失败后的游标策略有一处已知差异。KsyMoon 恢复游标和本次重复项预算，便于失败后重试。官方 Python 0.11 会保留失败位置。正常结果、成功定位恢复和失败接受判定已对照，失败后的游标策略另有专门回归。更多编码、通用导航和集合表达式仍按后续矩阵推进。
+定位实例失败后的游标策略有一处已知差异。KsyMoon 恢复游标和本次重复项预算，便于失败后重试。官方 Python 0.11 会保留失败位置。正常结果、成功定位恢复和失败接受判定已对照，失败后的游标策略另有专门回归。更多编码、集合表达式和模块导入仍按后续矩阵推进。
 
 2026-11-19 补充组合核验后，已修复动态负长度被误判为无界读取、UTF-16 显式终止符消费宽度，以及纯计算嵌套记录的生成与实例方法归属问题。新增 9 项边界回归和 7 项官方对照，覆盖零长度、负长度、隐式/显式终止符、只读实例、流查询、重复和同名子类型。 [边界测试](examples/consumer/reader_edges_wbtest.mbt)
 

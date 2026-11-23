@@ -1,0 +1,1827 @@
+{
+  "standard": "Kaitai Struct 0.11",
+  "source_commit": "95dfd8ad1fec962fd8f293fa28131b53f63e50df",
+  "tracked_worktree_dirty": false,
+  "upstream_repository": "https://github.com/kaitai-io/kaitai_struct_tests",
+  "upstream_revision": "4108136c807f8df88df843de6571f1a7bf29c74e",
+  "upstream_archive_sha256": "3a78e2ffb3938c18b5c1d2f06f3bc8567bc72e054a8e68f0ddacbfa1406937fe",
+  "total": 339,
+  "counts": {
+    "rejected": 196,
+    "generated": 143
+  },
+  "generated_sources_compile_and_build": true,
+  "runtime_oracle_schemas": [
+    "if_instances.ksy",
+    "if_values.ksy",
+    "instance_std_array.ksy",
+    "expr_int_div.ksy",
+    "repeat_eos_u4.ksy",
+    "repeat_eos_struct.ksy",
+    "repeat_until_s4.ksy",
+    "repeat_until_sized.ksy",
+    "repeat_until_complex.ksy",
+    "repeat_eos_bytes.ksy",
+    "repeat_eos_bytes_pad_term.ksy",
+    "switch_integers.ksy",
+    "switch_manual_int.ksy",
+    "switch_manual_int_else.ksy",
+    "switch_manual_int_size.ksy",
+    "switch_manual_int_size_else.ksy",
+    "switch_manual_str.ksy",
+    "switch_manual_str_else.ksy",
+    "str_eos.ksy",
+    "str_pad_term.ksy",
+    "str_pad_term_empty.ksy",
+    "str_pad_term_equal.ksy",
+    "str_pad_term_zero_size.ksy",
+    "str_eos_pad_term.ksy",
+    "term_strz.ksy",
+    "term_strz2.ksy",
+    "term_strz3.ksy",
+    "term_strz4.ksy",
+    "bytes_eos_pad_term.ksy",
+    "term_strz_utf16_v1.ksy",
+    "term_strz_utf16_v2.ksy",
+    "term_strz_utf16_v3.ksy",
+    "term_strz_utf16_v4.ksy",
+    "str_pad_term_utf16.ksy",
+    "str_encodings_utf16.ksy",
+    "instance_io_user.ksy",
+    "instance_io_user_earlier.ksy",
+    "nav_parent2.ksy",
+    "nav_parent3.ksy",
+    "io_local_var.ksy",
+    "expr_io_ternary.ksy",
+    "enum_if.ksy",
+    "enum_of_value_inst.ksy",
+    "enum_to_i.ksy",
+    "params_call.ksy",
+    "params_def.ksy",
+    "params_call_extra_parens.ksy"
+  ],
+  "meaning": "generated means source emitted and independently checked/built on four targets; runtime conformance is measured separately",
+  "schemas": [
+    {
+      "schema": "bcd_user_type_be.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bcd_user_type_be.ksy: ltr_obj.instances.as_str: operator requires integer operands"
+    },
+    {
+      "schema": "bcd_user_type_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bcd_user_type_le.ksy: ltr_obj.instances.as_str: operator requires integer operands"
+    },
+    {
+      "schema": "bits_byte_aligned.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_byte_aligned.ksy: types.foo.seq[0].type: unknown or unsupported type 'b19'"
+    },
+    {
+      "schema": "bits_byte_aligned_eof_be.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_byte_aligned_eof_be.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_byte_aligned_eof_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_byte_aligned_eof_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_enum.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_enum.ksy: seq[0].type: unknown or unsupported type 'b4'"
+    },
+    {
+      "schema": "bits_seq_endian_combo.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_seq_endian_combo.ksy: seq[0].type: unknown or unsupported type 'b6be'"
+    },
+    {
+      "schema": "bits_shift_by_b32_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_shift_by_b32_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_shift_by_b64_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_shift_by_b64_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_signed_res_b32_be.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_signed_res_b32_be.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_signed_res_b32_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_signed_res_b32_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_signed_shift_b32_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_signed_shift_b32_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_signed_shift_b64_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_signed_shift_b64_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_simple.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_simple.ksy: seq[0].type: unknown or unsupported type 'b8'"
+    },
+    {
+      "schema": "bits_simple_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_simple_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_unaligned_b32_be.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_unaligned_b32_be.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_unaligned_b32_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_unaligned_b32_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_unaligned_b64_be.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_unaligned_b64_be.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "bits_unaligned_b64_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: bits_unaligned_b64_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "buffered_struct.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "bytes_eos_pad_term.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "bytes_pad_term.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "bytes_pad_term_empty.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "bytes_pad_term_equal.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "bytes_pad_term_roundtrip.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "bytes_pad_term_zero_size.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "cast_nested.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "cast_to_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: cast_to_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "cast_to_imported2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: cast_to_imported2.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "cast_to_top.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: cast_to_top.ksy: instances.header.type: unknown or unsupported type 'cast_to_top'"
+    },
+    {
+      "schema": "combine_bool.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: combine_bool.ksy: seq[0].type: unknown or unsupported type 'b1'"
+    },
+    {
+      "schema": "combine_bytes.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: combine_bytes.ksy: instances.bytes_calc.value: unexpected expression token '['"
+    },
+    {
+      "schema": "combine_enum.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "combine_str.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: combine_str.ksy: instances.calc_bytes.value: unexpected expression token '['"
+    },
+    {
+      "schema": "debug_0.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: debug_0.ksy: meta.ks-debug: unsupported key"
+    },
+    {
+      "schema": "debug_array_user.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: debug_array_user.ksy: meta.ks-debug: unsupported key"
+    },
+    {
+      "schema": "debug_array_user_current_excluded.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: debug_array_user_current_excluded.ksy: meta.ks-debug: unsupported key"
+    },
+    {
+      "schema": "debug_array_user_eof_exception.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: debug_array_user_eof_exception.ksy: meta.ks-debug: unsupported key"
+    },
+    {
+      "schema": "debug_enum_name.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: debug_enum_name.ksy: meta.ks-debug: unsupported key"
+    },
+    {
+      "schema": "debug_switch_user.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: debug_switch_user.ksy: meta.ks-debug: unsupported key"
+    },
+    {
+      "schema": "default_big_endian.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "default_bit_endian_mod.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: default_bit_endian_mod.ksy: types.main_obj_subnest.seq[0].type: unknown or unsupported type 'b16'"
+    },
+    {
+      "schema": "default_endian_expr_exception.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: default_endian_expr_exception.ksy: types.doc_main_obj.meta: unsupported key"
+    },
+    {
+      "schema": "default_endian_expr_inherited.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: default_endian_expr_inherited.ksy: types.doc_main_obj_sub_obj_subsub_obj.seq[0].type: multibyte numeric type needs an explicit byte order"
+    },
+    {
+      "schema": "default_endian_expr_is_be.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: default_endian_expr_is_be.ksy: types.doc_main_obj_sub_main_obj.seq[0].type: multibyte numeric type needs an explicit byte order"
+    },
+    {
+      "schema": "default_endian_expr_is_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: default_endian_expr_is_le.ksy: types.doc_main_obj.meta: unsupported key"
+    },
+    {
+      "schema": "default_endian_mod.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: default_endian_mod.ksy: types.main_obj_subnest.seq[0].type: multibyte numeric type needs an explicit byte order"
+    },
+    {
+      "schema": "docstrings.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: docstrings.ksy: types.complex_subtype.seq: expected at least one field or instance"
+    },
+    {
+      "schema": "docstrings_docref.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "docstrings_docref_multi.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: docstrings_docref_multi.ksy: seq: expected at least one field or instance"
+    },
+    {
+      "schema": "enum_0.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_1.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_deep.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_deep.ksy: @root.seq.pet_2: unknown enum 'container1__container2::animal'"
+    },
+    {
+      "schema": "enum_deep_literals.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_deep_literals.ksy: @root.seq.pet_2: unknown enum 'container1__container2::animal'"
+    },
+    {
+      "schema": "enum_fancy.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_if.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_import_literals.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_import_literals.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "enum_import_seq.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_import_seq.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "enum_int_range_s.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_int_range_u.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_invalid.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_long_range_s.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_long_range_s.ksy: seq[0].type: unknown or unsupported type 's8'"
+    },
+    {
+      "schema": "enum_long_range_u.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_long_range_u.ksy: @root.enums.constants.18446744073709551615: enum code must fit a signed 64-bit integer"
+    },
+    {
+      "schema": "enum_negative.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_of_value_inst.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_to_i.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "enum_to_i_class_border_1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_to_i_class_border_1.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "enum_to_i_class_border_2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: enum_to_i_class_border_2.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "enum_to_i_invalid.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "eof_exception_bits_be.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: eof_exception_bits_be.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "eof_exception_bits_be2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: eof_exception_bits_be2.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "eof_exception_bits_le.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: eof_exception_bits_le.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "eof_exception_bits_le2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: eof_exception_bits_le2.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "eof_exception_bytes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "eof_exception_sized.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: eof_exception_sized.ksy: types.foo.seq: expected at least one field or instance"
+    },
+    {
+      "schema": "eof_exception_switch_user.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "eof_exception_u4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "eos_exception_bytes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "eos_exception_sized.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: eos_exception_sized.ksy: types.foo.seq: expected at least one field or instance"
+    },
+    {
+      "schema": "eos_exception_u4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "expr_0.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_0.ksy: instances.must_be_abc123.value: operator requires integer operands"
+    },
+    {
+      "schema": "expr_1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_1.ksy: @root.instances.str1_len: attribute requires an object, stream or supported collection"
+    },
+    {
+      "schema": "expr_2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_2.ksy: @root.instances.str1_len: attribute requires an object, stream or supported collection"
+    },
+    {
+      "schema": "expr_3.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_3.ksy: instances.three.value: operator requires integer operands"
+    },
+    {
+      "schema": "expr_array.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_array.ksy: seq[1].type: unknown or unsupported type 'f8'"
+    },
+    {
+      "schema": "expr_bits.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_bits.ksy: types.endian_switch.meta: unsupported key"
+    },
+    {
+      "schema": "expr_bytes_cmp.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_bytes_cmp.ksy: instances.ack.value: unexpected expression token '['"
+    },
+    {
+      "schema": "expr_bytes_non_literal.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_bytes_non_literal.ksy: instances.calc_bytes.value: unexpected expression token '['"
+    },
+    {
+      "schema": "expr_bytes_ops.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_bytes_ops.ksy: instances.two.value: unexpected expression token '['"
+    },
+    {
+      "schema": "expr_calc_array_ops.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_calc_array_ops.ksy: instances.int_array.value: unexpected expression token '['"
+    },
+    {
+      "schema": "expr_enum.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "expr_fstring_0.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_fstring_0.ksy: instances.empty.value: unexpected expression token '\"\"'"
+    },
+    {
+      "schema": "expr_if_int_eq.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_if_int_eq.ksy: instances.seq_eq_calc_if: expression references a conditional instance"
+    },
+    {
+      "schema": "expr_if_int_ops.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_if_int_ops.ksy: seq[2].process: unsupported key"
+    },
+    {
+      "schema": "expr_int_div.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "expr_io_eof.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "expr_io_eof_bits.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_io_eof_bits.ksy: meta.bit-endian: unsupported key"
+    },
+    {
+      "schema": "expr_io_pos.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_io_pos.ksy: types.all_plus_number.seq[1].size: expected a nonnegative decimal integer"
+    },
+    {
+      "schema": "expr_io_pos_bits.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_io_pos_bits.ksy: seq[0].type: unknown or unsupported type 'b3'"
+    },
+    {
+      "schema": "expr_io_ternary.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "expr_mod.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "expr_ops_parens.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_ops_parens.ksy: instances.f_2pi.value: expected an integer, boolean or expression string"
+    },
+    {
+      "schema": "expr_sizeof_type_0.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_sizeof_type_0.ksy: instances.sizeof_block.value: expected an expression"
+    },
+    {
+      "schema": "expr_sizeof_type_1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_sizeof_type_1.ksy: instances.sizeof_block.value: expected an expression"
+    },
+    {
+      "schema": "expr_sizeof_value_0.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_sizeof_value_0.ksy: instances.self_sizeof.value: unexpected expression token '_sizeof'"
+    },
+    {
+      "schema": "expr_sizeof_value_sized.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_sizeof_value_sized.ksy: instances.self_sizeof.value: unexpected expression token '_sizeof'"
+    },
+    {
+      "schema": "expr_str_encodings.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_str_encodings.ksy: seq[5].encoding: encoding is awaiting implementation: SJIS"
+    },
+    {
+      "schema": "expr_str_ops.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_str_ops.ksy: instances.one_substr_0_to_3.value: unexpected expression token '('"
+    },
+    {
+      "schema": "expr_to_i_trailing.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: expr_to_i_trailing.ksy: instances.to_i_r16.value: unexpected expression token '('"
+    },
+    {
+      "schema": "fixed_contents.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "fixed_struct.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: fixed_struct.ksy: types.header.seq[10].type: unknown or unsupported type 's8'"
+    },
+    {
+      "schema": "float_to_i.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: float_to_i.ksy: seq[1].type: unknown or unsupported type 'f8'"
+    },
+    {
+      "schema": "floating_points.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: floating_points.ksy: seq[1].type: unknown or unsupported type 'f8'"
+    },
+    {
+      "schema": "for_rel_imports/imported_1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: for_rel_imports/imported_1.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "for_rel_imports/imported_2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "hello_world.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "if_instances.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "if_struct.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "if_values.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "imports0.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports0.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_abs.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_abs.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_abs_abs.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_abs_abs.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_abs_rel.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_abs_rel.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_cast_to_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_cast_to_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_cast_to_imported2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_cast_to_imported2.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_circular_a.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_circular_a.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_circular_b.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_circular_b.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_params_def_array_usertype_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_params_def_array_usertype_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_params_def_enum_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_params_def_enum_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_params_def_usertype_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_params_def_usertype_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "imports_rel_1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: imports_rel_1.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "index_sizes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "index_to_param_eos.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "index_to_param_expr.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "index_to_param_until.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "instance_in_repeat_expr.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: instance_in_repeat_expr.ksy: seq[0].repeat-expr: expected an earlier scalar u1, u2 or u4 field, optionally minus an integer"
+    },
+    {
+      "schema": "instance_in_repeat_until.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: instance_in_repeat_until.ksy: seq[0].repeat-until: unknown field 'until_val'"
+    },
+    {
+      "schema": "instance_in_sized.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: instance_in_sized.ksy: types.qux.seq[0].if: unknown or forward field 'inst_invoked'"
+    },
+    {
+      "schema": "instance_io_user.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "instance_io_user_earlier.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "instance_std.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "instance_std_array.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "instance_user_array.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "integers.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: integers.ksy: seq[10].type: unknown or unsupported type 's8'"
+    },
+    {
+      "schema": "integers_double_overflow.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: integers_double_overflow.ksy: seq[0].type: unknown or unsupported type 's8be'"
+    },
+    {
+      "schema": "integers_min_max.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: integers_min_max.ksy: types.signed.seq[3].type: unknown or unsupported type 's8le'"
+    },
+    {
+      "schema": "io_local_var.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "js_signed_right_shift.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "ks_path/for_abs_imports/imported_and_abs.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: ks_path/for_abs_imports/imported_and_abs.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "ks_path/for_abs_imports/imported_and_rel.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: ks_path/for_abs_imports/imported_and_rel.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "ks_path/imported_root.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "meta_tags.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: meta_tags.ksy: seq: expected at least one field or instance"
+    },
+    {
+      "schema": "meta_xref.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: meta_xref.ksy: seq: expected at least one field or instance"
+    },
+    {
+      "schema": "multiple_use.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "name_clash_import_vs_inst.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: name_clash_import_vs_inst.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "nav_parent.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nav_parent2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nav_parent3.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nav_parent_false.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: nav_parent_false.ksy: types.parent_b.seq[0].parent: unsupported key"
+    },
+    {
+      "schema": "nav_parent_false2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: nav_parent_false2.ksy: seq[0].parent: unsupported key"
+    },
+    {
+      "schema": "nav_parent_override.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: nav_parent_override.ksy: types.mediator.seq[0].parent: unsupported key"
+    },
+    {
+      "schema": "nav_parent_recursive.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: nav_parent_recursive.ksy: seq[1].type: unknown or unsupported type 'nav_parent_recursive'"
+    },
+    {
+      "schema": "nav_parent_switch.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nav_parent_switch_cast.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nav_parent_vs_value_inst.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nav_root.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nav_root_recursive.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: nav_root_recursive.ksy: seq[1].type: unknown or unsupported type 'nav_root_recursive'"
+    },
+    {
+      "schema": "nested_same_name.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nested_same_name2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nested_type_param.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nested_types.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nested_types2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "nested_types3.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: nested_types3.ksy: types.subtype_a_subtype_c.seq: expected at least one field or instance"
+    },
+    {
+      "schema": "nested_types_import.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: nested_types_import.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "non_standard.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "opaque_external_type.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: opaque_external_type.ksy: meta.ks-opaque-types: unsupported key"
+    },
+    {
+      "schema": "opaque_external_type_02_child.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "opaque_external_type_02_parent.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: opaque_external_type_02_parent.ksy: meta.ks-opaque-types: unsupported key"
+    },
+    {
+      "schema": "opaque_with_param.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: opaque_with_param.ksy: meta.ks-opaque-types: unsupported key"
+    },
+    {
+      "schema": "optional_id.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: optional_id.ksy: seq[0].id: missing required key"
+    },
+    {
+      "schema": "params_call.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "params_call_extra_parens.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "params_def.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "params_def_array_usertype_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_def_array_usertype_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "params_def_enum_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_def_enum_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "params_def_usertype_imported.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_def_usertype_imported.ksy: meta.imports: unsupported key"
+    },
+    {
+      "schema": "params_enum.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_enum.ksy: types.with_param.seq.params[0].enum: unsupported key"
+    },
+    {
+      "schema": "params_pass_array_int.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_array_int.ksy: types.wants_ints.seq.params[0].type: unsupported parameter type 'u2[]'"
+    },
+    {
+      "schema": "params_pass_array_io.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_array_io.ksy: types.param_type.seq.params[0].type: unsupported parameter type 'io[]'"
+    },
+    {
+      "schema": "params_pass_array_str.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_array_str.ksy: types.wants_strs.seq.params[0].type: unsupported parameter type 'str[]'"
+    },
+    {
+      "schema": "params_pass_array_struct.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_array_struct.ksy: types.struct_type.seq.params[0].type: unsupported parameter type 'struct[]'"
+    },
+    {
+      "schema": "params_pass_array_usertype.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_array_usertype.ksy: types.param_type.seq.params[0].type: unsupported parameter type 'block[]'"
+    },
+    {
+      "schema": "params_pass_bool.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_bool.ksy: types.param_type_b1.seq.params[0].type: unsupported parameter type 'b1'"
+    },
+    {
+      "schema": "params_pass_io.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_io.ksy: types.param_type.seq.params[0].type: unsupported parameter type 'io'"
+    },
+    {
+      "schema": "params_pass_struct.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_struct.ksy: types.struct_type_baz.seq.params[0].type: unsupported parameter type 'struct'"
+    },
+    {
+      "schema": "params_pass_usertype.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: params_pass_usertype.ksy: types.param_type.seq.params[0].type: unsupported parameter type 'block'"
+    },
+    {
+      "schema": "position_abs.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "position_in_seq.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "position_to_end.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "process_bytes_pad_term.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_bytes_pad_term.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_coerce_bytes.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_coerce_bytes.ksy: types.record.seq[2].process: unsupported key"
+    },
+    {
+      "schema": "process_coerce_switch.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_coerce_switch.ksy: seq[3].process: unsupported key"
+    },
+    {
+      "schema": "process_coerce_usertype1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_coerce_usertype1.ksy: types.record.seq[2].process: unsupported key"
+    },
+    {
+      "schema": "process_coerce_usertype2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_coerce_usertype2.ksy: types.record.seq[2].process: unsupported key"
+    },
+    {
+      "schema": "process_custom.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_custom.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_custom_no_args.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_custom_no_args.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_repeat_bytes.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_repeat_bytes.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_repeat_usertype.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_repeat_usertype.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_repeat_usertype_dynarg_custom.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_repeat_usertype_dynarg_custom.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_repeat_usertype_dynarg_rotate.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_repeat_usertype_dynarg_rotate.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_repeat_usertype_dynarg_xor.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_repeat_usertype_dynarg_xor.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_rotate.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_rotate.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_struct_pad_term.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_struct_pad_term.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_term_struct.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_term_struct.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_to_user.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_to_user.ksy: seq[0].process: unsupported key"
+    },
+    {
+      "schema": "process_xor4_const.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_xor4_const.ksy: seq[1].process: unsupported key"
+    },
+    {
+      "schema": "process_xor4_value.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_xor4_value.ksy: seq[1].process: unsupported key"
+    },
+    {
+      "schema": "process_xor_const.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_xor_const.ksy: seq[1].process: unsupported key"
+    },
+    {
+      "schema": "process_xor_value.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: process_xor_value.ksy: seq[1].process: unsupported key"
+    },
+    {
+      "schema": "recursive_one.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: recursive_one.ksy: seq[1].type.cases.0: unknown or unsupported type 'recursive_one'"
+    },
+    {
+      "schema": "repeat_eos_bits_b1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_eos_bits_b1.ksy: seq[0].type: unknown or unsupported type 'b1'"
+    },
+    {
+      "schema": "repeat_eos_bits_b4.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_eos_bits_b4.ksy: seq[0].type: unknown or unsupported type 'b4'"
+    },
+    {
+      "schema": "repeat_eos_bytes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_eos_bytes_pad.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_eos_bytes_pad_term.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_eos_struct.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_eos_term_bytes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_eos_term_struct.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_eos_u4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_n_bytes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_n_bytes_pad.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_n_bytes_pad_term.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_n_struct.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_n_strz.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_n_strz_double.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_n_strz_double.ksy: seq[1].repeat-expr: expected an earlier scalar u1, u2 or u4 field, optionally minus an integer"
+    },
+    {
+      "schema": "repeat_n_term_bytes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_n_term_struct.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_until_bytes.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_until_bytes.ksy: @root.seq.records: index requires an array"
+    },
+    {
+      "schema": "repeat_until_bytes_pad.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_until_bytes_pad.ksy: records: element member requires a user type"
+    },
+    {
+      "schema": "repeat_until_bytes_pad_term.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_until_bytes_pad_term.ksy: seq[0].repeat-until: unexpected expression token '['"
+    },
+    {
+      "schema": "repeat_until_calc_array_type.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_until_calc_array_type.ksy: @root.instances.recs_accessor: value instance type awaits implementation"
+    },
+    {
+      "schema": "repeat_until_complex.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_until_s4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_until_sized.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "repeat_until_term_bytes.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_until_term_bytes.ksy: seq[1].repeat-until: unexpected expression token '['"
+    },
+    {
+      "schema": "repeat_until_term_struct.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: repeat_until_term_struct.ksy: seq[1].repeat-until: unexpected expression token '['"
+    },
+    {
+      "schema": "str_encodings.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: str_encodings.ksy: seq[5].encoding: encoding is awaiting implementation: SJIS"
+    },
+    {
+      "schema": "str_encodings_default.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: str_encodings_default.ksy: types.subtype.seq[3].encoding: encoding is awaiting implementation: SJIS"
+    },
+    {
+      "schema": "str_encodings_escaping_enc.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: str_encodings_escaping_enc.ksy: types.str1_wrapper.instances.v.encoding: encoding is awaiting implementation: ASCII\\\\X"
+    },
+    {
+      "schema": "str_encodings_escaping_to_s.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: str_encodings_escaping_to_s.ksy: instances.str1.value: unexpected expression token '('"
+    },
+    {
+      "schema": "str_encodings_utf16.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_eos.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_eos_pad_term.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_eos_pad_term_empty.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_eos_pad_term_equal.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_literals.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: str_literals.ksy: instances.complex_str.value: unsupported string escape"
+    },
+    {
+      "schema": "str_literals2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_literals_latin1.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: str_literals_latin1.ksy: instances.parsed_eq_literal.value: unsupported string escape"
+    },
+    {
+      "schema": "str_pad_term.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_pad_term_empty.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_pad_term_equal.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_pad_term_roundtrip.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_pad_term_utf16.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "str_pad_term_zero_size.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "struct_pad_term.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "struct_pad_term_equal.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_bytearray.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: switch_bytearray.ksy: types.opcode.seq[1].type.cases.[73]: unexpected expression token '['"
+    },
+    {
+      "schema": "switch_cast.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_else_only.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_integers.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_integers2.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: switch_integers2.ksy: @root.seq.ham: incompatible expression branches"
+    },
+    {
+      "schema": "switch_manual_enum.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_enum_invalid.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_enum_invalid_else.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_int.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_int_else.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_int_size.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_int_size_else.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_int_size_eos.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_str.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_manual_str_else.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_multi_bool_ops.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_repeat_expr.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "switch_repeat_expr_invalid.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_bytes.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_bytes2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_bytes3.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_bytes4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_struct.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_struct2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_struct3.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_struct4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz3.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz_utf16_v1.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz_utf16_v2.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz_utf16_v3.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_strz_utf16_v4.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "term_u1_val.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "to_string_custom.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: to_string_custom.ksy: schema.to-string: unsupported key"
+    },
+    {
+      "schema": "ts_packet_header.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: ts_packet_header.ksy: seq[1].type: unknown or unsupported type 'b1'"
+    },
+    {
+      "schema": "type_int_unary_op.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: type_int_unary_op.ksy: seq[1].type: unknown or unsupported type 's8'"
+    },
+    {
+      "schema": "type_ternary.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: type_ternary.ksy: seq[1].process: unsupported key"
+    },
+    {
+      "schema": "type_ternary_2nd_falsy.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: type_ternary_2nd_falsy.ksy: instances.v_float_zero.value: expected a lower snake case identifier"
+    },
+    {
+      "schema": "type_ternary_opaque.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: type_ternary_opaque.ksy: meta.ks-opaque-types: unsupported key"
+    },
+    {
+      "schema": "user_type.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_eq_str_encodings.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_eq_str_encodings.ksy: seq[1].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_fail_anyof_int.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_anyof_int.ksy: seq[0].valid.any-of: unsupported key"
+    },
+    {
+      "schema": "valid_fail_contents.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_fail_contents_inst.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_contents_inst.ksy: @root.seq.a: attribute requires an object, stream or supported collection"
+    },
+    {
+      "schema": "valid_fail_eq_bytes.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_eq_bytes.ksy: seq[0].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_fail_eq_int.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_fail_eq_str.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_eq_str.ksy: seq[0].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_fail_expr.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_expr.ksy: seq[0].valid.expr: unsupported key"
+    },
+    {
+      "schema": "valid_fail_in_enum.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_in_enum.ksy: seq[0].valid.in-enum: unsupported key"
+    },
+    {
+      "schema": "valid_fail_inst.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_inst.ksy: seq[0].if: unknown or forward field 'inst'"
+    },
+    {
+      "schema": "valid_fail_max_int.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_fail_min_int.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_fail_range_bytes.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_range_bytes.ksy: seq[0].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_fail_range_float.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_range_float.ksy: seq[0].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_fail_range_int.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_fail_range_str.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_range_str.ksy: seq[0].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_fail_repeat_anyof_int.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_repeat_anyof_int.ksy: seq[0].valid: only scalar fields support 'valid'"
+    },
+    {
+      "schema": "valid_fail_repeat_contents.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_fail_repeat_eq_int.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_repeat_eq_int.ksy: seq[0].valid: only scalar fields support 'valid'"
+    },
+    {
+      "schema": "valid_fail_repeat_expr.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_repeat_expr.ksy: seq[0].valid: only scalar fields support 'valid'"
+    },
+    {
+      "schema": "valid_fail_repeat_inst.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_repeat_inst.ksy: instances.inst.valid: only scalar fields support 'valid'"
+    },
+    {
+      "schema": "valid_fail_repeat_max_int.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_repeat_max_int.ksy: seq[0].valid: only scalar fields support 'valid'"
+    },
+    {
+      "schema": "valid_fail_repeat_min_int.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_fail_repeat_min_int.ksy: seq[0].valid: only scalar fields support 'valid'"
+    },
+    {
+      "schema": "valid_long.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_long.ksy: seq[0].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_not_parsed_if.ksy",
+      "status": "generated",
+      "diagnostic": ""
+    },
+    {
+      "schema": "valid_optional_id.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_optional_id.ksy: seq[0].id: missing required key"
+    },
+    {
+      "schema": "valid_short.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_short.ksy: seq[0].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "valid_switch.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: valid_switch.ksy: seq[1].valid: only scalar integers up to 32 bits support 'valid'"
+    },
+    {
+      "schema": "yaml_ints.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: yaml_ints.ksy: instances.test_u8_dec.value: expected an integer, boolean or expression string"
+    },
+    {
+      "schema": "zlib_surrounded.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: zlib_surrounded.ksy: seq[1].process: unsupported key"
+    },
+    {
+      "schema": "zlib_with_header_78.ksy",
+      "status": "rejected",
+      "diagnostic": "ksymoon: zlib_with_header_78.ksy: seq[0].process: unsupported key"
+    }
+  ],
+  "runtime_verification": {
+    "source_commit": "95dfd8ad1fec962fd8f293fa28131b53f63e50df",
+    "tracked_worktree_dirty": false,
+    "targets": [
+      "js",
+      "wasm",
+      "wasm-gc",
+      "native"
+    ],
+    "check_build_test_and_run": true,
+    "official_reference_rerun": true,
+    "compiler_version": "0.11",
+    "upstream_schemas": [
+      "if_instances.ksy",
+      "if_values.ksy",
+      "instance_std_array.ksy",
+      "expr_int_div.ksy",
+      "repeat_eos_u4.ksy",
+      "repeat_eos_struct.ksy",
+      "repeat_until_s4.ksy",
+      "repeat_until_sized.ksy",
+      "repeat_until_complex.ksy",
+      "repeat_eos_bytes.ksy",
+      "repeat_eos_bytes_pad_term.ksy",
+      "switch_integers.ksy",
+      "switch_manual_int.ksy",
+      "switch_manual_int_else.ksy",
+      "switch_manual_int_size.ksy",
+      "switch_manual_int_size_else.ksy",
+      "switch_manual_str.ksy",
+      "switch_manual_str_else.ksy",
+      "str_eos.ksy",
+      "str_pad_term.ksy",
+      "str_pad_term_empty.ksy",
+      "str_pad_term_equal.ksy",
+      "str_pad_term_zero_size.ksy",
+      "str_eos_pad_term.ksy",
+      "term_strz.ksy",
+      "term_strz2.ksy",
+      "term_strz3.ksy",
+      "term_strz4.ksy",
+      "bytes_eos_pad_term.ksy",
+      "term_strz_utf16_v1.ksy",
+      "term_strz_utf16_v2.ksy",
+      "term_strz_utf16_v3.ksy",
+      "term_strz_utf16_v4.ksy",
+      "str_pad_term_utf16.ksy",
+      "str_encodings_utf16.ksy",
+      "instance_io_user.ksy",
+      "instance_io_user_earlier.ksy",
+      "nav_parent2.ksy",
+      "nav_parent3.ksy",
+      "io_local_var.ksy",
+      "expr_io_ternary.ksy",
+      "enum_if.ksy",
+      "enum_of_value_inst.ksy",
+      "enum_to_i.ksy",
+      "params_call.ksy",
+      "params_def.ksy",
+      "params_call_extra_parens.ksy"
+    ],
+    "upstream_specs": 43,
+    "upstream_proper_prefixes": 1429,
+    "prefixes_rejected": 1115,
+    "comparison_tests": 112
+  }
+}
