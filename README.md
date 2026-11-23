@@ -2,7 +2,7 @@
 
 KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进制解析器。生成的源码只依赖 MoonBit 标准库。
 
-项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。当前开发版为 `0.3.0-dev.3`，已实现条件、惰性实例、有界子流、EOS/Until 重复、类型分支和字符串解析。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
+项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。当前开发版为 `0.3.0-dev.4`，已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支和字符串解析。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
 
 ## 从 Mooncakes 安装
 
@@ -41,9 +41,9 @@ moon -C examples/consumer run --target js .
 node scripts/verify.mjs
 ```
 
-脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局、流控制布局与 35 份原样上游兼容描述均重新生成，并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
+脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局、流控制布局与 39 份原样上游兼容描述均重新生成，并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
 
-安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 82 个对照测试。新增 31 组原样上游描述、二进制样本和 Python 测试说明，并核对 948 个真前缀的接受或报错结果。四后端每个目标通过 19 项生成器测试和 137 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
+安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 35 个原样上游 Python 测试及 94 项比较测试。对 35 组上游样本检查了 1,095 个真前缀，跨流用例也触发惰性实例读取。四后端每个目标通过 22 项生成器测试和 158 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
 ```powershell
 python -m pip install kaitaistruct==0.11
@@ -76,24 +76,25 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 - `u1`、`u2`、`u4`、`u8`、`s1`、`s2`、`s4`、`f4`。多字节类型采用 `meta.endian` 或类型的显式大小端后缀，`u8` 生成为 `UInt64`。
 - `contents` 固定签名支持 UTF-8 字符串，以及包含字符串和字节整数的数组。`valid` 支持 32 位以内整数标量的常量、`eq`、`min` 和 `max`。
 - `size`、`size-eos: true`、终止符字节字段及用户类型有界子流。父流一次消费完整边界，子流从 0 计数，内部 `pos` 被限制在子流内，惰性实例保留其所属流。
-- `repeat: expr/eos/until` 数组。Until 在读取后判断并保留结束元素，支持 `_`、`_.整数成员`、`_index`、当前流位置和 EOF 条件。EOS 检查流边界和无进展迭代，重复项共享预算。长度与计数表达式支持非负常量、先前的 `u1/u2/u4` 标量字段，以及该字段减去非负整数。
+- `repeat: expr/eos/until` 数组。Until 在读取后判断并保留结束元素，支持 `_`、`_.整数成员`、`_index`、当前流位置和 EOF 条件。EOS 检查流边界和无进展迭代，重复项共享预算。长度与计数表达式支持非负常量、先前的 `u1/u2/u4` 标量字段，以及该字段减去非负整数。使用跨流实例的描述也支持经过检查的整数长度与计数表达式。
 - `switch-on/cases` 支持常量整数、字符串及布尔标签，生成带载荷的 MoonBit 枚举。显式 `_` 默认分支按对应类型读取，未匹配的有界分支返回原始字节，未匹配的无界分支返回 `Unknown` 并跳过读取。
 - `str/strz` 支持 ASCII、UTF-8、UTF-16LE/BE，支持字段或 `meta` 默认编码，以及 `terminator/pad-right/include/consume/eos-error`。UTF-16 `strz` 隐式终止符按双字节对齐，显式 `terminator` 按字节读取，非法编码提供字段与字节位置。
 - `if` 条件标量、字节字段、嵌套记录和数组，结果生成为 `Option[T]`。条件为假时跳过读取、约束及重复项预留。
 - `instances` 的 `pos` 定位读取、计数数组和 `value` 计算值，均按需求值并缓存成功结果，使用生成记录的同名方法访问，如 `record.entries()`。条件实例在求值为假时跳过定位与读取。
+- `instances.io` 可选择当前流、根流、父对象流、字段或实例的子流，也支持按数组索引和条件选流。`pos` 相对所选流定位，实例表达式中的 `_io` 保持为所属对象的流。无 `pos` 时推进所选流，成功结果按需缓存。 [跨流用例](examples/consumer/io_wbtest.mbt)
 - `if/value/pos` 的有类型整数、布尔及基础字符串字面量表达式，支持括号、算术、比较、位运算、逻辑短路、条件表达式、实例依赖和 `_io.pos/_io.size`。当前数字引用为 32 位以内非可选字段，计算类型为 Int64。 [新增回归](examples/consumer/conditional_wbtest.mbt)
 - 生成的解析器读取描述指定的前缀。UDP 校验和作为字段返回，由调用者按使用场景校验。
-- 当前尚待实现的标准语义包括跨流 `instances.io`、imports、参数、枚举、对象导航、位域、完整表达式、更多编码与处理器等，对应 P2—P5 的明确门禁。遇到尚未实现的语法会返回描述诊断。运行时错误包含字段路径和字节偏移。单次顺序解析及实例读取共享 1,000,000 个重复项的预算，失败的实例读取会归还本次预留，嵌套数组计入同一预算。 [完整兼容终点](docs/COMPATIBILITY.zh-CN.md)
+- 当前尚待实现的标准语义包括 imports、参数、枚举、通用对象和集合表达式、类型转换、位域、更多编码与处理器，按 P3—P5 的门禁推进。遇到尚未实现的语法会返回描述诊断。运行时错误包含字段路径和字节偏移。单次顺序解析及实例读取共享 1,000,000 个重复项的预算，失败的实例读取会归还本次预留，嵌套数组计入同一预算。 [完整兼容终点](docs/COMPATIBILITY.zh-CN.md)
 
 ## 来源与许可
 
 KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy) · [IVF 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/vp8_duck_ivf.ksy)
 
-35 份兼容描述与新增 31 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
+39 份兼容描述与其中 35 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
 
-最近一次 P2 实现验证为 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/44449612826)。全量盘点为 99 份可生成并在四后端构建、240 份待支持，运行对照覆盖其中 35 份上游描述。 [公开完整报告](docs/reports/kaitai-0.11-audit-2026-11-19.json)
+跨流实例的实现由 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45185761258) 验证。固定语料的 339 份描述中，103 份可生成并在四后端构建，236 份保留待支持诊断。39 份上游描述有运行对照。 [公开完整报告](docs/reports/kaitai-0.11-p2-io-2026-11-23.json)
 
-定位实例失败后的游标策略有一处已知差异。KsyMoon 恢复游标和本次重复项预算，便于失败后重试。官方 Python 0.11 会保留失败位置。正常结果、成功定位恢复和失败接受判定已对照，失败后的游标策略另有专门回归。ASCII/UTF 编码之外的编码、字节数组表达式及跨流导航仍按后续矩阵推进。
+定位实例失败后的游标策略有一处已知差异。KsyMoon 恢复游标和本次重复项预算，便于失败后重试。官方 Python 0.11 会保留失败位置。正常结果、成功定位恢复和失败接受判定已对照，失败后的游标策略另有专门回归。更多编码、通用导航和集合表达式仍按后续矩阵推进。
 
 2026-11-19 补充组合核验后，已修复动态负长度被误判为无界读取、UTF-16 显式终止符消费宽度，以及纯计算嵌套记录的生成与实例方法归属问题。新增 9 项边界回归和 7 项官方对照，覆盖零长度、负长度、隐式/显式终止符、只读实例、流查询、重复和同名子类型。 [边界测试](examples/consumer/reader_edges_wbtest.mbt)
 
