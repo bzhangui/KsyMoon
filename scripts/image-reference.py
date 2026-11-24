@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -144,6 +145,12 @@ def png_chunk(kind, payload):
     return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
 
 
+def stored_zlib(data):
+    # A single final stored block keeps fixture bytes independent of the host compressor.
+    assert len(data) <= 0xFFFF
+    return b"\x78\x01\x01" + struct.pack("<HH", len(data), len(data) ^ 0xFFFF) + data + struct.pack(">I", zlib.adler32(data))
+
+
 def png_assertions(reference, parser):
     profile = bytearray(132)
     profile[0:4] = struct.pack(">I", len(profile))
@@ -154,10 +161,10 @@ def png_assertions(reference, parser):
     header = b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
     data = b"".join([
         header,
-        png_chunk(b"iCCP", b"caf\xe9\x00\x00" + zlib.compress(profile)),
+        png_chunk(b"iCCP", b"caf\xe9\x00\x00" + stored_zlib(profile)),
         png_chunk(b"eXIf", NUMERICS["make_exif"](True)),
         png_chunk(b"tEXt", b"Title\x00caf\xe9"),
-        png_chunk(b"IDAT", zlib.compress(b"\x00\x01\x02\x03")),
+        png_chunk(b"IDAT", stored_zlib(b"\x00\x01\x02\x03")),
         png_chunk(b"IEND", b""),
     ])
     result = reference.from_bytes(data)
@@ -219,7 +226,8 @@ def main():
         (package / "moon.pkg").write_text(parser_package(source), encoding="utf-8")
         tests, inputs, accepted = assertions(reference, source)
         (package / "reference_wbtest.mbt").write_text(tests, encoding="utf-8")
-        results[name] = {"inputs": inputs, "accepted": accepted, "rejected": inputs - accepted}
+        results[name] = {"inputs": inputs, "accepted": accepted, "rejected": inputs - accepted,
+                         "fixture_test_sha256": hashlib.sha256(tests.encode("utf-8")).hexdigest()}
     for action in ("check", "build", "test"):
         subprocess.run(["moon", action, "--frozen", "--target", "all", "--deny-warn"], cwd=consumer, check=True)
     report = {
