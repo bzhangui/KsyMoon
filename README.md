@@ -4,7 +4,7 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。仓库已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
 
-`v0.4.0` 增加显式模块导入、位域及经过对照验证的 WAV/RIFF 解析。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.4.0)
+`v0.4.0` 已发布，增加显式模块导入、位域及经过对照验证的 WAV/RIFF 解析。发布包重新生成的六个解析器与同版本 CI 的源码输出逐字节一致，四后端各通过 25 项消费测试。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.4.0) · [发布验收记录](docs/reports/mooncakes-0.4.0.json) · [发布版 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45344575642)
 
 ## 快速开始
 

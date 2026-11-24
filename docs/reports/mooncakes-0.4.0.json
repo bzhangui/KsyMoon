@@ -1,0 +1,71 @@
+{
+  "source_commit": "e04895afa5c109a0dc473d7218cd11de5cdc71f7",
+  "tag": "v0.4.0",
+  "module": "bzhangui/ksymoon",
+  "version": "0.4.0",
+  "published": true,
+  "yanked": false,
+  "published_at": "2026-11-24T07:02:58.549085+00:00",
+  "registry_url": "https://mooncakes.io/docs/bzhangui/ksymoon@0.4.0",
+  "registry_checksum": "b2a4d50e7ce677e0557cd636522e59775a6d79eb185ef2abb76acbb5a1e1c744",
+  "release_ci": "https://github.com/bzhangui/KsyMoon/actions/runs/45344575642",
+  "moonc": "0.10.19+97801ee1b",
+  "archive_files": 340,
+  "release_archive_contents_verified": true,
+  "installed_archive_files_match": true,
+  "registry_install_verified": true,
+  "fresh_registry_cache": true,
+  "fresh_consumer_targets": [
+    "js",
+    "wasm",
+    "wasm-gc",
+    "native"
+  ],
+  "fresh_consumer_tests_passed": {
+    "wasm": 25,
+    "wasm-gc": 25,
+    "js": 25,
+    "native": 25
+  },
+  "quickstart_tests_passed": {
+    "js": 2,
+    "wasm": 2,
+    "wasm-gc": 2,
+    "native": 2
+  },
+  "scenario_checks": {
+    "wav": "PCM, extensible channel mask, odd-length padded unknown chunk and truncated prefixes",
+    "riff": "nested LIST/INFO, unknown chunk, truncated prefixes and nesting limit",
+    "udp": "ports and payload, invalid declared length and truncated datagram",
+    "stl": "triangle fields and floats, excessive triangle count and truncated attribute",
+    "stm32": "sequence, tick, ADC samples, zero/maximum sample count and truncated frame",
+    "ivf": "frame sizes, full 64-bit timestamps, truncated timestamp and nested payload"
+  },
+  "kaitai_compiler_version": "0.11",
+  "kaitai_formats_revision": "30e7ad51e8c870d3a098cd618c0f4b2797efc538",
+  "schemas_sha256": {
+    "wav": "c425bf2bd43f624d1840b56c0e8791c1220e19d2aba13f14d6bcb79be6485dd8",
+    "riff": "8e43fd273dad55ef3d654a47645477b80048b81b78648eedb8044ba7ff1cad72",
+    "udp": "ed599e447a760b85a154e2f9b0e00f7433977e75ea4f29dca4f814ae2bd1b8a2",
+    "stl": "bf9fac93edff1b49e795a15a4abb311d690166fe7b38b6400f6958cd72ae67cd",
+    "stm32": "c879845e76247ec8da75209a031a5004742daec401522276a37ece4325605fb6",
+    "ivf": "15e866272984260f415e5395ee78cfc11cd1c9810a3346b803145afa8257bdfa"
+  },
+  "reproduced_parsers_sha256": {
+    "wav": "28fb458a848d60092fcb00cba75c15f3a962f2439dc0b38afd5f6aafda0736fc",
+    "riff": "24e03740d96a6d71d50533b04fdf8792b52064ab7373c5a64d01d86be04ea01d",
+    "udp": "203655bc9a6ae24d6a3fe2f92e96bdb1ebd25deb75859d1fe25dd14ce321a44a",
+    "stl": "c4e7c404389cdea742e92f0efeeff7152baf2e515d6273b896ccfa1351796ab3",
+    "stm32": "c4442b9a81c67d7b58b059443c51b7e26de5e0947de46a099fdf620d8d906bb6",
+    "ivf": "9207be8d62bd862f2f26c0e8ed47a8ad917efd232be7d8beb0e4cab13d69b0b5"
+  },
+  "parsers_match_hosted_ci": true,
+  "wav_riff_comparisons": 8,
+  "wav_riff_rejected_prefixes": 246,
+  "corpus_inventory": {
+    "total": 339,
+    "rejected": 179,
+    "generated": 160,
+    "runtime_oracle_schemas": 51
+  }
+}

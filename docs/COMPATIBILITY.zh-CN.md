@@ -4,7 +4,7 @@
 
 KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语言与二进制读取语义，生成可独立使用的类型化解析器。v1.0 的交付范围覆盖语法、表达式、类型与流语义、运行时错误、依赖解析及标准处理器。编译器和运行时的核心逻辑由 MoonBit 承担。 [语言指南](https://doc.kaitai.io/user_guide.html) · [官方编译器 0.11](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
-2026-11-18 的初审反馈指出，v0.2.0 把条件字段和 instances 排除在交付目标之外，缺少完整兼容终点。本计划以标准能力和固定测试集作为验收依据，按阶段推进到完整目标。`v0.4.0` 增加 WAV/RIFF 支持，完整标准语义继续按 v1.0 门禁验收。
+2026-11-18 的初审反馈指出，v0.2.0 把条件字段和 instances 排除在交付目标之外，缺少完整兼容终点。本计划以标准能力和固定测试集作为验收依据，按阶段推进到完整目标。Mooncakes 已发布 `v0.4.0`，增加 WAV/RIFF 支持。完整标准语义继续按 v1.0 门禁验收。 [发布验收记录](reports/mooncakes-0.4.0.json)
 
 ## 固定基线
 
@@ -85,6 +85,10 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 现有导入由调用方显式提供描述；单个图最多 16 个导入。涉及跨模块根/父对象的描述等待后续支持。位整数支持 1 到 32 位，大小位序只在字节边界切换。允许通过惰性实例出现的类型环，顺序读取中的类型环给出诊断，运行中对象深度最多 64 层。跨文件导入、位字段更宽类型、表达式和处理器继续按矩阵推进。
 
+### v0.4.0 发布复验
+
+发布提交 `e04895a` 通过 MoonBit v0.10.19+97801ee1b 的四后端 CI。归档的 340 个文件与发布前检查及 Mooncakes 安装后的内容一致，归档 SHA-256 与注册表一致。全新模块安装后，六个解析器重新生成，源码哈希与 CI 一致。JS、Wasm、Wasm-GC、Native 各通过 25 项测试，其中 WAV 和 RIFF 保持与 Kaitai 0.11 的 4 个完整输入、246 个真前缀和递归限制检查。固定语料盘点结果仍为 160 份生成构建、179 份诊断、51 份有运行对照。 [源码标签](https://github.com/bzhangui/KsyMoon/tree/v0.4.0) · [发布版 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45344575642) · [发布复验证据](reports/mooncakes-0.4.0.json)
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -100,7 +104,7 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 python -m pip install kaitaistruct==0.11
 node scripts/verify.mjs --kaitai-reference
 python scripts/compatibility-report.py --runtime-report
-python scripts/wav-reference.py
+python scripts/wav-reference.py --all-scenarios
 ```
 
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。第二条脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
@@ -111,4 +115,4 @@ python scripts/wav-reference.py
 
 ## 发布内容核验
 
-`python scripts/package-check.py` 检查实际 ZIP，并用本地申报书占位文件覆盖未跟踪文件场景，确认申报书、参考生成旁路文件与构建目录被排除，必需源码及许可证完整。CI 上传 `_build/package-content-report.json`。本地草稿保留在项目目录，排除规则不修改其内容。发布版安装示例复验可运行 `node examples/quickstart/run.mjs --all-targets`。
+`python scripts/package-check.py` 检查实际 ZIP，并用本地申报书占位文件覆盖未跟踪文件场景，确认申报书、参考生成旁路文件与构建目录被排除，必需源码及许可证完整。CI 上传 `_build/package-content-report.json`。本地草稿保留在项目目录，排除规则不修改其内容。检出 `v0.4.0` 后，运行 `python scripts/wav-reference.py --registry` 从 Mooncakes 安装并在空白项目重跑六个场景。`node examples/quickstart/run.mjs --all-targets` 运行 UDP 和跨流实例的快速示例。
