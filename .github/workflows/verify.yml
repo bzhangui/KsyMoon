@@ -45,7 +45,7 @@ jobs:
           node scripts/verify.mjs --kaitai-reference
           python scripts/compatibility-report.py --runtime-report
           node examples/quickstart/run.mjs --source --all-targets
-          python scripts/wav-reference.py
+          python scripts/wav-reference.py --all-scenarios
           python scripts/package-check.py
       - name: Upload complete compatibility inventory
         uses: actions/upload-artifact@v4

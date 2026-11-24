@@ -40,7 +40,13 @@ def main():
         assert all(not name.startswith(("_build/", ".mooncakes/", ".git/", "target/")) for name in files)
         required = {path.name for path in ROOT.glob("*.mbt")}
         required.update({"moon.mod", "moon.pkg", "LICENSE", "README.md", "cmd/ksymoon/main.mbt", "cmd/ksymoon/moon.pkg", "fixtures/kaitai/LICENSE"})
-        assert required.issubset(files), f"Missing source or license: {required.difference(files)}"
+        required.update({
+            "scripts/wav-reference.py", "scripts/kaitai-reference.py",
+            "fixtures/udp_datagram.ksy", "fixtures/stl.ksy", "fixtures/stm32_sample_frame.ksy",
+            "fixtures/vp8_duck_ivf.ksy",
+        })
+        assert required.issubset(files), f"Missing source, fixture or license: {required.difference(files)}"
+        assert all(not path.endswith(("/wav.ksy", "/riff.ksy")) for path in files), "WAV/RIFF descriptions should be fetched on demand"
         assert before == hashlib.sha256(PROPOSAL.read_bytes()).hexdigest(), "Proposal was modified"
         report = {
             "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),

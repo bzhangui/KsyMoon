@@ -1,9 +1,12 @@
-"""Verify the pinned, original WAV and RIFF descriptions against Kaitai 0.11."""
+"""Verify original WAV and RIFF against Kaitai 0.11, optionally with the four demo formats."""
+import argparse
 import hashlib
 import importlib.metadata
 import json
 from pathlib import Path
+import re
 import runpy
+import shutil
 import struct
 import subprocess
 import sys
@@ -23,6 +26,16 @@ OVERRIDES = ["/common/riff", "common/riff.ksy"]
 TARGETS = ("js", "wasm", "wasm-gc", "native")
 REFERENCE = runpy.run_path(str(ROOT / "scripts/kaitai-reference.py"))
 literal = REFERENCE["bytes_literal"]
+DEMO_FORMATS = {
+    "udp": "udp_datagram.ksy",
+    "stl": "stl.ksy",
+    "stm32": "stm32_sample_frame.ksy",
+    "ivf": "vp8_duck_ivf.ksy",
+}
+DEMO_SOURCES = (
+    "main.mbt", "stl_checks.mbt", "stm32_checks.mbt", "main_wbtest.mbt",
+    "prefix_wbtest.mbt", "ivf_wbtest.mbt",
+)
 
 
 def verified_format(path, digest, cache, work):
@@ -180,17 +193,64 @@ def recursion_limit_check():
     ])
 
 
+def generator_command(work, registry):
+    generator = ROOT
+    command = "cmd/ksymoon"
+    dependency = None
+    if registry:
+        manifest = (ROOT / "moon.mod").read_text(encoding="utf-8")
+        version = re.search(r'^version = "([0-9]+\.[0-9]+\.[0-9]+)"$', manifest, re.M)
+        if version is None:
+            raise ValueError("--registry requires a stable version in moon.mod")
+        dependency = f"bzhangui/ksymoon@{version[1]}"
+        generator = work / "generator"
+        generator.mkdir()
+        (generator / "moon.mod").write_text(
+            'name = "example/ksymoon-registry-generator"\nversion = "0.1.0"\n', encoding="utf-8",
+        )
+        for name in ("main.mbt", "moon.pkg"):
+            shutil.copyfile(ROOT / "cmd/ksymoon" / name, generator / name)
+        subprocess.run(["moon", "update"], cwd=generator, check=True)
+        subprocess.run(["moon", "add", dependency], cwd=generator, check=True)
+        subprocess.run(["moon", "tree"], cwd=generator, check=True)
+        command = "."
+    print(f"Generator: {dependency or 'repository source'}", flush=True)
+    return generator, ["moon", "run", "--frozen", "--target", "js", "--deny-warn", command, "--"], dependency
+
+
+def create_consumer(work, include_demos):
+    consumer = work / "consumer"
+    consumer.mkdir()
+    module = "example/ksymoon-wav"
+    (consumer / "moon.mod").write_text(f'name = "{module}"\nversion = "0.1.0"\n', encoding="utf-8")
+    packages = f'import {{\n  "{module}/wav",\n  "{module}/riff",\n'
+    if include_demos:
+        packages += f'  "{module}/ivf",\n'
+        for name in DEMO_SOURCES:
+            shutil.copyfile(ROOT / "examples/consumer" / name, consumer / name)
+    packages += '} for "wbtest"\n'
+    if include_demos:
+        packages += 'import {\n' + "".join(f'  "{module}/{name}",\n' for name in ("udp", "stl", "stm32"))
+        packages += '}\n\npkgtype(kind: "executable")\n'
+    (consumer / "moon.pkg").write_text(packages, encoding="utf-8")
+    print(f"Fresh consumer: {consumer}", flush=True)
+    return consumer
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--all-scenarios", action="store_true", help="also regenerate and test UDP, STL, STM32, IVF")
+    parser.add_argument("--registry", action="store_true", help="install the current release from Mooncakes and test all six formats")
+    args = parser.parse_args()
+    include_demos = args.all_scenarios or args.registry
     if importlib.metadata.version("kaitaistruct") != REFERENCE["VERSION"]:
         raise RuntimeError("Install kaitaistruct==0.11 to run this check")
     build = ROOT / "_build"
     build.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="wav-reference-", dir=build))
     inputs = {name: verified_format(name, sha, build / "kaitai-formats", work) for name, sha in FORMATS.items()}
-    consumer = work / "consumer"
-    consumer.mkdir()
-    (consumer / "moon.mod").write_text('name = "example/ksymoon-wav"\nversion = "0.1.0"\n', encoding="utf-8")
-    (consumer / "moon.pkg").write_text('import {\n  "example/ksymoon-wav/wav",\n  "example/ksymoon-wav/riff",\n} for "wbtest"\n', encoding="utf-8")
+    generator, cli, dependency = generator_command(work, args.registry)
+    consumer = create_consumer(work, include_demos)
     refs = work / "python"
     refs.mkdir()
     subprocess.run([*REFERENCE["compiler_command"](work), "--target", "python", "--import-path",
@@ -199,14 +259,16 @@ def main():
     from riff import Riff
     from wav import Wav
 
-    for name, source in (("wav", inputs["media/wav.ksy"]), ("riff", inputs["common/riff.ksy"])):
+    scenarios = {"wav": inputs["media/wav.ksy"], "riff": inputs["common/riff.ksy"]}
+    if include_demos:
+        scenarios.update({name: ROOT / "fixtures" / spec for name, spec in DEMO_FORMATS.items()})
+    for name, source in scenarios.items():
         package = consumer / name
         package.mkdir()
         (package / "moon.pkg").write_text("", encoding="utf-8")
-        cli = ["moon", "run", "--frozen", "--target", "js", "--deny-warn", "cmd/ksymoon", "--"]
         extra = ["--import", OVERRIDES[0], str(inputs[OVERRIDES[1]])] if name == "wav" else []
-        subprocess.run([*cli, "check", str(source), *extra], cwd=ROOT, check=True)
-        subprocess.run([*cli, "generate", str(source), "--out", str(package / "parser.mbt"), *extra], cwd=ROOT, check=True)
+        subprocess.run([*cli, "check", str(source), *extra], cwd=generator, check=True)
+        subprocess.run([*cli, "generate", str(source), "--out", str(package / "parser.mbt"), *extra], cwd=generator, check=True)
 
     tests = []
     prefixes = rejected = 0
@@ -231,8 +293,14 @@ def main():
         "upstream_revision": REVISION, "upstream_hashes": FORMATS,
         "targets": TARGETS, "comparisons": len(tests), "resource_limit_tests": 1, "prefixes": prefixes,
         "rejected_prefixes": rejected, "check_build_test": True,
+        "generator_dependency": dependency, "scenarios": list(scenarios),
+        "schema_sha256": {name: hashlib.sha256(source.read_bytes()).hexdigest() for name, source in scenarios.items()},
+        "parser_sha256": {
+            name: hashlib.sha256((consumer / name / "parser.mbt").read_bytes()).hexdigest() for name in scenarios
+        },
     }
-    (build / "wav-reference-report.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    report = "registry-scenarios-report.json" if args.registry else "wav-reference-report.json"
+    (build / report).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(f"WAV/RIFF: {len(tests)} official comparisons, {prefixes} prefix outcomes ({rejected} rejected), depth limit checked; four backends passed")
 
 
