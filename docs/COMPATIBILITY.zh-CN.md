@@ -4,7 +4,7 @@
 
 KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语言与二进制读取语义，生成可独立使用的类型化解析器。v1.0 的交付范围覆盖语法、表达式、类型与流语义、运行时错误、依赖解析及标准处理器。编译器和运行时的核心逻辑由 MoonBit 承担。 [语言指南](https://doc.kaitai.io/user_guide.html) · [官方编译器 0.11](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
-2026-11-18 的初审反馈指出，v0.2.0 把条件字段和 instances 排除在交付目标之外，缺少完整兼容终点。本计划以标准能力和固定测试集作为验收依据，按阶段推进到完整目标。当前开发版为 `0.3.0-dev.5`，当前已发布版为 `0.2.0`。
+2026-11-18 的初审反馈指出，v0.2.0 把条件字段和 instances 排除在交付目标之外，缺少完整兼容终点。本计划以标准能力和固定测试集作为验收依据，按阶段推进到完整目标。本轮交付版为 `0.3.0`，完整标准语义仍按 v1.0 门禁验收。
 
 ## 固定基线
 
@@ -106,4 +106,4 @@ python scripts/compatibility-report.py --runtime-report
 
 ## 发布内容核验
 
-`python scripts/package-check.py` 检查实际 ZIP，并用本地申报书占位文件覆盖未跟踪文件场景，确认申报书、参考生成旁路文件与构建目录被排除，必需源码及许可证完整。CI 上传 `_build/package-content-report.json`。本地草稿保留在项目目录，排除规则不修改其内容。该步骤未发布新版本，Mooncakes 当前仍为 `0.2.0`。
+`python scripts/package-check.py` 检查实际 ZIP，并用本地申报书占位文件覆盖未跟踪文件场景，确认申报书、参考生成旁路文件与构建目录被排除，必需源码及许可证完整。CI 上传 `_build/package-content-report.json`。本地草稿保留在项目目录，排除规则不修改其内容。发布版安装示例复验可运行 `node examples/quickstart/run.mjs --all-targets`。

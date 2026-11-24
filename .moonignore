@@ -9,3 +9,6 @@ target/
 # Reference outputs generated locally, not the checked-in oracle assertions.
 /examples/consumer/kaitai_reference_wbtest.mbt
 /examples/consumer/oracle-cases.json
+
+# Local interfaces emitted by moon info.
+pkg.generated.mbti

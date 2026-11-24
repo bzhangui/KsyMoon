@@ -2,19 +2,19 @@
 
 KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进制解析器。生成的源码只依赖 MoonBit 标准库。
 
-项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。当前开发版为 `0.3.0-dev.5`，已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
+项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。本版为 `0.3.0`，已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
 
-## 从 Mooncakes 安装
+## 快速开始
 
-在自己的 MoonBit 模块中安装生成器。
+使用 MoonBit v0.10.19 和 Node.js 24，从本仓库检出 `v0.3.0` 后运行：
 
 ```powershell
-moon add bzhangui/ksymoon@0.2.0
+node examples/quickstart/run.mjs
 ```
 
-在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。用 `@ksymoon.generate(source)` 将描述文本生成为 MoonBit 源码，或用 `@ksymoon.validate(source)` 单独校验描述。两个接口都会用 `SchemaError` 报告超出支持范围的描述。
+脚本在新模块中执行 `moon add bzhangui/ksymoon@0.3.0`，调用安装的生成器，把原样 UDP 和跨流实例描述转换为独立 MoonBit 源码，再检查、构建、测试和运行。正常输出包含 `UDP: 1234 -> 5678, ABC` 与 `Cross-stream names: the, rainy, day it is`，两个截断样本均被拒绝。加 `--all-targets` 检查四后端，加 `--source` 从当前 Git 源码运行同一示例。
 
-Mooncakes 当前已发布 `v0.2.0`，提供固定签名、有符号整数、整数标量约束、64 位无符号整数和只读 `check` 命令。新增语义通过本仓库开发源码复现。
+在自己的模块中，先执行 `moon add bzhangui/ksymoon@0.3.0`，在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。`@ksymoon.generate(source)` 返回 MoonBit 源码。`@ksymoon.validate(source)` 校验描述。把生成结果写入新包后，以输入字节调用生成的 `parse_<id>`。
 
 ## 生成并运行
 

@@ -1,0 +1,57 @@
+///|
+fn udp_demo() -> Unit raise {
+  let sample = b"\x04\xD2\x16\x2E\x00\x0B\x12\x34ABC"
+  let packet = @udp.parse_udp_datagram(sample)
+  assert_eq(packet.src_port, 1234U)
+  assert_eq(packet.dst_port, 5678U)
+  assert_eq(packet.body.to_owned(), b"ABC")
+  try @udp.parse_udp_datagram(sample[:10].to_owned()) catch {
+    @udp.UdpDatagramTruncated(field~, offset~, ..) => {
+      assert_eq(field, "udp_datagram.body")
+      assert_eq(offset, 8)
+    }
+    error => raise error
+  } noraise {
+    _ => fail("accepted truncated UDP")
+  }
+}
+
+///|
+fn names_demo() -> Unit raise {
+  let sample = b"\x03\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x04\x00\x00\x00\xFF\xFF\xFF\xFE\x0A\x00\x00\x00\xFF\xFF\xFF\xFD\x74\x68\x65\x00\x72\x61\x69\x6E\x79\x00\x64\x61\x79\x20\x69\x74\x20\x69\x73\x00"
+  let frame = @names.parse_instance_io_user(sample)
+  assert_eq(frame.qty_entries, 3U)
+  assert_eq(frame.entries[0].name(), "the")
+  assert_eq(frame.entries[1].name(), "rainy")
+  assert_eq(frame.entries[2].name(), "day it is")
+  try @names.parse_instance_io_user(sample[:sample.length() - 1].to_owned()) catch {
+    @names.InstanceIoUserMissingTerminator(field~, ..) => {
+      assert_true(field.has_prefix("instance_io_user.strings.str"))
+    }
+    error => raise error
+  } noraise {
+    _ => fail("accepted missing name terminator")
+  }
+}
+
+///|
+test "UDP package generation and truncation" {
+  udp_demo()
+}
+
+///|
+test "cross-stream names and missing terminator" {
+  names_demo()
+}
+
+///|
+fn main {
+  try {
+    udp_demo()
+    println("UDP: 1234 -> 5678, ABC; truncated payload rejected at byte 8")
+    names_demo()
+    println("Cross-stream names: the, rainy, day it is; missing terminator rejected")
+  } catch {
+    error => abort("quick start failed: \{error}")
+  }
+}

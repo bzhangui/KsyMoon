@@ -1,0 +1,6 @@
+import {
+  "example/ksymoon-quickstart/udp" @udp,
+  "example/ksymoon-quickstart/names" @names,
+}
+
+pkgtype(kind: "executable")
