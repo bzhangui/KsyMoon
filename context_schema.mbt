@@ -570,6 +570,9 @@ fn context_expression_type(
         }
       } else {
         guard a == b else {
+          if a is Enum(name) {
+            invalid(scope.path, "expected enum '" + name + "'")
+          }
           invalid(scope.path, "expression operands have different types")
         }
         match op {
