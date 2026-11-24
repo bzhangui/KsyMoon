@@ -36,7 +36,7 @@ fn raw_uses_context(
   }
   for field in fields {
     if field is @yaml.Map(properties) {
-      if properties.contains("enum") {
+      if properties.contains("enum") || properties.contains("process") {
         return true
       }
       let expressions = [
@@ -143,7 +143,8 @@ priv struct ContextGraph {
   enum_scopes : Map[String, Map[String, String]]
   enums : Map[String, EnumDef]
   bits : Bool
-  imported_types : Array[String]
+  module_roots : Map[String, String]
+  root_referenced : Bool
 }
 
 ///|
@@ -170,6 +171,7 @@ fn context_graph(schema : Schema) -> ContextGraph {
   for name, _ in records {
     parents[name] = []
   }
+  let mut root_referenced = false
   for owner, record in records {
     let fields = record.fields.copy()
     for instance in record.instances {
@@ -179,7 +181,9 @@ fn context_graph(schema : Schema) -> ContextGraph {
     }
     for field in fields {
       for child in kind_references(field.kind) {
-        if !parents[child].contains(owner) {
+        root_referenced = root_referenced || child == "@root"
+        if schema.module_roots.get(child) == schema.module_roots.get(owner) &&
+          !parents[child].contains(owner) {
           parents[child].push(owner)
         }
       }
@@ -193,7 +197,8 @@ fn context_graph(schema : Schema) -> ContextGraph {
     enum_scopes: schema.enum_scopes,
     enums: schema.enums,
     bits: schema_has_bits(schema),
-    imported_types: schema.imported_types,
+    module_roots: schema.module_roots,
+    root_referenced,
   }
 }
 
@@ -340,21 +345,25 @@ fn context_member_type(
         _ => invalid(scope.path, "unknown stream attribute '" + name + "'")
       }
     Object(owners) => {
-      if name == "_root" || name == "_parent" {
-        guard !owners
-          .iter()
-          .any(fn(owner) { scope.graph.imported_types.contains(owner) }) else {
-          invalid(
-            scope.path,
-            "root and parent navigation on imported records awaits implementation",
-          )
-        }
-      }
       if name == "_io" {
         return Stream
       }
       if name == "_root" {
-        return Object(["@root"])
+        let roots = []
+        for owner in owners {
+          let root = scope.graph.module_roots.get(owner).unwrap_or("@root")
+          guard scope.graph.records.contains(root) else {
+            invalid(
+              scope.path,
+              "module root is unavailable for a directly imported nested type",
+            )
+          }
+          if !roots.contains(root) {
+            roots.push(root)
+          }
+        }
+        roots.sort()
+        return Object(roots)
       }
       if name == "_parent" {
         let names = []
@@ -567,9 +576,9 @@ fn check_context_kind(
     }
     Enumerated(_, name) => ignore(context_enum(scope, name))
     ByteField(options) | Text(options, _) =>
-      check_context_length(scope, options.length)
+      check_context_byte_options(scope, options)
     Bounded(inner, options) => {
-      check_context_length(scope, options.length)
+      check_context_byte_options(scope, options)
       check_context_kind(scope, inner)
     }
     Switch(_, selector, cases, _) => {
@@ -582,6 +591,20 @@ fn check_context_kind(
         check_context_kind(scope, branch)
       }
     }
+    _ => ()
+  }
+}
+
+///|
+fn check_context_byte_options(
+  scope : ContextScope,
+  options : ByteOptions,
+) -> Unit raise SchemaError {
+  check_context_length(scope, options.length)
+  match options.processor {
+    Some(Xor(key, mask)) =>
+      context_require(scope, key, if mask { Bytes } else { Integer })
+    Some(Rotate(count, _)) => context_require(scope, count, Integer)
     _ => ()
   }
 }

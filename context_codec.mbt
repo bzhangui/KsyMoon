@@ -20,6 +20,7 @@ fn context_unpack_expression(
     Integer | Enum(_) => "Number"
     Boolean => "Flag"
     Text => "StringValue"
+    Bytes => "Binary"
     Stream => "Source"
     Object(_) => "ObjectId"
     _ => abort("unsupported scalar expression type")
@@ -36,7 +37,8 @@ fn context_value_code(
   owner_reader : String,
 ) -> String raise SchemaError {
   match expression {
-    Reference("_root") => "\{root}Value::ObjectId(0)"
+    Reference("_root") if scope.graph.module_roots.is_empty() =>
+      "\{root}Value::ObjectId(0)"
     Reference("_parent") =>
       "\{root}Value::ObjectId(context).attribute(arena, \"_parent\", \{path})"
     Reference("_io") => "\{root}Value::Source(\{owner_reader})"
@@ -522,10 +524,15 @@ fn context_kind_expressions(kind : FieldKind) -> Array[Expr] {
   for kind in walk_kinds(kind) {
     match kind {
       Application(_, args) => expressions.append(args)
-      ByteField(options) | Text(options, _) | Bounded(_, options) =>
+      ByteField(options) | Text(options, _) | Bounded(_, options) => {
         if options.length is Some(Calculated(value)) {
           expressions.push(value)
         }
+        if options.processor is Some(Xor(value, _) | Rotate(value, _)) &&
+          (context_has_reference(value) || expression_arithmetic(value)) {
+          expressions.push(value)
+        }
+      }
       Switch(_, selector, cases, _) => {
         expressions.push(selector)
         for (tag, _) in cases {

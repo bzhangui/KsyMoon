@@ -381,7 +381,7 @@ test "enums reject undefined labels and incompatible enum comparisons" {
 }
 
 ///|
-test "explicit imports diagnose missing dependencies and import cycles" {
+test "explicit imports diagnose missing dependencies and unconditional recursion" {
   let source =
     #|meta: {id: example, imports: [/data/message]}
     #|seq: [{id: payload, type: message::body}]
@@ -395,24 +395,6 @@ test "explicit imports diagnose missing dependencies and import cycles" {
   )
   let code = generate_with_imports(source, Map([("/data/message", message)]))
   assert_true(code.contains("reader.read_bits(2, false, path_number)"))
-  let wrong_root =
-    #|meta: {id: message}
-    #|types:
-    #|  body:
-    #|    instances:
-    #|      root_size: {value: _root._io.size}
-  try
-    validate_with_imports(source, Map([("/data/message", wrong_root)]))
-  catch {
-    InvalidSchema(error) =>
-      assert_true(
-        error.contains(
-          "root and parent navigation on imported records awaits implementation",
-        ),
-      )
-  } noraise {
-    _ => fail("used the caller's root as the imported root")
-  }
   let parent =
     #|meta: {id: message, imports: [number]}
     #|types:
@@ -438,14 +420,16 @@ test "explicit imports diagnose missing dependencies and import cycles" {
   }
   let circular =
     #|meta: {id: message, imports: [/data/message]}
-    #|seq: [{id: marker, type: u1}]
+    #|types:
+    #|  body:
+    #|    seq: [{id: child, type: message::body}]
   try validate_with_imports(source, Map([("/data/message", circular)])) catch {
     InvalidSchema(message) =>
-      assert_eq(
-        message, "meta.imports./data/message: cyclic import: /data/message -> /data/message",
+      assert_true(
+        message.contains("recursive type reference in sequential fields"),
       )
   } noraise {
-    _ => fail("accepted a cyclic import")
+    _ => fail("accepted unconditional recursive reads")
   }
 }
 

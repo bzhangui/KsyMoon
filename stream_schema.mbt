@@ -63,6 +63,11 @@ fn parse_byte_options(
     keep_terminator: boolean_option(field, "include", false, path),
     consume: boolean_option(field, "consume", true, path),
     eos_error: boolean_option(field, "eos-error", true, path),
+    processor: field
+    .get("process")
+    .map(fn(value) raise SchemaError {
+      parse_processor(value, earlier, path + ".process")
+    }),
   }
 }
 
@@ -95,7 +100,7 @@ fn parse_field_kind(
     for
       key in [
         "type", "size", "size-eos", "terminator", "pad-right", "encoding", "include",
-        "consume", "eos-error",
+        "consume", "eos-error", "process",
       ] {
       guard !field.contains(key) else {
         invalid(path, "contents cannot be combined with " + key)
@@ -221,6 +226,7 @@ fn parse_field_kind(
   }
   let has_options = [
       "size", "size-eos", "terminator", "pad-right", "include", "consume", "eos-error",
+      "process",
     ]
     .iter()
     .any(fn(key) { field.contains(key) })
@@ -269,9 +275,9 @@ fn flatten_types(
   inherited_enums : Map[String, String],
   enum_scopes : Map[String, Map[String, String]],
   enums : Map[String, EnumDef],
-  imports_visibility : Map[String, Array[String]],
-  imported_types : Array[String],
-  imported~ : Bool = false,
+  imports_visibility : Map[String, Map[String, String]],
+  module_roots : Map[String, String],
+  module_owner~ : String = "@root",
 ) -> Map[String, @yaml.Yaml] raise SchemaError {
   let types = match mapping.get("types") {
     Some(value) => as_mapping(value, "types")
@@ -282,11 +288,11 @@ fn flatten_types(
   } else {
     prefix[:prefix.length() - 1].to_owned()
   }
-  if imported {
-    imported_types.push(owner)
+  if module_owner != "@root" {
+    module_roots[owner] = module_owner
   }
   let visible = match imports_visibility.get(owner) {
-    Some(aliases) => Map(aliases.map(fn(name) { (name, name) }))
+    Some(aliases) => aliases.copy()
     None => inherited.copy()
   }
   for name, _ in types {
@@ -331,9 +337,12 @@ fn flatten_types(
         enum_scopes,
         enums,
         imports_visibility,
-        imported_types,
-        imported=imported ||
-          (owner == "@root" && imports_visibility.contains(name)),
+        module_roots,
+        module_owner=if owner == "@root" && imports_visibility.contains(name) {
+          full
+        } else {
+          module_owner
+        },
       ),
     )
   }
@@ -382,7 +391,7 @@ fn scoped_type_name(name : String, visible : Map[String, String]) -> String {
 fn scoped_field_type(
   name : String,
   visible : Map[String, String],
-  imports_visibility : Map[String, Array[String]],
+  imports_visibility : Map[String, Map[String, String]],
 ) -> String raise SchemaError {
   let base = match name.split_once("(") {
     Some((base, _)) => base.trim().to_owned()
@@ -403,7 +412,7 @@ fn rewrite_field_type(
   value : @yaml.Yaml,
   visible : Map[String, String],
   visible_enums : Map[String, String],
-  imports_visibility : Map[String, Array[String]],
+  imports_visibility : Map[String, Map[String, String]],
 ) -> @yaml.Yaml raise SchemaError {
   let field = as_mapping(value, "field").copy()
   if field.get("enum") is Some(@yaml.String(name)) {
@@ -459,7 +468,7 @@ fn schema_endian(
 fn inherit_read_defaults(
   mapping : Map[String, @yaml.Yaml],
   inherited : Map[String, @yaml.Yaml],
-  imports_visibility : Map[String, Array[String]],
+  imports_visibility : Map[String, Map[String, String]],
   root~ : Bool = true,
 ) -> Map[String, @yaml.Yaml] raise SchemaError {
   let defaults = inherited.copy()

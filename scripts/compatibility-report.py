@@ -17,7 +17,7 @@ ARCHIVE_SHA256 = "3a78e2ffb3938c18b5c1d2f06f3bc8567bc72e054a8e68f0ddacbfa1406937
 EXPECTED_SCHEMAS = 339
 
 
-def main():
+def corpus_archive():
     cache = ROOT / "_build/kaitai-reference"
     cache.mkdir(parents=True, exist_ok=True)
     archive = cache / "upstream-tests-4108136.zip"
@@ -38,6 +38,33 @@ def main():
     if hashlib.sha256(archive.read_bytes()).hexdigest() != ARCHIVE_SHA256:
         raise ValueError("Cached upstream tests failed checksum verification")
 
+    return archive
+
+
+def extract_formats(archive, directory):
+    prefix = f"kaitai_struct_tests-{REVISION}/formats/"
+    with zipfile.ZipFile(archive) as source:
+        names = sorted(name for name in source.namelist() if name.startswith(prefix) and name.endswith(".ksy"))
+        if len(names) != EXPECTED_SCHEMAS:
+            raise ValueError(f"Expected {EXPECTED_SCHEMAS} upstream schemas, got {len(names)}")
+        for name in names:
+            path = directory / name[len(prefix):]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(source.read(name))
+    return [directory / name[len(prefix):] for name in names]
+
+
+def parser_package(source):
+    if "@ksy_zlib.decompress(" in source:
+        return (
+            'import { "moonbitlang/core/compress/zlib" @ksy_zlib }\n'
+            'options("allow-experimental-packages": ["moonbitlang/core/compress/zlib"])\n'
+        )
+    return ""
+
+
+def main():
+    archive = corpus_archive()
     subprocess.run(["moon", "build", "--frozen", "--release", "--target", "js", "cmd/ksymoon"], cwd=ROOT, check=True)
     cli = ROOT / "_build/js/release/build/cmd/ksymoon/ksymoon.js"
     if not cli.exists():
@@ -49,33 +76,29 @@ def main():
         'name = "verification/ksymoon-corpus"\nversion = "0.1.0"\n', encoding="utf-8",
     )
     rows = []
-    with zipfile.ZipFile(archive) as source:
-        prefix = f"kaitai_struct_tests-{REVISION}/formats/"
-        names = sorted(name for name in source.namelist() if name.startswith(prefix) and name.endswith(".ksy"))
-        if len(names) != EXPECTED_SCHEMAS:
-            raise ValueError(f"Expected {EXPECTED_SCHEMAS} upstream schemas, got {len(names)}")
-        for index, name in enumerate(names):
-            # Each checked file is copied unchanged. Imports are intentionally accounted
-            # for as pending implementation rather than removed from the denominator.
-            path = scratch / f"{index:03}.ksy"
-            path.write_bytes(source.read(name))
-            result = subprocess.run(
-                ["node", str(cli), "generate", str(path), "--out", str(scratch / f"{index:03}.mbt")],
-                cwd=ROOT, text=True, encoding="utf-8", capture_output=True, timeout=10,
-            )
-            status = "generated" if result.returncode == 0 else "rejected"
-            if result.returncode not in (0, 1) or (result.returncode and not result.stderr.startswith("ksymoon: ")):
-                raise RuntimeError(f"Unexpected compiler failure for {name}: {result.stderr}")
-            rows.append({
-                "schema": name[len(prefix):],
-                "status": status,
-                "diagnostic": result.stderr.strip().replace(str(path), name[len(prefix):]),
-            })
-            if status == "generated":
-                package = generated_module / f"case_{index:03}"
-                package.mkdir()
-                (package / "moon.pkg").write_text("// Generated corpus parser.\n", encoding="utf-8")
-                (package / "parser.mbt").write_bytes((scratch / f"{index:03}.mbt").read_bytes())
+    formats = scratch / "formats"
+    for index, path in enumerate(extract_formats(archive, formats)):
+        relative = path.relative_to(formats).as_posix()
+        output = scratch / f"{index:03}.mbt"
+        result = subprocess.run(
+            ["node", str(cli), "generate", str(path), "--root", str(formats),
+             "-I", str(formats / "ks_path"), "--out", str(output)],
+            cwd=ROOT, text=True, encoding="utf-8", capture_output=True, timeout=10,
+        )
+        status = "generated" if result.returncode == 0 else "rejected"
+        if result.returncode not in (0, 1) or (result.returncode and not result.stderr.startswith("ksymoon: ")):
+            raise RuntimeError(f"Unexpected compiler failure for {relative}: {result.stderr}")
+        rows.append({
+            "schema": relative,
+            "status": status,
+            "diagnostic": result.stderr.strip().replace(str(path), relative),
+        })
+        if status == "generated":
+            package = generated_module / f"case_{index:03}"
+            package.mkdir()
+            text = output.read_text(encoding="utf-8")
+            (package / "moon.pkg").write_text(parser_package(text), encoding="utf-8")
+            (package / "parser.mbt").write_bytes(output.read_bytes())
 
     # Accepted schemas must emit independently compilable source on every target.
     # Runtime equivalence remains a separate, smaller oracle-tested measurement.
@@ -97,6 +120,7 @@ def main():
         "total": len(rows),
         "counts": counts,
         "generated_sources_compile_and_build": True,
+        "resolves_imports_from_upstream_tree": True,
         "runtime_oracle_schemas": [],
         "meaning": "generated means source emitted and independently checked/built on four targets; runtime conformance is measured separately",
         "schemas": rows,

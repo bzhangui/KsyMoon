@@ -1,6 +1,6 @@
 name = "bzhangui/ksymoon"
 
-version = "0.4.0"
+version = "0.5.0-dev.1"
 
 readme = "README.md"
 

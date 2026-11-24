@@ -18,12 +18,40 @@ pub fn generate_with_imports(
 }
 
 ///|
+/// Compiles a project using slash-separated paths relative to its root.
+/// Read callbacks receive normalized in-project paths ending in .ksy.
+pub fn generate_project(
+  source : String,
+  entry : String,
+  search : Array[String],
+  read : (String) -> String?,
+  imports~ : Map[String, String] = Map([]),
+) -> String raise SchemaError {
+  generate_schema(
+    load_schema(source, imports~, entry=Some(entry), search~, read~),
+  )
+}
+
+///|
+/// Validates a project with the same import lookup used by generate_project.
+pub fn validate_project(
+  source : String,
+  entry : String,
+  search : Array[String],
+  read : (String) -> String?,
+  imports~ : Map[String, String] = Map([]),
+) -> Unit raise SchemaError {
+  ignore(load_schema(source, imports~, entry=Some(entry), search~, read~))
+}
+
+///|
 priv struct SchemaImports {
-  sources : Map[String, String]
-  aliases : Map[String, String]
+  overrides : Map[String, String]
+  search : Array[String]
+  read : (String) -> String?
+  files : Map[String, String]
   modules : Map[String, @yaml.Yaml]
-  visibility : Map[String, Array[String]]
-  active : Array[String]
+  visibility : Map[String, Map[String, String]]
   root_id : String
 }
 
@@ -61,7 +89,10 @@ fn import_names(
           invalid(path, "empty import name")
         }
         for index in first..<segments.length() {
-          check_identifier(segments[index], path)
+          let segment = segments[index]
+          if segment != ".." && segment != "." {
+            check_identifier(segment, path)
+          }
         }
         guard !names.contains(name) else {
           invalid(path, "duplicate import '" + name + "'")
@@ -75,22 +106,65 @@ fn import_names(
 }
 
 ///|
+fn project_path(directory : String, name : String) -> String? {
+  let normalized : Array[String] = []
+  for part in (directory + "/" + name).split("/") {
+    match part {
+      "" | "." => ()
+      ".." => if normalized.pop() is None { return None }
+      _ => normalized.push(part.to_owned())
+    }
+  }
+  Some(normalized.join("/"))
+}
+
+///|
+fn import_source(
+  graph : SchemaImports,
+  from : String?,
+  key : String,
+  path : String,
+) -> (String, String?, String) raise SchemaError {
+  if graph.overrides.get(key) is Some(source) {
+    // Explicit aliases remain keyed by the name supplied by the caller.
+    return ("@" + key, None, source)
+  }
+  if from is Some(file) {
+    let (directories, requested) = if key.has_prefix("/") {
+      guard project_path("", key + ".ksy") is Some(relative) else {
+        invalid(path, "absolute import path leaves its search directory")
+      }
+      (graph.search, relative)
+    } else {
+      let parts = file.split("/").map(fn(part) { part.to_owned() }).collect()
+      ignore(parts.pop())
+      ([parts.join("/")], key + ".ksy")
+    }
+    for directory in directories {
+      guard project_path(directory, requested) is Some(candidate) else {
+        invalid(path, "import path leaves the project root")
+      }
+      if (graph.read)(candidate) is Some(source) {
+        return (candidate, Some(candidate), source)
+      }
+    }
+  }
+  invalid(path, "missing imported description '" + key + "'")
+}
+
+///|
 fn resolve_import(
   graph : SchemaImports,
+  from : String?,
   key : String,
-) -> String raise SchemaError {
+) -> (String, String) raise SchemaError {
   let path = "meta.imports." + key
-  guard !graph.active.contains(key) else {
-    invalid(path, "cyclic import: " + [..graph.active, key].join(" -> "))
+  let (file, location, source) = import_source(graph, from, key, path)
+  if graph.files.get(file) is Some(owner) {
+    return (if owner == "@root" { graph.root_id } else { owner }, owner)
   }
-  if graph.aliases.get(key) is Some(name) {
-    return name
-  }
-  guard graph.aliases.length() < 16 else {
+  guard graph.files.length() < 17 else {
     invalid(path, "at most 16 imported documents")
-  }
-  guard graph.sources.get(key) is Some(source) else {
-    invalid(path, "missing imported description '" + key + "'")
   }
   let document = document_mapping(source, path)
   check_keys(
@@ -102,7 +176,7 @@ fn resolve_import(
   check_keys(
     meta,
     [
-      "id", "endian", "bit-endian", "encoding", "imports", "title", "application",
+      "id", "endian", "encoding", "bit-endian", "imports", "title", "application",
       "file-extension", "xref", "license", "tags", "ks-version",
     ],
     path + ".meta",
@@ -110,18 +184,16 @@ fn resolve_import(
   let id = as_string(get_required(meta, "id", path), path + ".meta.id")
   check_identifier(id, path + ".meta.id")
   guard id != graph.root_id &&
-    !graph.aliases.values().any(fn(name) { name == id }) else {
+    !graph.files.values().any(fn(owner) { owner == id }) else {
     invalid(path, "imported module has a conflicting id '" + id + "'")
   }
-  graph.aliases[key] = id
-  graph.active.push(key)
-  defer ignore(graph.active.pop())
-  let dependencies = import_names(meta, path + ".meta.imports").map(fn(
-    key,
-  ) raise SchemaError {
-    resolve_import(graph, key)
-  })
-  graph.visibility[id] = dependencies
+  graph.files[file] = id
+  graph.visibility[id] = import_scope(
+    graph,
+    meta,
+    location,
+    path + ".meta.imports",
+  )
   let module_meta = Map([])
   for key in ["endian", "encoding", "bit-endian"] {
     if meta.get(key) is Some(value) {
@@ -131,7 +203,22 @@ fn resolve_import(
   let linked = document.copy()
   linked["meta"] = @yaml.Map(module_meta)
   graph.modules[id] = @yaml.Map(linked)
-  id
+  (id, id)
+}
+
+///|
+fn import_scope(
+  graph : SchemaImports,
+  meta : Map[String, @yaml.Yaml],
+  from : String?,
+  path : String,
+) -> Map[String, String] raise SchemaError {
+  let declarations = Map([])
+  for name in import_names(meta, path) {
+    let (id, owner) = resolve_import(graph, from, name)
+    declarations[id] = owner
+  }
+  declarations
 }
 
 ///|
@@ -140,22 +227,23 @@ fn link_imports(
   meta : Map[String, @yaml.Yaml],
   id : String,
   imports : Map[String, String],
-) -> (Map[String, @yaml.Yaml], Map[String, Array[String]]) raise SchemaError {
-  let names = import_names(meta, "meta.imports")
-  if names.is_empty() {
+  entry : String?,
+  search : Array[String],
+  read : (String) -> String?,
+) -> (Map[String, @yaml.Yaml], Map[String, Map[String, String]]) raise SchemaError {
+  if import_names(meta, "meta.imports").is_empty() {
     return (root, Map([]))
   }
   let graph : SchemaImports = {
-    sources: imports,
-    aliases: Map([]),
+    overrides: imports,
+    search,
+    read,
+    files: Map([(entry.unwrap_or("@entry"), "@root")]),
     modules: Map([]),
     visibility: Map([]),
-    active: [],
     root_id: id,
   }
-  graph.visibility["@root"] = names.map(fn(key) raise SchemaError {
-    resolve_import(graph, key)
-  })
+  graph.visibility["@root"] = import_scope(graph, meta, entry, "meta.imports")
   let types = match root.get("types") {
     Some(raw) => as_mapping(raw, "types").copy()
     None => Map([])

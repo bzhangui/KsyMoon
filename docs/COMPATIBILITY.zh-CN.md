@@ -89,6 +89,14 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 发布提交 `e04895a` 通过 MoonBit v0.10.19+97801ee1b 的四后端 CI。归档的 340 个文件与发布前检查及 Mooncakes 安装后的内容一致，归档 SHA-256 与注册表一致。全新模块安装后，六个解析器重新生成，源码哈希与 CI 一致。JS、Wasm、Wasm-GC、Native 各通过 25 项测试，其中 WAV 和 RIFF 保持与 Kaitai 0.11 的 4 个完整输入、246 个真前缀和递归限制检查。固定语料盘点结果仍为 160 份生成构建、179 份诊断、51 份有运行对照。 [源码标签](https://github.com/bzhangui/KsyMoon/tree/v0.4.0) · [发布版 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45344575642) · [发布复验证据](reports/mooncakes-0.4.0.json)
 
+## v0.5.0 开发版的模块与处理器
+
+`0.5.0-dev.1` 自动读取同项目内的相对、搜索根绝对和级联导入，保持显式映射接口。导入记录各自维护模块根、模块内父对象及子流，跨模块的惰性定位与条件递归纳入回归。兼容盘点按上游目录结构备齐依赖，再对同一批 339 份原样描述逐份生成、检查和构建。
+
+字节处理支持 `xor`、`rol`、`ror` 和 zlib。处理后子流使用独立读取边界，zlib 使用 MoonBit 标准库，并限制单块解压输出至 16 MiB。任意自定义处理器、动态字节序完整语义及其余类型和表达式覆盖继续按能力矩阵推进。
+
+固定上游的五个导入用例及十个处理器用例由 Kaitai 0.11 生成 Python 参考解析器。补充的 MoonBit 消费测试检查模块本地 `_root`、`_parent`、`instances.io` 的共享子流、递归深度和 zlib 校验和。 [复现脚本](../scripts/module-process-reference.py)
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -103,15 +111,16 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 ```powershell
 python -m pip install kaitaistruct==0.11
 node scripts/verify.mjs --kaitai-reference
+python scripts/module-process-reference.py
 python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
 ```
 
-第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。第二条脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
+第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。兼容盘点脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
 
-`generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。当前盘点为 **160 份生成、179 份保留诊断**，全部 339 份都保留结果。51 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P3—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
+`generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。v0.4.0 的固定盘点为 **160 份生成、179 份保留诊断**，全部 339 份都保留结果。51 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P3—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
 
-[最新固定语料报告](reports/kaitai-0.11-p4-2026-11-24.json)保留全部 339 行。WAV 与 RIFF 是额外的格式库用例，单独计入 [WAV/RIFF 报告](reports/wav-riff-2026-11-24.json)。
+[v0.4.0 固定语料报告](reports/kaitai-0.11-p4-2026-11-24.json)保留全部 339 行。WAV 与 RIFF 是额外的格式库用例，单独计入 [WAV/RIFF 报告](reports/wav-riff-2026-11-24.json)。
 
 ## 发布内容核验
 

@@ -40,6 +40,7 @@ priv struct ByteOptions {
   keep_terminator : Bool
   consume : Bool
   eos_error : Bool
+  processor : ByteProcessor?
 }
 
 ///|
@@ -89,7 +90,7 @@ priv struct Schema {
   records : Array[RecordDef]
   has_context : Bool
   recursive : Bool
-  imported_types : Array[String]
+  module_roots : Map[String, String]
   type_scopes : Map[String, Map[String, String]]
   enum_scopes : Map[String, Map[String, String]]
   enums : Map[String, EnumDef]
@@ -434,7 +435,7 @@ fn parse_field(
     [
       "id", "type", "size", "contents", "valid", "repeat", "repeat-expr", "doc",
       "enum", "doc-ref", "if", "repeat-until", "size-eos", "encoding", "terminator",
-      "pad-right", "include", "consume", "eos-error", "-orig-id",
+      "pad-right", "include", "consume", "eos-error", "-orig-id", "process",
     ],
     path,
   )
@@ -650,6 +651,9 @@ fn check_eager_type_cycles(
   active.push(name)
   defer ignore(active.pop())
   for field in record.fields {
+    if field.condition is Some(condition) && !(condition is Boolean(true)) {
+      continue
+    }
     for child in kind_references(field.kind) {
       check_eager_type_cycles(
         child,
@@ -667,6 +671,9 @@ fn check_eager_type_cycles(
 fn load_schema(
   source : String,
   imports~ : Map[String, String] = Map([]),
+  entry~ : String? = None,
+  search~ : Array[String] = [],
+  read~ : (String) -> String? = fn(_) { None },
 ) -> Schema raise SchemaError {
   let root = document_mapping(source, "schema")
   check_keys(
@@ -686,11 +693,13 @@ fn load_schema(
   let id = as_string(get_required(meta, "id", "schema.meta"), "meta.id")
   check_identifier(id, "meta.id")
   let endian = schema_endian(meta.get("endian"), "meta.endian")
-  let (root, imports_visibility) = link_imports(root, meta, id, imports)
+  let (root, imports_visibility) = link_imports(
+    root, meta, id, imports, entry, search, read,
+  )
   let type_scopes = Map([])
   let enum_scopes = Map([])
   let enums = Map([])
-  let imported_types = []
+  let module_roots = Map([])
   let root = flatten_types(
     inherit_read_defaults(root, Map([]), imports_visibility),
     "",
@@ -701,7 +710,7 @@ fn load_schema(
     enum_scopes,
     enums,
     imports_visibility,
-    imported_types,
+    module_roots,
   )
   let types = match root.get("types") {
     Some(value) => as_mapping(value, "types")
@@ -720,6 +729,9 @@ fn load_schema(
     }) ||
     raw_uses_context(root, types, [])
   let names = types.keys().collect()
+  if !imports_visibility.is_empty() {
+    names.push("@root")
+  }
   let definitions : Map[String, RecordDef] = Map([])
   for name, value in types {
     let path = "types.\{name}"
@@ -766,9 +778,11 @@ fn load_schema(
   }
   let reachable : Map[String, RecordDef] = Map([])
   let recursion = [false]
-  collect_records(root_record, definitions, [], reachable, recursion)
+  definitions["@root"] = root_record
+  collect_records(root_record, definitions, ["@root"], reachable, recursion)
   if recursion[0] {
     let checked = Map([])
+    check_eager_type_cycles("@root", root_record, definitions, [], checked)
     for name, record in reachable {
       check_eager_type_cycles(name, record, definitions, [], checked)
     }
@@ -780,17 +794,26 @@ fn load_schema(
     records: reachable.values().collect(),
     has_context,
     recursive,
-    imported_types,
+    module_roots,
     type_scopes,
     enum_scopes,
     enums,
   }
   let all_definitions : Schema = {
     root: root_record,
-    records: definitions.values().collect(),
+    records: definitions
+    .iter()
+    .filter_map(fn(entry) {
+      if entry.0 == "@root" {
+        None
+      } else {
+        Some(entry.1)
+      }
+    })
+    .collect(),
     has_context,
     recursive,
-    imported_types,
+    module_roots,
     type_scopes,
     enum_scopes,
     enums,

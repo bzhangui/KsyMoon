@@ -8,7 +8,11 @@ pub fn generate(source : String) -> String raise SchemaError {
 fn generate_schema(schema : Schema) -> String raise SchemaError {
   let needs_context = schema.has_context &&
     (
-      !context_all_expressions(schema).is_empty() ||
+      context_all_expressions(schema)
+      .iter()
+      .any(fn(value) {
+        context_has_reference(value) || expression_arithmetic(value)
+      }) ||
       [schema.root, ..schema.records]
       .iter()
       .any(fn(record) {
@@ -47,6 +51,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
   let mut has_byte_options = false
   let mut has_strings = false
   let mut has_open_repeats = false
+  let processors = []
   for record in records {
     has_instances = has_instances || !record.instances.is_empty()
     let fields = record.fields.copy()
@@ -85,6 +90,12 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
         has_stream_size = has_stream_size || expression_stream_size(expression)
       }
       for kind in walk_kinds(field.kind) {
+        if kind_processor(kind) is Some(processor) {
+          let name = processor_name(processor)
+          if !processors.contains(name) {
+            processors.push(name)
+          }
+        }
         if !(kind is Nested(_) ||
           kind is Switch(_, _, _, _) ||
           kind is BitInteger(_, _)) {
@@ -145,7 +156,9 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
     has_read_fields~,
     has_input=has_read_fields || has_stream_size || has_positions || has_bits,
     has_bits~,
+    has_process=processors.iter().any(fn(name) { name != "process_xor_mask" }),
   )
+  emit_processors(output, root_type, processors)
   for record in schema.records {
     let name = nested_reader(id, record.name)
     emit_record_reader(
@@ -232,11 +245,17 @@ fn pascal_case(name : String) -> String {
 
 ///|
 fn nested_type(root_type : String, name : String) -> String {
+  if name == "@root" {
+    return root_type + "Record"
+  }
   "\{root_type}_\{name}"
 }
 
 ///|
 fn nested_reader(id : String, name : String) -> String {
+  if name == "@root" {
+    return "read_" + id + "_root"
+  }
   "read_\{id}_type_\{name}"
 }
 
@@ -294,6 +313,7 @@ fn length_code(
   match expression {
     Constant(value) => "\{value}L"
     Remaining => "(reader.input.length() - reader.offset).to_int64()"
+    Calculated(Integer(value)) => "\{value}L"
     Calculated(value) => evaluate.unwrap()(value)
     EarlierField(name, 0L) => "\{prefix}\{name}.to_int64()"
     EarlierField(name, subtract) => "\{prefix}\{name}.to_int64() - \{subtract}L"

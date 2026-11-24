@@ -139,6 +139,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     has_context=true,
     has_bits=graph.bits,
   )
+  emit_processors(output, root, flags)
   if stream_values {
     context_emit_stream_value(output, root, graph.bits)
   }
@@ -153,6 +154,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     rollback,
     graph.bits,
     schema.recursive,
+    !graph.module_roots.is_empty(),
     expressions.iter().any(context_contains_index),
     !object_values.is_empty() || expressions.iter().any(context_contains_cast),
   )
@@ -236,7 +238,7 @@ fn context_emit_type(
   for field in record.fields {
     output.write_string("  \{field.name} : \{field_result_type(field, root)}\n")
   }
-  if owner != "@root" || !record.instances.is_empty() {
+  if owner != "@root" || graph.root_referenced || !record.instances.is_empty() {
     output.write_string("  priv _ksy_context : Int\n")
   }
   if !record.instances.is_empty() {
@@ -253,10 +255,11 @@ fn context_emit_type(
 ///|
 fn context_emit_record_state(
   output : StringBuilder,
+  graph : ContextGraph,
   owner : String,
   record : RecordDef,
 ) -> Unit {
-  if owner != "@root" || !record.instances.is_empty() {
+  if owner != "@root" || graph.root_referenced || !record.instances.is_empty() {
     output.write_string("    _ksy_context: context,\n")
   }
   if !record.instances.is_empty() {
@@ -286,8 +289,14 @@ fn context_emit_reader(
   }
   let effect = if raises { " raise " + root + "ParseError" } else { "" }
   let parameters = parameter_signature(record.parameters)
+  let module_args = if graph.module_roots.is_empty() {
+    ""
+  } else {
+    let module_owner = graph.module_roots.get(owner).unwrap_or("@root")
+    ", " + module_owner.escape() + ", " + (owner == module_owner).to_string()
+  }
   output.write_string(
-    "///|\nfn \{name}(reader : \{root}Reader, path : String, arena : \{root}Arena, parent : Int\{parameters}) -> \{context_type_name(root, owner)}\{effect} {\n  let context = arena.create(\{tag}, parent, reader, path)\n",
+    "///|\nfn \{name}(reader : \{root}Reader, path : String, arena : \{root}Arena, parent : Int\{parameters}) -> \{context_type_name(root, owner)}\{effect} {\n  let context = arena.create(\{tag}, parent, reader, path\{module_args})\n",
   )
   if body_raises {
     output.write_string("  errdefer { arena.release(context) }\n")
@@ -380,7 +389,7 @@ fn context_emit_reader(
   for field in record.fields {
     output.write_string("    \{field.name}: v_\{field.name},\n")
   }
-  context_emit_record_state(output, owner, record)
+  context_emit_record_state(output, graph, owner, record)
   output.write_string("  }\n}\n\n")
 }
 
@@ -631,6 +640,6 @@ fn context_emit_hydrator(
       "    \{field.name}: \{context_unpack_field(field, "frame.fields.get(" + field.name.escape() + ").unwrap_or(" + root + "Value::Absent)", root, "path", reader="frame.reader")},\n",
     )
   }
-  context_emit_record_state(output, name, record)
+  context_emit_record_state(output, graph, name, record)
   output.write_string("  }\n}\n\n")
 }

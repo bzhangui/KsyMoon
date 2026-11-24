@@ -43,6 +43,7 @@ jobs:
             exit 1
           fi
           node scripts/verify.mjs --kaitai-reference
+          python scripts/module-process-reference.py
           python scripts/compatibility-report.py --runtime-report
           node examples/quickstart/run.mjs --source --all-targets
           python scripts/wav-reference.py --all-scenarios
@@ -55,4 +56,5 @@ jobs:
             _build/compatibility-report.json
             _build/package-content-report.json
             _build/wav-reference-report.json
+            _build/module-process-report.json
           if-no-files-found: error

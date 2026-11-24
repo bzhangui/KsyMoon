@@ -37,6 +37,30 @@ moon -C examples/consumer run --target js .
 
 `check INPUT.ksy` 只校验描述。通过时返回状态 0，输入无法读取或描述超出支持范围时返回非零状态并打印诊断。库接口提供 `validate(source)` 和 `generate(source)`。
 
+## 多文件描述和字节处理器
+
+`0.5.0-dev.1` 允许 CLI 自动加载 `meta.imports`。相对路径从声明所在文件的目录查找，以 `/` 开头的描述依次查找 `-I` 目录和项目根目录。目录需要位于 `--root` 内。省略 `--root` 时使用输入描述所在目录。已有的 `--import NAME FILE.ksy` 可以显式覆盖指定名称。
+
+```powershell
+moon run --target js cmd/ksymoon -- generate formats/media/wav.ksy --root formats --out wav.mbt
+```
+
+库的 `generate_project` 和 `validate_project` 接收项目根下的入口相对路径、搜索目录和读取函数。导入子流的 `_root` 指向该次导入模块的根，模块内的 `_parent` 指向所属对象。可终止的递归引用受 64 层读取深度约束。
+
+`process` 支持 `xor`、`rol`、`ror` 与 `zlib`。原始字段先完成字节边界读取，再处理字节，用户类型在处理结果的独立子流中解析。XOR 支持单字节值、字节数组常量和先前读取的字节字段。zlib 解压使用 MoonBit 标准库，单块解压上限为 16 MiB。使用 zlib 的生成包需要声明以下依赖。
+
+```moonbit
+import { "moonbitlang/core/compress/zlib" @ksy_zlib }
+options("allow-experimental-packages": ["moonbitlang/core/compress/zlib"])
+```
+
+库、生成代码和消费断言使用 MoonBit。CLI 的 Node 适配负责文件访问和退出状态。官方对照运行原样描述、二进制样本和 Python 测试，涵盖相对及绝对导入、条件递归、跨模块定位和处理后的子流。
+
+```powershell
+python -m pip install kaitaistruct==0.11
+python scripts/module-process-reference.py
+```
+
 ## WAV 与 RIFF
 
 安装 Java 21、Python、Node.js 24 与 MoonBit v0.10.19，在本仓库运行：

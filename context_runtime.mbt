@@ -29,6 +29,9 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
         add("items")
       }
       for kind in walk_kinds(field.kind) {
+        if kind_processor(kind) is Some(processor) {
+          add(processor_name(processor))
+        }
         match kind {
           ByteField(_) | Contents(_) => add("binary")
           Text(_, _) => add("text")
@@ -55,6 +58,7 @@ fn context_emit_runtime(
   rollback : Bool,
   bits : Bool,
   recursive : Bool,
+  modules : Bool,
   index : Bool,
   objects : Bool,
 ) -> Unit {
@@ -87,7 +91,7 @@ fn context_emit_runtime(
     #|  cache : Map[String, __ROOT__Value]
     #|  partial : Map[String, __ROOT__Value]
     #|__BUSY_FIELD__
-    #|__DEPTH_FIELD____ACCOUNT_FIELD__}
+    #|__DEPTH_FIELD____ACCOUNT_FIELD____MODULE_FIELDS__}
     #|
     #|///|
     #|priv struct __ROOT__Arena {
@@ -104,13 +108,13 @@ fn context_emit_runtime(
     #|}
     #|
     #|///|
-    #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, __PATH_ARG__ : String) -> Int__CREATE_EFFECT__ {
-    #|__DEPTH_CHECK__  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____DEPTH_INIT____ACCOUNT_INIT__ }
+    #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, __PATH_ARG__ : String__MODULE_ARG__) -> Int__CREATE_EFFECT__ {
+    #|__DEPTH_CHECK____MODULE_SETUP__  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____DEPTH_INIT____ACCOUNT_INIT____MODULE_INIT__ }
     #|  let context = match self.free.pop() {
     #|    Some(context) => { self.frames[context] = Some(frame); context }
     #|    None => { self.frames.push(Some(frame)); self.frames.length() - 1 }
     #|  }
-    #|  if parent >= 0 { self.frames[parent].unwrap().children.push(context) }
+    #|__MODULE_ROOT__  if parent >= 0 { self.frames[parent].unwrap().children.push(context) }
     #|  context
     #|}
     #|
@@ -143,7 +147,7 @@ fn context_emit_runtime(
     )
     .replace_all(
       old="__PATH_ARG__",
-      new=if has_instances { "path" } else { "_path" },
+      new=if has_instances || recursive { "path" } else { "_path" },
     )
     .replace_all(
       old="__PATH_INIT__",
@@ -165,6 +169,43 @@ fn context_emit_runtime(
       old="__ACCOUNT_INIT__",
       new=if accounting {
         ", account: reader.budget[reader.budget[1] - 1]"
+      } else {
+        ""
+      },
+    )
+  let block = block
+    .replace_all(
+      old="__MODULE_FIELDS__",
+      new=if modules {
+        "  module_id : String\n  mut module_root : Int\n  logical_parent : Int\n"
+      } else {
+        ""
+      },
+    )
+    .replace_all(
+      old="__MODULE_ARG__",
+      new=if modules { ", module_id : String, module_entry : Bool" } else { "" },
+    )
+    .replace_all(
+      old="__MODULE_SETUP__",
+      new=if modules {
+        "  let same_module = parent >= 0 && self.frames[parent].unwrap().module_id == module_id\n"
+      } else {
+        ""
+      },
+    )
+    .replace_all(
+      old="__MODULE_INIT__",
+      new=if modules {
+        ", module_id, module_root: if same_module { self.frames[parent].unwrap().module_root } else { -1 }, logical_parent: if same_module { parent } else { -1 }"
+      } else {
+        ""
+      },
+    )
+    .replace_all(
+      old="__MODULE_ROOT__",
+      new=if modules {
+        "  if !same_module && module_entry { frame.module_root = context }\n"
       } else {
         ""
       },
@@ -206,8 +247,8 @@ fn context_emit_runtime(
     #|      let frame = arena.frame(context, field)
     #|      match name {
     #|        "_io" => Source(frame.reader)
-    #|        "_root" => ObjectId(0)
-    #|        "_parent" => if frame.parent < 0 { Absent } else { ObjectId(frame.parent) }
+    #|        "_root" => __LOGICAL_ROOT__
+    #|        "_parent" => if frame.__LOGICAL_PARENT__ < 0 { Absent } else { ObjectId(frame.__LOGICAL_PARENT__) }
     #|        _ => arena.attribute(context, name, field)
     #|      }
     #|    }
@@ -258,6 +299,18 @@ fn context_emit_runtime(
     output,
     block
     .replace_all(old="__EXTRA_CASES__", new=extra.to_string()[:])
+    .replace_all(
+      old="__LOGICAL_ROOT__",
+      new=if modules {
+        "if frame.module_root < 0 { Absent } else { ObjectId(frame.module_root) }"
+      } else {
+        "ObjectId(0)"
+      },
+    )
+    .replace_all(
+      old="__LOGICAL_PARENT__",
+      new=if modules { "logical_parent" } else { "parent" },
+    )
     .replace_all(
       old="__BIT_EOF__",
       new=if bits { "reader.bits_left == 0 && " } else { "" },

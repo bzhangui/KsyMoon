@@ -45,7 +45,7 @@ fn byte_read_code(
     Some(length) => length_code(length, in_instance=instance, evaluate~)
     None => "-1L"
   }
-  if options.terminator is None && options.padding is None {
+  let raw = if options.terminator is None && options.padding is None {
     "reader.take(\{length}, \{path})"
   } else {
     let term = match options.terminator {
@@ -62,6 +62,10 @@ fn byte_read_code(
       None => "-1"
     }
     "reader.read_bytes(\{length}, \{options.length is None}, \{term}, \{pad}, \{options.keep_terminator}, \{options.consume}, \{options.eos_error}, \{unit}, \{big_endian}, \{path})"
+  }
+  match options.processor {
+    Some(processor) => processor_code(processor, raw, path, evaluate)
+    None => raw
   }
 }
 

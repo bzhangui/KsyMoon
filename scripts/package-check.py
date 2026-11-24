@@ -41,7 +41,7 @@ def main():
         required = {path.name for path in ROOT.glob("*.mbt")}
         required.update({"moon.mod", "moon.pkg", "LICENSE", "README.md", "cmd/ksymoon/main.mbt", "cmd/ksymoon/moon.pkg", "fixtures/kaitai/LICENSE"})
         required.update({
-            "scripts/wav-reference.py", "scripts/kaitai-reference.py",
+            "scripts/wav-reference.py", "scripts/kaitai-reference.py", "scripts/module-process-reference.py",
             "fixtures/udp_datagram.ksy", "fixtures/stl.ksy", "fixtures/stm32_sample_frame.ksy",
             "fixtures/vp8_duck_ivf.ksy",
         })

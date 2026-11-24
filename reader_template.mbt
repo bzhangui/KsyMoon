@@ -18,6 +18,7 @@ fn emit_reader(
   has_input~ : Bool,
   has_context~ : Bool = false,
   has_bits~ : Bool = false,
+  has_process~ : Bool = false,
 ) -> Unit {
   let validation_error = if has_validation {
     "  __ROOT__InvalidValue(field~ : String, offset~ : Int, value~ : Int64, minimum~ : Int64, maximum~ : Int64)\n"
@@ -97,7 +98,7 @@ fn emit_reader(
     #|
   let header = header.replace_all(
     old="__ARITHMETIC_ERROR__",
-    new=((if has_context {
+    new=((if has_context || has_process {
         "  __ROOT__ContextError(field~ : String, offset~ : Int, message~ : String)\n"
       } else {
         ""
