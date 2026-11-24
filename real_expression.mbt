@@ -54,6 +54,14 @@ fn context_uses_integer_arithmetic(
   expr : Expr,
 ) -> Bool raise SchemaError {
   match expr {
+    ArrayLiteral(items) => {
+      for item in items {
+        if context_uses_integer_arithmetic(scope, item) {
+          return true
+        }
+      }
+      false
+    }
     Binary(op, left, right) => {
       let arithmetic = ["+", "-", "*", "/", "%", "<<", ">>"].contains(op)
       (arithmetic && !context_real_binary(scope, left, right)) ||
@@ -116,6 +124,9 @@ fn context_integer_helpers(graph : ContextGraph) -> Bool raise SchemaError {
         index_allowed=field.count is Some(_),
       )
       let values = context_kind_expressions(field.kind)
+      if field.predicate is Some(value) {
+        values.push(value)
+      }
       if field.condition is Some(value) {
         values.push(value)
       }

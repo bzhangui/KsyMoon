@@ -20,6 +20,18 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
               expression,
             ) {
             Text => add("text")
+            Bytes => add("binary")
+            WideInteger => add("wide")
+            Sequence(element) => {
+              add("items")
+              match element {
+                Real => add("real")
+                Text => add("text")
+                Bytes => add("binary")
+                WideInteger => add("wide")
+                _ => ()
+              }
+            }
             Real => add("real")
             _ => ()
           }
@@ -45,7 +57,22 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
       }
     }
   }
-  if context_all_expressions(schema).iter().any(context_contains_endpoint) {
+  let expressions = context_all_expressions(schema)
+  if expressions
+    .iter()
+    .any(fn(expr) {
+      expression_any(expr, fn(value) { value is ArrayLiteral(_) })
+    }) {
+    add("items")
+  }
+  if expressions
+    .iter()
+    .any(fn(expr) {
+      expression_any(expr, fn(value) { value is Member(_, "min" | "max") })
+    }) {
+    add("sequence_extremes")
+  }
+  if expressions.iter().any(context_contains_endpoint) {
     flags.push("sequence_endpoints")
   }
   if context_all_expressions(schema).iter().any(context_contains_wide_cast) &&
@@ -306,6 +333,16 @@ fn context_emit_runtime(
   if flags.contains("real") {
     extra.write_string("    RealValue(value) => { ignore(value); Absent }\n")
   }
+  if flags.contains("binary") && flags.contains("sequence_extremes") {
+    extra.write_string(
+      "    Binary(bytes) if (name == \"min\" || name == \"max\") && !bytes.is_empty() => {\n      let mut best = bytes[0]\n      for byte in bytes { if (name == \"min\" && byte < best) || (name == \"max\" && byte > best) { best = byte } }\n      Number(best.to_int64())\n    }\n",
+    )
+  }
+  if flags.contains("items") && flags.contains("sequence_extremes") {
+    extra.write_string(
+      "    Items(items) if name == \"min\" || name == \"max\" => self.extreme(items, name == \"min\")\n",
+    )
+  }
   if flags.contains("binary") {
     extra.write_string(
       if flags.contains("sequence_endpoints") {
@@ -346,6 +383,9 @@ fn context_emit_runtime(
     ),
     root,
   )
+  if flags.contains("items") && flags.contains("sequence_extremes") {
+    emit_sequence_extremes(output, root, flags)
+  }
   if objects {
     let selected = if flags.contains("selected") {
       "    Selected(_, value) => value.object_id()\n"
@@ -424,11 +464,15 @@ fn context_all_expressions(schema : Schema) -> Array[Expr] {
     }
     for field in fields {
       expressions.append(context_kind_expressions(field.kind))
+      if field.predicate is Some(value) && !plain_predicate(field) {
+        expressions.push(value)
+      }
       if field.condition is Some(value) {
         expressions.push(value)
       }
       match field.count {
-        Some(Times(Calculated(value))) | Some(Until(value)) =>
+        Some(Times(Calculated(value))) => expressions.push(value)
+        Some(Until(value)) if !plain_byte_until(value) =>
           expressions.push(value)
         _ => ()
       }

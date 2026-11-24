@@ -70,6 +70,7 @@ priv struct Field {
   kind : FieldKind
   count : Repetition?
   validation : ScalarCheck?
+  predicate : Expr?
   condition : Expr?
 }
 
@@ -507,14 +508,11 @@ fn parse_field(
         "expected expr/repeat-expr, eos, or until/repeat-until",
       )
   }
-  let validation = match field.get("valid") {
-    None => None
-    Some(value) => {
-      guard count is None else {
-        invalid(path + ".valid", "only scalar fields support 'valid'")
-      }
-      Some(parse_scalar_check(value, kind, path + ".valid"))
-    }
+  let (validation, predicate) = match field.get("valid") {
+    None => (None, None)
+    Some(value) if count is None && scalar_validation(kind, value) =>
+      (Some(parse_scalar_check(value, kind, path + ".valid")), None)
+    Some(value) => (None, Some(validation_expression(value, path + ".valid")))
   }
   let condition = if navigation {
     field
@@ -543,7 +541,7 @@ fn parse_field(
   } else {
     kind
   }
-  { name, kind, count, validation, condition, }
+  { name, kind, count, validation, predicate, condition, }
 }
 
 ///|

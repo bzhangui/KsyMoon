@@ -11,6 +11,7 @@ fn emit_reader(
   has_repeated_fields~ : Bool,
   has_contents~ : Bool,
   has_validation~ : Bool,
+  has_predicates~ : Bool = false,
   has_instances~ : Bool,
   has_positions~ : Bool,
   has_arithmetic~ : Bool,
@@ -27,6 +28,12 @@ fn emit_reader(
   } else {
     ""
   }
+  let validation_error = validation_error +
+    (if has_predicates {
+      "  __ROOT__ValidationMismatch(field~ : String, offset~ : Int)\n"
+    } else {
+      ""
+    })
   let bit_error = if has_bits {
     "  __ROOT__BitOrder(field~ : String, offset~ : Int)\n"
   } else {

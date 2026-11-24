@@ -57,7 +57,8 @@ fn instance_reference(record : RecordDef, name : String) -> String {
     .unwrap()
   match instance.kind {
     Value(_) => "self.\{name}()"
-    Parsed({ kind: Text(_, _) | BitInteger(1, _), .. }, _) => "self.\{name}()"
+    Parsed({ kind: Text(_, _) | BitInteger(1, _) | Signed64(_), .. }, _) =>
+      "self.\{name}()"
     Parsed(_, _) => "self.\{name}().to_int64()"
   }
 }

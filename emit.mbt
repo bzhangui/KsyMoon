@@ -45,6 +45,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
   let mut has_repeated_fields = false
   let mut has_contents = false
   let mut has_validation = false
+  let mut has_predicates = false
   let mut has_instances = false
   let mut has_positions = false
   let mut has_arithmetic = false
@@ -79,6 +80,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
       }
     }
     for field in fields {
+      has_predicates = has_predicates || field.predicate is Some(_)
       if field.condition is Some(condition) {
         has_arithmetic = has_arithmetic || expression_arithmetic(condition)
         has_stream_size = has_stream_size || expression_stream_size(condition)
@@ -155,6 +157,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
     has_repeated_fields~,
     has_contents~,
     has_validation~,
+    has_predicates~,
     has_instances~,
     has_positions~,
     has_arithmetic~,

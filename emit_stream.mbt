@@ -24,7 +24,8 @@ fn record_reference(
 ) -> String {
   let prefix = if instance { "self." } else { "v_" }
   let field = record.fields.iter().find_first(fn(f) { f.name == name })
-  let suffix = if field is Some({ kind: Text(_, _) | BitInteger(1, _), .. }) {
+  let suffix = if field
+    is Some({ kind: Text(_, _) | BitInteger(1, _) | Signed64(_), .. }) {
     ""
   } else {
     ".to_int64()"
@@ -184,6 +185,11 @@ fn emit_field_read(
       output.write_string(
         "  let \{target} = \{read_code(field.kind, id, path, in_instance=instance, reference~, evaluate~, parent_context~, bits~)}\n",
       )
+      if field.predicate is Some(predicate) {
+        output.write_string(
+          "  { let item = \{target}; ignore(item); guard \{predicate_code(field, predicate, path, evaluate)} else { raise \{pascal_case(id)}ValidationMismatch(field=\{path}, offset=reader.offset) } }\n",
+        )
+      }
       if field.validation is Some(check) {
         output.write_string(
           "  reader.check_scalar(\{target}.to_int64(), \{check.width.to_int()}, \{check.minimum}L, \{check.maximum}L, \{path})\n",
@@ -239,20 +245,28 @@ fn emit_field_read(
         )
       }
       output.write_string(
-        "    let item = \{read_code(field.kind, id, "item_path", in_instance=instance, reference~, evaluate~, parent_context~, bits~)}\n    \{target}.push(item)\n",
+        "    let item = \{read_code(field.kind, id, "item_path", in_instance=instance, reference~, evaluate~, parent_context~, bits~)}\n",
       )
+      if field.predicate is Some(predicate) {
+        output.write_string(
+          "    guard \{predicate_code(field, predicate, "item_path", evaluate)} else { raise \{pascal_case(id)}ValidationMismatch(field=item_path, offset=reader.offset) }\n",
+        )
+      }
+      output.write_string("    \{target}.push(item)\n")
       if publish_items is Some((_, after)) {
         output.write_string(after)
       }
       if repeat is Until(expression) {
         let predicate = match evaluate {
+          _ if plain_byte_until(expression) =>
+            plain_predicate_code(field.kind, expression, "item_path")
           Some(evaluate) => evaluate(expression)
           None =>
             expression_code(
               expression,
               fn(name) {
                 if name == "_" {
-                  if field.kind is Text(_, _) || field.kind is BitInteger(1, _) {
+                  if field.kind is (Text(_, _) | BitInteger(1, _) | Signed64(_)) {
                     "item"
                   } else {
                     "item.to_int64()"

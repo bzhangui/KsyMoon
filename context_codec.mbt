@@ -16,6 +16,11 @@ fn context_unpack_expression(
   path : String,
   reader : String,
 ) -> String {
+  if kind is Sequence(element) {
+    let item = context_unpack_expression(element, "item", root, path, reader)
+    let error = context_error(root, path, reader~)
+    return "(match \{value} { \{root}Value::Items(items) => items.map(fn(item) raise \{root}ParseError { \{item} }); _ => { \{error} } })"
+  }
   let variant = match kind {
     Integer | Enum(_) => "Number"
     WideInteger => "Wide"
@@ -39,6 +44,25 @@ fn context_value_code(
   owner_reader : String,
 ) -> String raise SchemaError {
   match expression {
+    ArrayLiteral(values) => {
+      let kind = context_expression_type(scope, expression)
+      let items = values.map(fn(value) raise SchemaError {
+        if kind == Sequence(Real) &&
+          context_expression_type(scope, value) == Integer {
+          let code = context_expression_code(
+            scope,
+            value,
+            root,
+            path,
+            owner_reader~,
+          )
+          "\{root}Value::RealValue((\{code}).to_double())"
+        } else {
+          context_value_code(scope, value, root, path, owner_reader)
+        }
+      })
+      "\{root}Value::Items([\{items.join(", ")}])"
+    }
     Reference("_root") if scope.graph.module_roots.is_empty() =>
       "\{root}Value::ObjectId(0)"
     Reference("_parent") =>
@@ -101,6 +125,9 @@ fn context_value_code(
     }
     ToEnum(value, _) =>
       context_value_code(scope, value, root, path, owner_reader)
+    Member(base, "size") if context_expression_type(scope, base)
+      is (Sequence(_) | Bytes) =>
+      "\{context_value_code(scope, base, root, path, owner_reader)}.attribute(arena, \"length\", \{path})"
     Member(base, "to_i") if context_expression_type(scope, base) is Enum(_) =>
       context_value_code(scope, base, root, path, owner_reader)
     Member(base, "to_s") if context_expression_type(scope, base) is Integer =>
@@ -149,7 +176,8 @@ fn context_expression_code(
     | Cast(_, _)
     | Decode(_, _)
     | EnumLiteral(_, _)
-    | ToEnum(_, _) =>
+    | ToEnum(_, _)
+    | ArrayLiteral(_) =>
       context_unpack_expression(
         kind,
         context_value_code(scope, expression, root, path, owner_reader),
@@ -159,6 +187,8 @@ fn context_expression_code(
       )
     Unary(op, child) if kind == Real =>
       "(\{op}\{context_expression_code(scope, child, root, path, owner_reader~)})"
+    Binary(op, left, right) if lexical_binary(scope, op, left) =>
+      context_lexical_code(scope, op, left, right, root, path, owner_reader)
     Binary(op, left, right) if context_real_binary(scope, left, right) =>
       context_real_code(scope, op, left, right, root, path, owner_reader)
     Choose(condition, yes, no) =>
@@ -354,12 +384,15 @@ fn context_instance_result(
         Integer => "Int64"
         Boolean => "Bool"
         Text => "String"
+        Bytes => "BytesView"
+        WideInteger => "UInt64"
         Real => "Double"
+        Sequence(element) =>
+          "Array[" + expression_result_type(element, instance.name) + "]"
         Stream => root + "Stream"
         Enum(name) => generated_enum_type(root, name)
         Object([name]) => context_type_name(root, name)
         Object(_) => context_choice_type(root, owner, instance.name)
-        _ => invalid(instance.name, "value instance type awaits implementation")
       }
     }
   }
@@ -431,7 +464,8 @@ fn context_has_reference(expression : Expr) -> Bool {
     | Cast(_, _)
     | Decode(_, _)
     | EnumLiteral(_, _)
-    | ToEnum(_, _) => true
+    | ToEnum(_, _)
+    | ArrayLiteral(_) => true
     Unary(_, child) => context_has_reference(child)
     Binary(_, a, b) => context_has_reference(a) || context_has_reference(b)
     Choose(a, b, c) =>
@@ -470,6 +504,7 @@ fn context_record_raises(
   .any(fn(field) {
     field.count is Some(_) ||
     field.validation is Some(_) ||
+    field.predicate is Some(_) ||
     (
       field.condition is Some(value) &&
       (context_has_reference(value) || expression_arithmetic(value))
@@ -509,6 +544,13 @@ fn context_expression_parts(
   navigation : Array[(Expr, String)],
 ) -> Unit raise SchemaError {
   match expression {
+    Binary(op, left, right) if lexical_binary(scope, op, left) =>
+      navigation.push(
+        (
+          expression,
+          context_lexical_code(scope, op, left, right, root, path, reader),
+        ),
+      )
     Binary(op, left, right) if context_real_binary(scope, left, right) =>
       navigation.push(
         (
@@ -542,7 +584,8 @@ fn context_expression_parts(
     | Cast(_, _)
     | Decode(_, _)
     | EnumLiteral(_, _)
-    | ToEnum(_, _) =>
+    | ToEnum(_, _)
+    | ArrayLiteral(_) =>
       navigation.push(
         (
           expression,
@@ -618,6 +661,9 @@ fn context_field_evaluator(
   reader~ : String = "reader",
 ) -> ((Expr) -> String) raise SchemaError {
   let expressions = context_kind_expressions(field.kind)
+  if field.predicate is Some(value) {
+    expressions.push(value)
+  }
   if field.condition is Some(value) {
     expressions.push(value)
   }

@@ -39,6 +39,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
   let mut repeated = false
   let mut contents = false
   let mut validation = false
+  let mut predicates = false
   let mut positions = false
   let mut reads = false
   let mut bounded = false
@@ -57,6 +58,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
       repeated = repeated || field.count is Some(_)
       open_repeats = open_repeats || field.count is Some(ToEnd)
       validation = validation || field.validation is Some(_)
+      predicates = predicates || field.predicate is Some(_)
       for kind in walk_kinds(field.kind) {
         reads = reads ||
           (
@@ -133,6 +135,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     has_repeated_fields=repeated,
     has_contents=contents,
     has_validation=validation,
+    has_predicates=predicates,
     has_instances~,
     has_positions=positions,
     has_arithmetic=context_integer_helpers(graph),

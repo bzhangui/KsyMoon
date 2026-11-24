@@ -36,6 +36,10 @@ fn raw_uses_context(
   }
   for field in fields {
     if field is @yaml.Map(properties) {
+      if properties.get("valid") is Some(value) &&
+        raw_predicate_validation(properties, value) {
+        return true
+      }
       if properties.contains("enum") ||
         properties.contains("process") ||
         (
@@ -113,7 +117,9 @@ fn expression_needs_context(expression : Expr) -> Bool {
     | Cast(_, _)
     | Decode(_, _)
     | EnumLiteral(_, _)
-    | ToEnum(_, _) => true
+    | ToEnum(_, _)
+    | ArrayLiteral(_)
+    | ByteLiteral(_) => true
     Reference("_root" | "_parent" | "_io") => true
     Unary(_, value) => expression_needs_context(value)
     Binary(_, left, right) =>
@@ -407,9 +413,10 @@ fn context_member_type(
         scope.path,
       )
     }
-    Sequence(_) | Bytes if name == "length" => Integer
-    Sequence(element) if name == "first" || name == "last" => element
-    Bytes if name == "first" || name == "last" => Integer
+    Sequence(_) | Bytes if name == "length" || name == "size" => Integer
+    Sequence(element) if ["first", "last", "min", "max"].contains(name) =>
+      element
+    Bytes if ["first", "last", "min", "max"].contains(name) => Integer
     Enum(_) if name == "to_i" => Integer
     Integer if name == "to_s" => Text
     _ =>
@@ -443,6 +450,21 @@ fn context_expression_type(
   expression : Expr,
 ) -> ExprType raise SchemaError {
   match expression {
+    ArrayLiteral(values) => {
+      let kinds = values.map(fn(value) raise SchemaError {
+        context_expression_type(scope, value)
+      })
+      let element = if kinds.iter().any(fn(kind) { kind == Real }) &&
+        kinds.iter().all(fn(kind) { kind == Real || kind == Integer }) {
+        Real
+      } else {
+        context_merge(kinds, scope.path)
+      }
+      guard element is (Integer | Real | Boolean | Text | Bytes | WideInteger) else {
+        invalid(scope.path, "array literal requires scalar elements")
+      }
+      Sequence(element)
+    }
     Decode(bytes, encoding) => {
       context_require(scope, bytes, Bytes)
       guard ["UTF-8", "UTF8", "ASCII", "UTF-16LE", "UTF-16BE"].contains(
@@ -523,28 +545,73 @@ fn context_expression_type(
         scope.path,
       )
     }
-    Unary("+" | "-", value) if context_expression_type(scope, value) == Real =>
-      Real
-    Binary(op, left, right) if context_real_binary(scope, left, right) =>
-      match op {
-        "+" | "-" | "*" | "/" => Real
-        "==" | "!=" | "<" | "<=" | ">" | ">=" => Boolean
-        _ => invalid(scope.path, "operator is unsupported for real operands")
+    Unary(op, value) => {
+      let kind = context_expression_type(scope, value)
+      if op == "not" {
+        guard kind == Boolean else {
+          invalid(scope.path, "logical operand must be boolean")
+        }
+      } else {
+        guard kind == Integer || (kind == Real && (op == "+" || op == "-")) else {
+          invalid(scope.path, "unary operator needs a numeric operand")
+        }
       }
-    Binary("==" | "!=", left, right) => {
-      let kind = context_expression_type(scope, left)
-      guard kind == Integer ||
-        kind == Boolean ||
-        kind == Text ||
-        kind == Bytes ||
-        kind is Enum(_) else {
-        invalid(
-          scope.path,
-          "comparison of this value type awaits implementation",
-        )
+      kind
+    }
+    Binary(op, left, right) => {
+      let a = context_expression_type(scope, left)
+      let b = context_expression_type(scope, right)
+      if a == Real || b == Real {
+        ignore(context_real_binary(scope, left, right))
+        match op {
+          "+" | "-" | "*" | "/" => Real
+          "==" | "!=" | "<" | "<=" | ">" | ">=" => Boolean
+          _ => invalid(scope.path, "operator is unsupported for real operands")
+        }
+      } else {
+        guard a == b else {
+          invalid(scope.path, "expression operands have different types")
+        }
+        match op {
+          "and" | "or" => {
+            guard a == Boolean else {
+              invalid(scope.path, "logical operands must be boolean")
+            }
+            Boolean
+          }
+          "==" | "!=" => {
+            guard a
+              is (Integer
+              | WideInteger
+              | Boolean
+              | Text
+              | Bytes
+              | Enum(_)
+              | Sequence(_)) else {
+              invalid(
+                scope.path,
+                "comparison of this value type awaits implementation",
+              )
+            }
+            Boolean
+          }
+          "<" | "<=" | ">" | ">=" => {
+            guard a is (Integer | WideInteger | Text | Bytes) else {
+              invalid(
+                scope.path,
+                "ordering requires numeric, string or binary values",
+              )
+            }
+            Boolean
+          }
+          _ => {
+            guard a == Integer else {
+              invalid(scope.path, "operator requires integer operands")
+            }
+            Integer
+          }
+        }
       }
-      context_require(scope, right, kind)
-      Boolean
     }
     _ =>
       expression_type(
@@ -668,6 +735,20 @@ fn check_context_field(
     index_allowed=field.count is Some(_),
   )
   check_context_kind(item_scope, field.kind)
+  if field.predicate is Some(predicate) {
+    context_require(
+      context_scope(
+        scope.graph,
+        scope.owner,
+        scope.path,
+        earlier=scope.earlier,
+        item=Some(field.kind),
+        index_allowed=field.count is Some(_),
+      ),
+      predicate,
+      Boolean,
+    )
+  }
   if field.count is Some(Until(expression)) {
     context_require(
       context_scope(
@@ -730,8 +811,11 @@ fn check_context_schema(schema : Schema) -> Unit raise SchemaError {
           guard kind == Integer ||
             kind == Boolean ||
             kind == Text ||
+            kind == Bytes ||
+            kind == WideInteger ||
             kind == Real ||
             kind is Stream ||
+            kind is Sequence(_) ||
             kind is Object(_) ||
             kind is Enum(_) else {
             invalid(scope.path, "value instance type awaits implementation")

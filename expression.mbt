@@ -4,6 +4,7 @@ priv enum Expr {
   RealLiteral(Double)
   Text(String)
   ByteLiteral(Bytes)
+  ArrayLiteral(Array[Expr])
   Boolean(Bool)
   Reference(String)
   Member(Expr, String)
@@ -173,14 +174,10 @@ fn ExprParser::parse(
       value
     }
     "[" => {
-      let bytes = []
+      let items = []
       if self.peek() != "]" {
         while true {
-          let byte = self.parse(1)
-          guard byte is Integer(value) && value >= 0L && value <= 255L else {
-            invalid(self.path, "expected a byte literal in 0..255")
-          }
-          bytes.push(value.to_byte())
+          items.push(self.parse(1))
           if self.peek() != "," {
             break
           }
@@ -189,7 +186,20 @@ fn ExprParser::parse(
       }
       guard self.peek() == "]" else { invalid(self.path, "expected ']'") }
       self.index += 1
-      ByteLiteral(Bytes::from_array(bytes[:]))
+      if items
+        .iter()
+        .all(fn(item) { item is Integer(value) && value >= 0L && value <= 255L }) {
+        ByteLiteral(
+          Bytes::makei(items.length(), fn(index) {
+            match items[index] {
+              Integer(value) => value.to_byte()
+              _ => abort("invalid byte literal")
+            }
+          }),
+        )
+      } else {
+        ArrayLiteral(items)
+      }
     }
     "-" if self.peek() == "9223372036854775808" => {
       self.index += 1
@@ -351,6 +361,8 @@ fn parse_expression(
 ) -> Expr raise SchemaError {
   match value {
     @yaml.Integer(value) => Integer(value)
+    @yaml.Real(value, ..) => RealLiteral(value)
+    @yaml.Array(_) => ByteLiteral(parse_contents(value, path))
     @yaml.Boolean(value) => Boolean(value)
     @yaml.String(source) => {
       let parser : ExprParser = {
@@ -417,7 +429,8 @@ fn expression_type(
     | Cast(_, _)
     | Decode(_, _)
     | EnumLiteral(_, _)
-    | ToEnum(_, _) =>
+    | ToEnum(_, _)
+    | ArrayLiteral(_) =>
       match navigation {
         Some(resolve) => resolve(expression)
         None => invalid(path, "object navigation awaits implementation")
@@ -536,7 +549,8 @@ fn expression_code(
     | Cast(_, _)
     | Decode(_, _)
     | EnumLiteral(_, _)
-    | ToEnum(_, _) => navigation.unwrap()(expression)
+    | ToEnum(_, _)
+    | ArrayLiteral(_) => navigation.unwrap()(expression)
     StreamPosition => "\{stream_reader}.offset.to_int64()"
     StreamSize => "\{stream_reader}.input.length().to_int64()"
     StreamEof =>
@@ -654,6 +668,8 @@ fn expression_any(expr : Expr, predicate : (Expr) -> Bool) -> Bool {
     return true
   }
   match expr {
+    ArrayLiteral(items) =>
+      items.iter().any(fn(item) { expression_any(item, predicate) })
     Member(base, _)
     | Cast(base, _)
     | Decode(base, _)
