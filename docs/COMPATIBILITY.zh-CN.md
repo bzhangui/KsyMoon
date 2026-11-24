@@ -97,6 +97,8 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 固定上游的五个导入用例及十个处理器用例由 Kaitai 0.11 生成 Python 参考解析器。补充的 MoonBit 消费测试检查模块本地 `_root`、`_parent`、`instances.io` 的共享子流、递归深度和 zlib 校验和。 [复现脚本](../scripts/module-process-reference.py)
 
+固定语料已通过 **188 份生成并在四后端构建**，较 v0.4.0 增加 28 份，151 份保留诊断。新增模块和处理器测试每个后端通过 34 项，并与官方对照 893 个真前缀。 [实现 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45350536553) · [开发版报告](reports/kaitai-0.11-modules-process-2026-11-24.json)
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。

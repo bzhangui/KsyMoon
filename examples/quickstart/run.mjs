@@ -30,10 +30,11 @@ if (!fromSource) {
   generator = join(work, "generator");
   mkdirSync(generator);
   writeFileSync(join(generator, "moon.mod"), 'name = "example/ksymoon-registry-generator"\nversion = "0.1.0"\n');
-  copyFileSync(join(root, "cmd", "ksymoon", "main.mbt"), join(generator, "main.mbt"));
-  copyFileSync(join(root, "cmd", "ksymoon", "moon.pkg"), join(generator, "moon.pkg"));
   moon(generator, "update");
   moon(generator, "add", "bzhangui/ksymoon@" + version);
+  const cli = join(generator, ".mooncakes", "bzhangui", "ksymoon", "cmd", "ksymoon");
+  copyFileSync(join(cli, "main.mbt"), join(generator, "main.mbt"));
+  copyFileSync(join(cli, "moon.pkg"), join(generator, "moon.pkg"));
   command = ".";
 }
 console.log("Generator:", fromSource ? "repository source" : "Mooncakes bzhangui/ksymoon@" + version);

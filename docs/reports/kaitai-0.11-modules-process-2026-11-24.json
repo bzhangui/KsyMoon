@@ -1,0 +1,90 @@
+{
+  "version": "0.5.0-dev.1",
+  "source_commit": "22f58e0a248186601060fd591082c290e9ea4acb",
+  "ci": "https://github.com/bzhangui/KsyMoon/actions/runs/45350536553",
+  "moonc": "0.10.19+97801ee1b",
+  "fixed_corpus_revision": "4108136c807f8df88df843de6571f1a7bf29c74e",
+  "fixed_corpus": {
+    "total": 339,
+    "rejected": 151,
+    "generated": 188,
+    "newly_generated": [
+      "for_rel_imports/imported_1.ksy",
+      "imports0.ksy",
+      "imports_abs_abs.ksy",
+      "imports_abs_rel.ksy",
+      "imports_circular_a.ksy",
+      "imports_circular_b.ksy",
+      "imports_rel_1.ksy",
+      "ks_path/for_abs_imports/imported_and_abs.ksy",
+      "ks_path/for_abs_imports/imported_and_rel.ksy",
+      "nested_types_import.ksy",
+      "process_bytes_pad_term.ksy",
+      "process_coerce_switch.ksy",
+      "process_coerce_usertype1.ksy",
+      "process_coerce_usertype2.ksy",
+      "process_repeat_bytes.ksy",
+      "process_repeat_usertype.ksy",
+      "process_repeat_usertype_dynarg_rotate.ksy",
+      "process_repeat_usertype_dynarg_xor.ksy",
+      "process_rotate.ksy",
+      "process_struct_pad_term.ksy",
+      "process_to_user.ksy",
+      "process_xor4_const.ksy",
+      "process_xor4_value.ksy",
+      "process_xor_const.ksy",
+      "process_xor_value.ksy",
+      "type_ternary.ksy",
+      "zlib_surrounded.ksy",
+      "zlib_with_header_78.ksy"
+    ]
+  },
+  "module_and_processor_reference": {
+    "source_commit": "22f58e0a248186601060fd591082c290e9ea4acb",
+    "upstream_specs": 15,
+    "schemas": [
+      "imports0",
+      "imports_rel_1",
+      "imports_abs_abs",
+      "imports_abs_rel",
+      "imports_circular_a",
+      "process_xor_const",
+      "process_xor_value",
+      "process_xor4_const",
+      "process_xor4_value",
+      "process_rotate",
+      "process_to_user",
+      "process_repeat_bytes",
+      "process_repeat_usertype",
+      "zlib_surrounded",
+      "zlib_with_header_78",
+      "container"
+    ],
+    "targets": [
+      "js",
+      "wasm",
+      "wasm-gc",
+      "native"
+    ],
+    "tests_per_target": 34,
+    "prefixes": 893,
+    "rejected_prefixes": 127
+  },
+  "six_scenario_regression": {
+    "scenarios": [
+      "wav",
+      "riff",
+      "udp",
+      "stl",
+      "stm32",
+      "ivf"
+    ],
+    "tests_per_target": 25,
+    "wav_riff_prefixes": 246
+  },
+  "base_verification": {
+    "generator_tests_per_target": 26,
+    "consumer_tests_per_target": 185
+  },
+  "archive_file_count_at_implementation": 343
+}
