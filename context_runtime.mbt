@@ -20,6 +20,7 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
               expression,
             ) {
             Text => add("text")
+            Real => add("real")
             _ => ()
           }
       }
@@ -35,14 +36,21 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
         match kind {
           ByteField(_) | Contents(_) => add("binary")
           Text(_, _) => add("text")
-          Unsigned64(_) => add("wide")
-          Float32(_) => add("float")
+          Unsigned64(_) | WideBitInteger(_, _) => add("wide")
+          Float32(_) | Float64(_) => add("real")
           Switch(_, _, _, _) => add("selected")
           Bounded(Switch(_, _, _, None), _) => add("binary")
           _ => ()
         }
       }
     }
+  }
+  if context_all_expressions(schema).iter().any(context_contains_endpoint) {
+    flags.push("sequence_endpoints")
+  }
+  if context_all_expressions(schema).iter().any(context_contains_wide_cast) &&
+    !flags.contains("wide") {
+    flags.push("wide")
   }
   flags
 }
@@ -59,6 +67,7 @@ fn context_emit_runtime(
   bits : Bool,
   recursive : Bool,
   modules : Bool,
+  contextual_endian : Bool,
   index : Bool,
   objects : Bool,
 ) -> Unit {
@@ -70,7 +79,7 @@ fn context_emit_runtime(
       ("text", "StringValue(String)"),
       ("binary", "Binary(BytesView)"),
       ("wide", "Wide(UInt64)"),
-      ("float", "FloatValue(Float)"),
+      ("real", "RealValue(Double)"),
       ("items", "Items(Array[" + root + "Value])"),
       ("selected", "Selected(Int, " + root + "Value)"),
     ] {
@@ -91,7 +100,7 @@ fn context_emit_runtime(
     #|  cache : Map[String, __ROOT__Value]
     #|  partial : Map[String, __ROOT__Value]
     #|__BUSY_FIELD__
-    #|__DEPTH_FIELD____ACCOUNT_FIELD____MODULE_FIELDS__}
+    #|__DEPTH_FIELD____ACCOUNT_FIELD____MODULE_FIELDS____ENDIAN_FIELD__}
     #|
     #|///|
     #|priv struct __ROOT__Arena {
@@ -109,7 +118,7 @@ fn context_emit_runtime(
     #|
     #|///|
     #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, __PATH_ARG__ : String__MODULE_ARG__) -> Int__CREATE_EFFECT__ {
-    #|__DEPTH_CHECK____MODULE_SETUP__  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____DEPTH_INIT____ACCOUNT_INIT____MODULE_INIT__ }
+    #|__DEPTH_CHECK____MODULE_SETUP__  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____DEPTH_INIT____ACCOUNT_INIT____MODULE_INIT____ENDIAN_INIT__ }
     #|  let context = match self.free.pop() {
     #|    Some(context) => { self.frames[context] = Some(frame); context }
     #|    None => { self.frames.push(Some(frame)); self.frames.length() - 1 }
@@ -174,6 +183,14 @@ fn context_emit_runtime(
       },
     )
   let block = block
+    .replace_all(
+      old="__ENDIAN_FIELD__",
+      new=if contextual_endian { "  mut little_endian : Bool\n" } else { "" },
+    )
+    .replace_all(
+      old="__ENDIAN_INIT__",
+      new=if contextual_endian { ", little_endian: false" } else { "" },
+    )
     .replace_all(
       old="__MODULE_FIELDS__",
       new=if modules {
@@ -286,14 +303,26 @@ fn context_emit_runtime(
   if flags.contains("wide") {
     extra.write_string("    Wide(value) => { ignore(value); Absent }\n")
   }
-  if flags.contains("float") {
-    extra.write_string("    FloatValue(value) => { ignore(value); Absent }\n")
+  if flags.contains("real") {
+    extra.write_string("    RealValue(value) => { ignore(value); Absent }\n")
   }
   if flags.contains("binary") {
-    extra.write_string("    Binary(_) => Absent\n")
+    extra.write_string(
+      if flags.contains("sequence_endpoints") {
+        "    Binary(bytes) if (name == \"first\" || name == \"last\") && !bytes.is_empty() => Number(bytes[if name == \"first\" { 0 } else { bytes.length() - 1 }].to_int64())\n    Binary(_) => Absent\n"
+      } else {
+        "    Binary(_) => Absent\n"
+      },
+    )
   }
   if flags.contains("items") {
-    extra.write_string("    Items(_) => Absent\n")
+    extra.write_string(
+      if flags.contains("sequence_endpoints") {
+        "    Items(items) if name == \"first\" => items.get(0).unwrap_or(Absent)\n    Items(items) if name == \"last\" => items.last().unwrap_or(Absent)\n    Items(_) => Absent\n"
+      } else {
+        "    Items(_) => Absent\n"
+      },
+    )
   }
   write_reader_block(
     output,
@@ -411,7 +440,8 @@ fn context_all_expressions(schema : Schema) -> Array[Expr] {
 ///|
 fn context_contains_cast(expression : Expr) -> Bool {
   match expression {
-    Cast(_, _) => true
+    Cast(base, target) =>
+      integer_cast(target) is None || context_contains_cast(base)
     Member(base, _) | Decode(base, _) | ToEnum(base, _) | Unary(_, base) =>
       context_contains_cast(base)
     Index(base, index) | Binary(_, base, index) =>

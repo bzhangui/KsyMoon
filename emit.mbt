@@ -6,26 +6,29 @@ pub fn generate(source : String) -> String raise SchemaError {
 
 ///|
 fn generate_schema(schema : Schema) -> String raise SchemaError {
-  let needs_context = schema.has_context &&
+  let needs_context = !schema.byte_orders.is_empty() ||
     (
-      context_all_expressions(schema)
-      .iter()
-      .any(fn(value) {
-        context_has_reference(value) || expression_arithmetic(value)
-      }) ||
-      [schema.root, ..schema.records]
-      .iter()
-      .any(fn(record) {
-        !record.parameters.is_empty() ||
-        !record.instances.is_empty() ||
-        record.fields
+      schema.has_context &&
+      (
+        context_all_expressions(schema)
         .iter()
-        .any(fn(field) {
-          walk_kinds(field.kind)
+        .any(fn(value) {
+          context_has_reference(value) || expression_arithmetic(value)
+        }) ||
+        [schema.root, ..schema.records]
+        .iter()
+        .any(fn(record) {
+          !record.parameters.is_empty() ||
+          !record.instances.is_empty() ||
+          record.fields
           .iter()
-          .any(fn(kind) { kind is Application(_, _) })
+          .any(fn(field) {
+            walk_kinds(field.kind)
+            .iter()
+            .any(fn(kind) { kind is Application(_, _) })
+          })
         })
-      })
+      )
     )
   if needs_context {
     return generate_context_schema(schema)
@@ -98,14 +101,16 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
         }
         if !(kind is Nested(_) ||
           kind is Switch(_, _, _, _) ||
-          kind is BitInteger(_, _)) {
+          kind is BitInteger(_, _) ||
+          kind is WideBitInteger(_, _)) {
           has_read_fields = true
         }
         has_numeric_fields = has_numeric_fields ||
           kind is Unsigned(_, _) ||
           kind is Signed(_, _) ||
           kind is Float32(_)
-        has_uint64 = has_uint64 || kind is Unsigned64(_)
+        has_uint64 = has_uint64 ||
+          kind is (Unsigned64(_) | Signed64(_) | Float64(_))
         has_contents = has_contents || kind is Contents(_)
         has_bounded = has_bounded || kind is Bounded(_, _)
         has_strings = has_strings || kind is Text(_, _)
@@ -156,6 +161,8 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
     has_read_fields~,
     has_input=has_read_fields || has_stream_size || has_positions || has_bits,
     has_bits~,
+    has_narrow_bits=bit_fields(schema, wide=false),
+    has_wide_bits=bit_fields(schema, wide=true),
     has_process=processors.iter().any(fn(name) { name != "process_xor_mask" }),
   )
   emit_processors(output, root_type, processors)
@@ -264,9 +271,11 @@ fn field_type(kind : FieldKind, root_type : String) -> String {
   match kind {
     BitInteger(1, _) => "Bool"
     Unsigned(_, _) | BitInteger(_, _) => "UInt"
-    Unsigned64(_) => "UInt64"
+    Unsigned64(_) | WideBitInteger(_, _) => "UInt64"
     Signed(_, _) => "Int"
+    Signed64(_) => "Int64"
     Float32(_) => "Float"
+    Float64(_) => "Double"
     Contents(_) | ByteField(_) => "BytesView"
     Text(_, _) => "String"
     Bounded(inner, _) => field_type(inner, root_type)
@@ -325,6 +334,7 @@ fn endian_flag(endian : Endian) -> String {
   match endian {
     Little => "true"
     Big => "false"
+    SelectedOrder => "arena.frames[context].unwrap().little_endian"
   }
 }
 
@@ -350,8 +360,14 @@ fn read_code(
     }
     Unsigned(width, endian) =>
       "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
+    WideBitInteger(width, endian) =>
+      "reader.read_wide_bit_integer(\{width}, \{endian is Little}, \{path})"
     Unsigned64(endian) =>
       "reader.read_uint64_bits(8, \{endian_flag(endian)}, \{path})"
+    Signed64(endian) =>
+      "reader.read_uint64_bits(8, \{endian_flag(endian)}, \{path}).reinterpret_as_int64()"
+    Float64(endian) =>
+      "reader.read_uint64_bits(8, \{endian_flag(endian)}, \{path}).reinterpret_as_double()"
     Signed(width, endian) => {
       let bits = "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
       let shift = (4 - width.to_int()) * 8

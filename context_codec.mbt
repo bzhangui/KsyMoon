@@ -18,9 +18,11 @@ fn context_unpack_expression(
 ) -> String {
   let variant = match kind {
     Integer | Enum(_) => "Number"
+    WideInteger => "Wide"
     Boolean => "Flag"
     Text => "StringValue"
     Bytes => "Binary"
+    Real => "RealValue"
     Stream => "Source"
     Object(_) => "ObjectId"
     _ => abort("unsupported scalar expression type")
@@ -48,6 +50,29 @@ fn context_value_code(
       "\{context_pack_kind(scope.item.unwrap(), "item", root)}.attribute(arena, \{name[2:].escape()}, \{path})"
     Reference(name) =>
       "\{root}Value::ObjectId(context).attribute(arena, \{name.escape()}, \{path})"
+    Cast(base, target) if integer_cast(target) is Some((bits, signed)) => {
+      let code = context_expression_code(scope, base, root, path, owner_reader~)
+      let value = if context_expression_type(scope, base) == WideInteger {
+        code + ".reinterpret_as_int64()"
+      } else {
+        code
+      }
+      if bits == 64 {
+        if signed {
+          "\{root}Value::Number(\{value})"
+        } else {
+          "\{root}Value::Wide((\{value}).reinterpret_as_uint64())"
+        }
+      } else {
+        let mask = (1L << bits) - 1L
+        let narrowed = "(\{value} & \{mask}L)"
+        if signed {
+          "\{root}Value::Number((\{narrowed} << \{64 - bits}) >> \{64 - bits})"
+        } else {
+          "\{root}Value::Number(\{narrowed})"
+        }
+      }
+    }
     Cast(base, target) => {
       let name = context_cast_target(scope, target)
       let tag = scope.graph.tags[name]
@@ -96,8 +121,11 @@ fn context_value_code(
       )
       let variant = match context_expression_type(scope, expression) {
         Integer | Enum(_) => "Number"
+        WideInteger => "Wide"
         Boolean => "Flag"
         Text => "StringValue"
+        Bytes => "Binary"
+        Real => "RealValue"
         _ => invalid(scope.path, "value expression type awaits implementation")
       }
       "\{root}Value::\{variant}(\{value})"
@@ -129,6 +157,10 @@ fn context_expression_code(
         path,
         owner_reader,
       )
+    Unary(op, child) if kind == Real =>
+      "(\{op}\{context_expression_code(scope, child, root, path, owner_reader~)})"
+    Binary(op, left, right) if context_real_binary(scope, left, right) =>
+      context_real_code(scope, op, left, right, root, path, owner_reader)
     Choose(condition, yes, no) =>
       "(if \{context_expression_code(scope, condition, root, path, owner_reader~)} { \{context_expression_code(scope, yes, root, path, owner_reader~)} } else { \{context_expression_code(scope, no, root, path, owner_reader~)} })"
     _ => {
@@ -143,6 +175,12 @@ fn context_expression_code(
         path,
         navigation=Some(fn(value) {
           navigation.iter().find_first(fn(pair) { pair.0 == value }).unwrap().1
+        }),
+        lowered=Some(fn(value) {
+          navigation
+          .iter()
+          .find_first(fn(pair) { pair.0 == value })
+          .map(fn(pair) { pair.1 })
         }),
         stream_reader=owner_reader,
         bit_stream=scope.graph.bits,
@@ -163,8 +201,10 @@ fn context_pack_kind(
     Unsigned(_, _) | Signed(_, _) | BitInteger(_, _) =>
       "\{root}Value::Number(\{value}.to_int64())"
     Enumerated(_, _) => "\{root}Value::Number(\{value}.to_i())"
-    Unsigned64(_) => "\{root}Value::Wide(\{value})"
-    Float32(_) => "\{root}Value::FloatValue(\{value})"
+    Unsigned64(_) | WideBitInteger(_, _) => "\{root}Value::Wide(\{value})"
+    Signed64(_) => "\{root}Value::Number(\{value})"
+    Float32(_) => "\{root}Value::RealValue(\{value}.to_double())"
+    Float64(_) => "\{root}Value::RealValue(\{value})"
     Text(_, _) => "\{root}Value::StringValue(\{value})"
     ByteField(_) | Contents(_) => "\{root}Value::Binary(\{value})"
     Bounded(inner, _) => context_pack_kind(inner, value, root, bounded=true)
@@ -235,8 +275,10 @@ fn context_unpack_kind(
     Signed(_, _) => scalar("Number", "value.to_int()")
     Enumerated(_, name) =>
       scalar("Number", generated_enum_type(root, name) + "::from_code(value)")
-    Unsigned64(_) => scalar("Wide", "value")
-    Float32(_) => scalar("FloatValue", "value")
+    Unsigned64(_) | WideBitInteger(_, _) => scalar("Wide", "value")
+    Signed64(_) => scalar("Number", "value")
+    Float32(_) => scalar("RealValue", "Float::from_double(value)")
+    Float64(_) => scalar("RealValue", "value")
     Text(_, _) => scalar("StringValue", "value")
     ByteField(_) | Contents(_) => scalar("Binary", "value")
     Nested(name) | Application(name, _) =>
@@ -312,6 +354,7 @@ fn context_instance_result(
         Integer => "Int64"
         Boolean => "Bool"
         Text => "String"
+        Real => "Double"
         Stream => root + "Stream"
         Enum(name) => generated_enum_type(root, name)
         Object([name]) => context_type_name(root, name)
@@ -409,6 +452,7 @@ fn context_read_effects(schema : Schema) -> Map[String, Bool] {
   for _ in 0..<graph.records.length() {
     for owner, record in graph.records {
       effects[owner] = schema.recursive ||
+        graph.byte_orders.contains(owner) ||
         context_record_raises(record, effects)
     }
   }
@@ -465,6 +509,26 @@ fn context_expression_parts(
   navigation : Array[(Expr, String)],
 ) -> Unit raise SchemaError {
   match expression {
+    Binary(op, left, right) if context_real_binary(scope, left, right) =>
+      navigation.push(
+        (
+          expression,
+          context_real_code(scope, op, left, right, root, path, reader),
+        ),
+      )
+    Unary("+" | "-", child) if context_expression_type(scope, child) == Real =>
+      navigation.push(
+        (
+          expression,
+          context_expression_code(
+            scope,
+            expression,
+            root,
+            path,
+            owner_reader=reader,
+          ),
+        ),
+      )
     Reference(name) =>
       references[name] = context_unpack_expression(
         context_expression_type(scope, expression),

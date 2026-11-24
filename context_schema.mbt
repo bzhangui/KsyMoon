@@ -36,7 +36,13 @@ fn raw_uses_context(
   }
   for field in fields {
     if field is @yaml.Map(properties) {
-      if properties.contains("enum") || properties.contains("process") {
+      if properties.contains("enum") ||
+        properties.contains("process") ||
+        (
+          properties.get("type")
+          is Some(@yaml.String("f4" | "f4le" | "f4be" | "f8" | "f8le" | "f8be")) &&
+          record.contains("instances")
+        ) {
         return true
       }
       let expressions = [
@@ -145,6 +151,7 @@ priv struct ContextGraph {
   bits : Bool
   module_roots : Map[String, String]
   root_referenced : Bool
+  byte_orders : Map[String, ByteOrder]
 }
 
 ///|
@@ -199,6 +206,7 @@ fn context_graph(schema : Schema) -> ContextGraph {
     bits: schema_has_bits(schema),
     module_roots: schema.module_roots,
     root_referenced,
+    byte_orders: schema.byte_orders,
   }
 }
 
@@ -250,9 +258,9 @@ fn context_kind_type(
 ) -> ExprType raise SchemaError {
   match kind {
     BitInteger(1, _) => Boolean
-    Unsigned(_, _) | Signed(_, _) | BitInteger(_, _) => Integer
-    Unsigned64(_) => WideInteger
-    Float32(_) => Real
+    Unsigned(_, _) | Signed(_, _) | Signed64(_) | BitInteger(_, _) => Integer
+    Unsigned64(_) | WideBitInteger(_, _) => WideInteger
+    Float32(_) | Float64(_) => Real
     Contents(_) | ByteField(_) => Bytes
     Text(_, _) => Text
     Bounded(inner, _) => context_kind_type(inner, path)
@@ -400,6 +408,8 @@ fn context_member_type(
       )
     }
     Sequence(_) | Bytes if name == "length" => Integer
+    Sequence(element) if name == "first" || name == "last" => element
+    Bytes if name == "first" || name == "last" => Integer
     Enum(_) if name == "to_i" => Integer
     Integer if name == "to_s" => Text
     _ =>
@@ -447,6 +457,17 @@ fn context_expression_type(
       ignore(context_enum(scope, name))
       context_require(scope, value, Integer)
       Enum(name)
+    }
+    Cast(base, target) if integer_cast(target) is Some(_) => {
+      let kind = context_expression_type(scope, base)
+      guard kind == Integer || kind == WideInteger else {
+        invalid(scope.path, "integer cast needs an integer source")
+      }
+      if target == "u8" {
+        WideInteger
+      } else {
+        Integer
+      }
     }
     Cast(base, target) => {
       let name = context_cast_target(scope, target)
@@ -502,11 +523,20 @@ fn context_expression_type(
         scope.path,
       )
     }
+    Unary("+" | "-", value) if context_expression_type(scope, value) == Real =>
+      Real
+    Binary(op, left, right) if context_real_binary(scope, left, right) =>
+      match op {
+        "+" | "-" | "*" | "/" => Real
+        "==" | "!=" | "<" | "<=" | ">" | ">=" => Boolean
+        _ => invalid(scope.path, "operator is unsupported for real operands")
+      }
     Binary("==" | "!=", left, right) => {
       let kind = context_expression_type(scope, left)
       guard kind == Integer ||
         kind == Boolean ||
         kind == Text ||
+        kind == Bytes ||
         kind is Enum(_) else {
         invalid(
           scope.path,
@@ -658,6 +688,18 @@ fn check_context_field(
 fn check_context_schema(schema : Schema) -> Unit raise SchemaError {
   let graph = context_graph(schema)
   for owner, record in graph.records {
+    if graph.byte_orders.get(owner) is Some(ChooseOrder(selector, cases, _)) {
+      let scope = context_scope(
+        graph,
+        owner,
+        owner + ".meta.endian",
+        earlier=Some(0),
+      )
+      let kind = context_expression_type(scope, selector)
+      for (tag, _) in cases {
+        context_require(scope, tag, kind)
+      }
+    }
     for index, field in record.fields {
       check_context_field(
         context_scope(
@@ -688,6 +730,7 @@ fn check_context_schema(schema : Schema) -> Unit raise SchemaError {
           guard kind == Integer ||
             kind == Boolean ||
             kind == Text ||
+            kind == Real ||
             kind is Stream ||
             kind is Object(_) ||
             kind is Enum(_) else {

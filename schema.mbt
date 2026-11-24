@@ -14,6 +14,7 @@ pub fn validate(source : String) -> Unit raise SchemaError {
 priv enum Endian {
   Little
   Big
+  SelectedOrder
 }
 
 ///|
@@ -48,8 +49,11 @@ priv enum FieldKind {
   Unsigned(Byte, Endian)
   Unsigned64(Endian)
   BitInteger(Int32, Endian)
+  WideBitInteger(Int32, Endian)
   Signed(Byte, Endian)
+  Signed64(Endian)
   Float32(Endian)
+  Float64(Endian)
   Contents(Bytes)
   Nested(String)
   Application(String, Array[Expr])
@@ -91,6 +95,7 @@ priv struct Schema {
   has_context : Bool
   recursive : Bool
   module_roots : Map[String, String]
+  byte_orders : Map[String, ByteOrder]
   type_scopes : Map[String, Map[String, String]]
   enum_scopes : Map[String, Map[String, String]]
   enums : Map[String, EnumDef]
@@ -297,17 +302,15 @@ fn parse_kind(
     return Application(base, parse_type_application(args.to_owned(), path))
   }
   if bit_width(type_name) is Some(width) {
-    guard width >= 1 && width <= 32 else {
-      invalid(path, "bit integer width must be 1..32")
+    guard width >= 1 && width <= 64 else {
+      invalid(path, "bit integer width must be 1..64")
     }
-    return BitInteger(
-      width,
-      if type_name.has_suffix("le") {
-        Little
-      } else {
-        Big
-      },
-    )
+    let bit_endian = if type_name.has_suffix("le") { Little } else { Big }
+    return if width <= 32 {
+      BitInteger(width, bit_endian)
+    } else {
+      WideBitInteger(width, bit_endian)
+    }
   }
   match type_name {
     "u1" => Unsigned(1, Big)
@@ -327,6 +330,12 @@ fn parse_kind(
     "s4" => Signed(4, default_endian(endian, path))
     "s4le" => Signed(4, Little)
     "s4be" => Signed(4, Big)
+    "s8" => Signed64(default_endian(endian, path))
+    "s8le" => Signed64(Little)
+    "s8be" => Signed64(Big)
+    "f8" => Float64(default_endian(endian, path))
+    "f8le" => Float64(Little)
+    "f8be" => Float64(Big)
     "f4" => Float32(default_endian(endian, path))
     "f4le" => Float32(Little)
     "f4be" => Float32(Big)
@@ -692,7 +701,7 @@ fn load_schema(
   )
   let id = as_string(get_required(meta, "id", "schema.meta"), "meta.id")
   check_identifier(id, "meta.id")
-  let endian = schema_endian(meta.get("endian"), "meta.endian")
+  let endian = byte_endian(meta.get("endian"), "meta.endian")
   let (root, imports_visibility) = link_imports(
     root, meta, id, imports, entry, search, read,
   )
@@ -700,8 +709,9 @@ fn load_schema(
   let enum_scopes = Map([])
   let enums = Map([])
   let module_roots = Map([])
+  let byte_orders = Map([])
   let root = flatten_types(
-    inherit_read_defaults(root, Map([]), imports_visibility),
+    inherit_read_defaults(root, Map([]), imports_visibility, byte_orders),
     "",
     Map([]),
     Map([]),
@@ -719,7 +729,8 @@ fn load_schema(
   guard types.length() <= 64 else {
     invalid("types", "at most 64 nested type definitions are supported")
   }
-  let has_context = !imports_visibility.is_empty() ||
+  let has_context = !byte_orders.is_empty() ||
+    !imports_visibility.is_empty() ||
     !enums.is_empty() ||
     root.contains("params") ||
     types
@@ -746,7 +757,7 @@ fn load_schema(
       get_required(mapping, "meta", path),
       path + ".meta",
     )
-    let local_endian = schema_endian(
+    let local_endian = byte_endian(
       defaults.get("endian"),
       path + ".meta.endian",
     )
@@ -795,6 +806,7 @@ fn load_schema(
     has_context,
     recursive,
     module_roots,
+    byte_orders,
     type_scopes,
     enum_scopes,
     enums,
@@ -814,6 +826,7 @@ fn load_schema(
     has_context,
     recursive,
     module_roots,
+    byte_orders,
     type_scopes,
     enum_scopes,
     enums,

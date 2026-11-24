@@ -61,13 +61,15 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
         reads = reads ||
           (
             !(kind is Nested(_) || kind is Application(_, _)) &&
-            !(kind is Switch(_, _, _, _) || kind is BitInteger(_, _))
+            !(kind is Switch(_, _, _, _) ||
+            kind is BitInteger(_, _) ||
+            kind is WideBitInteger(_, _))
           )
         numeric = numeric ||
           kind is Unsigned(_, _) ||
           kind is Signed(_, _) ||
           kind is Float32(_)
-        wide = wide || kind is Unsigned64(_)
+        wide = wide || kind is (Unsigned64(_) | Signed64(_) | Float64(_))
         contents = contents || kind is Contents(_)
         bounded = bounded || kind is Bounded(_, _)
         strings = strings || kind is Text(_, _)
@@ -133,11 +135,13 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     has_validation=validation,
     has_instances~,
     has_positions=positions,
-    has_arithmetic=expressions.iter().any(expression_arithmetic),
+    has_arithmetic=context_integer_helpers(graph),
     has_read_fields=reads,
     has_input=true,
     has_context=true,
     has_bits=graph.bits,
+    has_narrow_bits=bit_fields(schema, wide=false),
+    has_wide_bits=bit_fields(schema, wide=true),
   )
   emit_processors(output, root, flags)
   if stream_values {
@@ -148,6 +152,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     root,
     flags,
     rollback ||
+    !graph.byte_orders.is_empty() ||
     records.iter().any(fn(record) { context_record_raises(record, effects) }),
     has_instances,
     accounting,
@@ -155,9 +160,11 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     graph.bits,
     schema.recursive,
     !graph.module_roots.is_empty(),
+    !graph.byte_orders.is_empty(),
     expressions.iter().any(context_contains_index),
     !object_values.is_empty() || expressions.iter().any(context_contains_cast),
   )
+  emit_endian_inheritance(output, root, graph)
   for index, record in records {
     let owner = if index == 0 { "@root" } else { record.name }
     context_emit_reader(
@@ -169,6 +176,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
       id,
       index,
       effects[owner],
+      graph.byte_orders.contains(owner) ||
       context_record_raises(record, effects),
     )
     for instance in record.instances {
@@ -317,6 +325,7 @@ fn context_emit_reader(
       "  arena.frames[context].unwrap().fields[\{p.name.escape()}] = \{parameter_pack(p, root)}\n",
     )
   }
+  select_byte_order(output, graph, owner, root)
   for field in record.fields {
     let name = field.name
     let path = "path_" + name

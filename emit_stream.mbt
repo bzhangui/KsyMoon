@@ -206,7 +206,8 @@ fn emit_field_read(
         Times(_) =>
           output.write_string("  for index in 0..<count_\{target} {\n")
         ToEnd => {
-          let buffered = if bits && field.kind is BitInteger(_, _) {
+          let buffered = if bits &&
+            field.kind is (BitInteger(_, _) | WideBitInteger(_, _)) {
             " || reader.bits_left > 0"
           } else {
             ""

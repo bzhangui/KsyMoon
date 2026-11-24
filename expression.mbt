@@ -1,7 +1,9 @@
 ///|
 priv enum Expr {
   Integer(Int64)
+  RealLiteral(Double)
   Text(String)
+  ByteLiteral(Bytes)
   Boolean(Bool)
   Reference(String)
   Member(Expr, String)
@@ -81,12 +83,29 @@ fn expression_tokens(
     }
     let token = StringBuilder()
     if is_ascii_digit(ch) || is_ascii_lower(ch) || ch == '_' {
+      let start = i
+      let decimal = is_ascii_digit(ch) &&
+        !(ch == '0' &&
+        i + 1 < chars.length() &&
+        ['x', 'X', 'b', 'B', 'o', 'O'].contains(chars[i + 1]))
       while i < chars.length() &&
             (
               is_ascii_digit(chars[i]) ||
               is_ascii_lower(chars[i]) ||
               (chars[i] >= 'A' && chars[i] <= 'Z') ||
-              chars[i] == '_'
+              chars[i] == '_' ||
+              (
+                decimal &&
+                chars[i] == '.' &&
+                i + 1 < chars.length() &&
+                is_ascii_digit(chars[i + 1])
+              ) ||
+              (
+                decimal &&
+                i > start &&
+                (chars[i] == '+' || chars[i] == '-') &&
+                (chars[i - 1] == 'e' || chars[i - 1] == 'E')
+              )
             ) {
         token.write_char(chars[i])
         i += 1
@@ -153,6 +172,25 @@ fn ExprParser::parse(
       self.index += 1
       value
     }
+    "[" => {
+      let bytes = []
+      if self.peek() != "]" {
+        while true {
+          let byte = self.parse(1)
+          guard byte is Integer(value) && value >= 0L && value <= 255L else {
+            invalid(self.path, "expected a byte literal in 0..255")
+          }
+          bytes.push(value.to_byte())
+          if self.peek() != "," {
+            break
+          }
+          self.index += 1
+        }
+      }
+      guard self.peek() == "]" else { invalid(self.path, "expected ']'") }
+      self.index += 1
+      ByteLiteral(Bytes::from_array(bytes[:]))
+    }
     "-" if self.peek() == "9223372036854775808" => {
       self.index += 1
       Integer(-9223372036854775808L)
@@ -177,11 +215,7 @@ fn ExprParser::parse(
       }
     "_root" | "_parent" => Reference(token)
     number if number[0] >= '0' && number[0] <= '9' =>
-      Integer(
-        @string.parse_int64(number[:]) catch {
-          _ => invalid(self.path, "invalid or out-of-range integer constant")
-        },
-      )
+      parse_number_literal(number, self.path)
     quoted if quoted[0] == '\'' || quoted[0] == '"' =>
       Text(parse_quoted(quoted, self.path))
     "_" | "_index" =>
@@ -285,6 +319,32 @@ fn ExprParser::parse(
 }
 
 ///|
+fn parse_number_literal(
+  number : String,
+  path : String,
+) -> Expr raise SchemaError {
+  let lowercase = number.to_lower()
+  let base_prefix = lowercase.has_prefix("0x") ||
+    lowercase.has_prefix("0b") ||
+    lowercase.has_prefix("0o")
+  if !base_prefix && (number.contains(".") || lowercase.contains("e")) {
+    let value = @string.parse_double(number[:]) catch {
+      _ => invalid(path, "invalid real constant")
+    }
+    guard !value.is_inf() && !value.is_nan() else {
+      invalid(path, "real constant is out of range")
+    }
+    RealLiteral(value)
+  } else {
+    Integer(
+      @string.parse_int64(number[:]) catch {
+        _ => invalid(path, "invalid or out-of-range integer constant")
+      },
+    )
+  }
+}
+
+///|
 fn parse_expression(
   value : @yaml.Yaml,
   path : String,
@@ -347,8 +407,10 @@ fn expression_type(
 ) -> ExprType raise SchemaError {
   match expression {
     Integer(_) | StreamPosition | StreamSize => Integer
+    RealLiteral(_) => Real
     Boolean(_) | StreamEof => Boolean
     Text(_) => Text
+    ByteLiteral(_) => Bytes
     Reference(name) => lookup(name)
     Member(_, _)
     | Index(_, _)
@@ -437,22 +499,36 @@ fn expression_code(
   reference : (String) -> String,
   path : String,
   navigation~ : ((Expr) -> String)? = None,
+  lowered~ : ((Expr) -> String?)? = None,
   stream_reader~ : String = "reader",
   bit_stream~ : Bool = false,
 ) -> String {
+  if lowered is Some(lower) && lower(expression) is Some(code) {
+    return code
+  }
   let child = fn(value) {
     expression_code(
       value,
       reference,
       path,
       navigation~,
+      lowered~,
       stream_reader~,
       bit_stream~,
     )
   }
   match expression {
     Integer(n) => "\{n}L"
+    RealLiteral(value) => {
+      let code = value.to_string()
+      if code.contains(".") || code.contains("e") {
+        code
+      } else {
+        code + ".0"
+      }
+    }
     Text(value) => value.escape()
+    ByteLiteral(bytes) => byte_literal_code(bytes)
     Boolean(value) => if value { "true" } else { "false" }
     Reference(name) => reference(name)
     Member(_, _)
@@ -555,4 +631,50 @@ fn parse_quoted(source : String, path : String) -> String raise SchemaError {
     i += 1
   }
   output.to_string()
+}
+
+///|
+fn integer_cast(target : String) -> (Int32, Bool)? {
+  match target {
+    "u1" => Some((8, false))
+    "u2" => Some((16, false))
+    "u4" => Some((32, false))
+    "u8" => Some((64, false))
+    "s1" => Some((8, true))
+    "s2" => Some((16, true))
+    "s4" => Some((32, true))
+    "s8" => Some((64, true))
+    _ => None
+  }
+}
+
+///|
+fn expression_any(expr : Expr, predicate : (Expr) -> Bool) -> Bool {
+  if predicate(expr) {
+    return true
+  }
+  match expr {
+    Member(base, _)
+    | Cast(base, _)
+    | Decode(base, _)
+    | ToEnum(base, _)
+    | Unary(_, base) => expression_any(base, predicate)
+    Index(a, b) | Binary(_, a, b) =>
+      expression_any(a, predicate) || expression_any(b, predicate)
+    Choose(a, b, c) =>
+      expression_any(a, predicate) ||
+      expression_any(b, predicate) ||
+      expression_any(c, predicate)
+    _ => false
+  }
+}
+
+///|
+fn context_contains_endpoint(expr : Expr) -> Bool {
+  expression_any(expr, fn(value) { value is Member(_, "first" | "last") })
+}
+
+///|
+fn context_contains_wide_cast(expr : Expr) -> Bool {
+  expression_any(expr, fn(value) { value is Cast(_, "u8") })
 }

@@ -78,7 +78,7 @@ fn kind_expression_type(
 ) -> ExprType raise SchemaError {
   match kind {
     BitInteger(1, _) => Boolean
-    Unsigned(_, _) | Signed(_, _) | BitInteger(_, _) => Integer
+    Unsigned(_, _) | Signed(_, _) | Signed64(_) | BitInteger(_, _) => Integer
     Text(_, _) => Text
     _ =>
       invalid(
@@ -469,19 +469,35 @@ fn inherit_read_defaults(
   mapping : Map[String, @yaml.Yaml],
   inherited : Map[String, @yaml.Yaml],
   imports_visibility : Map[String, Map[String, String]],
+  byte_orders : Map[String, ByteOrder],
+  owner~ : String = "@root",
+  order_owner~ : String? = None,
   root~ : Bool = true,
 ) -> Map[String, @yaml.Yaml] raise SchemaError {
   let defaults = inherited.copy()
+  let mut order_owner = order_owner
+  let path = owner + ".meta.endian"
   if mapping.get("meta") is Some(value) {
     let meta = as_mapping(value, "type.meta")
     if !root {
       check_keys(meta, ["endian", "encoding", "bit-endian"], "type.meta")
+    }
+    if meta.get("endian") is Some(raw) {
+      if raw is @yaml.Map(options) {
+        byte_orders[owner] = parse_byte_order(options, path)
+        order_owner = Some(owner)
+      } else {
+        order_owner = None
+      }
     }
     for key in ["endian", "encoding", "bit-endian"] {
       if meta.get(key) is Some(value) {
         defaults[key] = value
       }
     }
+  }
+  if order_owner is Some(declaration) && declaration != owner {
+    byte_orders[owner] = Inherited(declaration)
   }
   let bit_order = if schema_endian(
       defaults.get("bit-endian"),
@@ -551,16 +567,17 @@ fn inherit_read_defaults(
   if result.get("types") is Some(@yaml.Map(entries)) {
     let rewritten = Map([])
     for name, value in entries {
-      let defaults = if root && imports_visibility.contains(name) {
-        Map([])
-      } else {
-        defaults
-      }
+      let external = root && imports_visibility.contains(name)
+      let child = if root { name } else { owner + "_" + name }
+      let defaults = if external { Map([]) } else { defaults }
       rewritten[name] = @yaml.Map(
         inherit_read_defaults(
           as_mapping(value, "types." + name),
           defaults,
           imports_visibility,
+          byte_orders,
+          owner=child,
+          order_owner=if external { None } else { order_owner },
           root=false,
         ),
       )

@@ -39,7 +39,7 @@ fn save_position(indent : String, bits : Bool) -> String {
 }
 
 ///|
-fn emit_bit_reader(output : StringBuilder, root : String) -> Unit {
+fn emit_bit_reader(output : StringBuilder, root : String, wide~ : Bool) -> Unit {
   let block =
     #|///|
     #|fn __ROOT__Reader::read_bit_integer(self : __ROOT__Reader, width : Int, little : Bool, field : String) -> UInt raise __ROOT__ParseError {
@@ -66,24 +66,47 @@ fn emit_bit_reader(output : StringBuilder, root : String) -> Unit {
     #|  result
     #|}
     #|
-  write_reader_block(output, block, root)
+  let code = if wide {
+    block
+    .replace_all(old="read_bit_integer", new="read_wide_bit_integer")
+    .replace_all(old="-> UInt", new="-> UInt64")
+    .replace_all(old="0U", new="0UL")
+    .replace_all(old="1U", new="1UL")
+    .replace_all(
+      old="(self.input[self.offset - 1].to_int().reinterpret_as_uint() >> shift)",
+      new="(self.input[self.offset - 1].to_uint64() >> shift)",
+    )
+  } else {
+    block
+  }
+  write_reader_block(output, code, root)
 }
 
 ///|
 fn schema_has_bits(schema : Schema) -> Bool {
+  bit_fields(schema, wide=false) || bit_fields(schema, wide=true)
+}
+
+///|
+fn bit_fields(schema : Schema, wide~ : Bool) -> Bool {
+  let matches = fn(kind) {
+    if wide {
+      kind is WideBitInteger(_, _)
+    } else {
+      kind is BitInteger(_, _)
+    }
+  }
   [schema.root, ..schema.records]
   .iter()
   .any(fn(record) {
     record.fields
     .iter()
-    .any(fn(field) {
-      walk_kinds(field.kind).iter().any(fn(k) { k is BitInteger(_, _) })
-    }) ||
+    .any(fn(field) { walk_kinds(field.kind).iter().any(matches) }) ||
     record.instances
     .iter()
     .any(fn(instance) {
       instance.kind is Parsed(field, _) &&
-      walk_kinds(field.kind).iter().any(fn(k) { k is BitInteger(_, _) })
+      walk_kinds(field.kind).iter().any(matches)
     })
   })
 }

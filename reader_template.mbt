@@ -18,6 +18,8 @@ fn emit_reader(
   has_input~ : Bool,
   has_context~ : Bool = false,
   has_bits~ : Bool = false,
+  has_narrow_bits~ : Bool = false,
+  has_wide_bits~ : Bool = false,
   has_process~ : Bool = false,
 ) -> Unit {
   let validation_error = if has_validation {
@@ -181,7 +183,12 @@ fn emit_reader(
   }
   write_reader_block(output, header, root_type)
   if has_bits {
-    emit_bit_reader(output, root_type)
+    if has_narrow_bits {
+      emit_bit_reader(output, root_type, wide=false)
+    }
+    if has_wide_bits {
+      emit_bit_reader(output, root_type, wide=true)
+    }
   }
   emit_stream_reader(
     output, root_type, has_bounded, has_byte_options, has_strings, has_repeated_fields,
