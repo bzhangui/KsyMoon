@@ -1,20 +1,4 @@
 ///|
-fn expression_result_type(
-  kind : ExprType,
-  field : String,
-) -> String raise SchemaError {
-  match kind {
-    Integer => "Int64"
-    WideInteger => "UInt64"
-    Real => "Double"
-    Text => "String"
-    Bytes => "BytesView"
-    Boolean => "Bool"
-    _ => invalid(field, "unsupported array element type")
-  }
-}
-
-///|
 fn emit_sequence_extremes(
   output : StringBuilder,
   root : String,

@@ -157,6 +157,7 @@ priv struct ContextGraph {
   bits : Bool
   module_roots : Map[String, String]
   root_referenced : Bool
+  mut object_refs : Bool
   byte_orders : Map[String, ByteOrder]
 }
 
@@ -212,6 +213,13 @@ fn context_graph(schema : Schema) -> ContextGraph {
     bits: schema_has_bits(schema),
     module_roots: schema.module_roots,
     root_referenced,
+    object_refs: records
+    .values()
+    .any(fn(record) {
+      record.parameters
+      .iter()
+      .any(fn(parameter) { parameter_is_object(parameter.kind) })
+    }),
     byte_orders: schema.byte_orders,
   }
 }
@@ -460,9 +468,6 @@ fn context_expression_type(
       } else {
         context_merge(kinds, scope.path)
       }
-      guard element is (Integer | Real | Boolean | Text | Bytes | WideInteger) else {
-        invalid(scope.path, "array literal requires scalar elements")
-      }
       Sequence(element)
     }
     Decode(bytes, encoding) => {
@@ -480,6 +485,12 @@ fn context_expression_type(
       context_require(scope, value, Integer)
       Enum(name)
     }
+    Cast(base, target) if integer_array_cast(target) is Some(kind) => {
+      guard context_expression_type(scope, base) == Sequence(kind) else {
+        invalid(scope.path, "array cast needs matching integer elements")
+      }
+      Sequence(kind)
+    }
     Cast(base, target) if integer_cast(target) is Some(_) => {
       let kind = context_expression_type(scope, base)
       guard kind == Integer || kind == WideInteger else {
@@ -494,7 +505,8 @@ fn context_expression_type(
     Cast(base, target) => {
       let name = context_cast_target(scope, target)
       let source = context_expression_type(scope, base)
-      guard source is Object(owners) && owners.contains(name) else {
+      guard source is Object(owners) &&
+        (owners.contains(name) || owners.contains("@any")) else {
         invalid(
           scope.path,
           "cast target '" + target + "' is not a possible object type",
@@ -671,7 +683,14 @@ fn check_context_kind(
         invalid(scope.path, "wrong number of arguments for type '" + name + "'")
       }
       for index, argument in arguments {
-        context_require(scope, argument, parameters[index].kind)
+        let expected = parameters[index].kind
+        let actual = context_expression_type(scope, argument)
+        guard parameter_kind_matches(actual, expected) else {
+          invalid(
+            scope.path,
+            "type mismatch for parameter '" + parameters[index].name + "'",
+          )
+        }
       }
     }
     Enumerated(_, name) => ignore(context_enum(scope, name))

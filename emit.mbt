@@ -103,6 +103,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
         }
         if !(kind is Nested(_) ||
           kind is Switch(_, _, _, _) ||
+          kind is Enumerated(_, _) ||
           kind is BitInteger(_, _) ||
           kind is WideBitInteger(_, _)) {
           has_read_fields = true
@@ -389,8 +390,36 @@ fn read_code(
         .collect()
       "reader.read_contents(Bytes::from_array([\{values.join(", ")}]), \{path})"
     }
-    Enumerated(inner, name) =>
-      "\{generated_enum_type(pascal_case(id), name)}::from_code(\{read_code(inner, id, path, in_instance~, reference~, evaluate~, parent_context~, bits~)}.to_int64())"
+    Enumerated(inner, name) => {
+      let code = match inner {
+        BitInteger(1, endian) =>
+          "reader.read_bit_integer(1, \{endian is Little}, \{path}).to_int64()"
+        Signed64(_) =>
+          read_code(
+            inner,
+            id,
+            path,
+            in_instance~,
+            reference~,
+            evaluate~,
+            parent_context~,
+            bits~,
+          )
+        _ =>
+          read_code(
+            inner,
+            id,
+            path,
+            in_instance~,
+            reference~,
+            evaluate~,
+            parent_context~,
+            bits~,
+          ) +
+          ".to_int64()"
+      }
+      "\{generated_enum_type(pascal_case(id), name)}::from_code(\{code})"
+    }
     Application(name, arguments) => {
       let values = arguments
         .map(fn(expression) { ", " + evaluate.unwrap()(expression) })

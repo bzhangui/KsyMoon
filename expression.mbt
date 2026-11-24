@@ -288,11 +288,20 @@ fn ExprParser::parse(
           }
           self.index += 1
         }
+        let is_array = self.peek() == "["
+        if is_array {
+          self.index += 1
+          guard self.peek() == "]" else {
+            invalid(self.path, "expected ']' after array cast target")
+          }
+          self.index += 1
+        }
         guard self.peek() == ">" else {
           invalid(self.path, "expected '>' after cast target")
         }
         self.index += 1
-        left = Cast(left, parts.join("::"))
+        let suffix = if is_array { "[]" } else { "" }
+        left = Cast(left, parts.join("::") + suffix)
       } else {
         if attribute != "_io" && attribute != "_root" && attribute != "_parent" {
           check_identifier(attribute, self.path)

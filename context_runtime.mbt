@@ -5,8 +5,18 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
   let graph = context_graph(schema)
   for owner, record in graph.records {
     for parameter in record.parameters {
-      if parameter.kind == Text {
-        add("text")
+      let kind = if parameter.kind is Sequence(element) {
+        add("items")
+        element
+      } else {
+        parameter.kind
+      }
+      match kind {
+        Text => add("text")
+        Bytes => add("binary")
+        Real => add("real")
+        WideInteger => add("wide")
+        _ => ()
       }
     }
     let fields = record.fields.copy()
@@ -97,6 +107,7 @@ fn context_emit_runtime(
   contextual_endian : Bool,
   index : Bool,
   objects : Bool,
+  parameter_only : Bool,
 ) -> Unit {
   output.write_string(
     "///|\npriv enum \{root}Value {\n  Number(Int64)\n  Flag(Bool)\n  ObjectId(Int)\n  Source(\{root}Reader)\n  Absent\n",
@@ -119,7 +130,7 @@ fn context_emit_runtime(
     #|///|
     #|priv struct __ROOT__Context {
     #|  tag : Int
-    #|  parent : Int
+    #|__PARENT_FIELD__
     #|  reader : __ROOT__Reader
     #|__PATH_FIELD__
     #|  children : Array[Int]
@@ -145,7 +156,7 @@ fn context_emit_runtime(
     #|
     #|///|
     #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, __PATH_ARG__ : String__MODULE_ARG__) -> Int__CREATE_EFFECT__ {
-    #|__DEPTH_CHECK____MODULE_SETUP__  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____DEPTH_INIT____ACCOUNT_INIT____MODULE_INIT____ENDIAN_INIT__ }
+    #|__DEPTH_CHECK____MODULE_SETUP__  let frame : __ROOT__Context = { tag, __PARENT_INIT__reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____DEPTH_INIT____ACCOUNT_INIT____MODULE_INIT____ENDIAN_INIT__ }
     #|  let context = match self.free.pop() {
     #|    Some(context) => { self.frames[context] = Some(frame); context }
     #|    None => { self.frames.push(Some(frame)); self.frames.length() - 1 }
@@ -160,6 +171,14 @@ fn context_emit_runtime(
     ""
   }
   let block = block
+    .replace_all(
+      old="__PARENT_FIELD__\n",
+      new=if modules && !release { "" } else { "  parent : Int\n" },
+    )
+    .replace_all(
+      old="__PARENT_INIT__",
+      new=if modules && !release { "" } else { "parent, " },
+    )
     .replace_all(
       old="__DEPTH_FIELD__",
       new=if recursive { "  depth : Int\n" } else { "" },
@@ -285,7 +304,7 @@ fn context_emit_runtime(
   }
   let block =
     #|///|
-    #|fn __ROOT__Value::attribute(self : __ROOT__Value, arena : __ROOT__Arena, name : String, field : String) -> __ROOT__Value raise __ROOT__ParseError {
+    #|__PARAMETER_ONLY__fn __ROOT__Value::attribute(self : __ROOT__Value, arena : __ROOT__Arena, name : String, field : String) -> __ROOT__Value raise __ROOT__ParseError {
     #|  match self {
     #|    ObjectId(context) => {
     #|      let frame = arena.frame(context, field)
@@ -364,6 +383,10 @@ fn context_emit_runtime(
   write_reader_block(
     output,
     block
+    .replace_all(
+      old="__PARAMETER_ONLY__",
+      new=if parameter_only { "#warnings(\"-unused_value\")\n" } else { "" },
+    )
     .replace_all(old="__EXTRA_CASES__", new=extra.to_string()[:])
     .replace_all(
       old="__LOGICAL_ROOT__",
@@ -442,40 +465,45 @@ fn context_contains_index(expression : Expr) -> Bool {
 
 ///|
 fn context_all_expressions(schema : Schema) -> Array[Expr] {
+  [schema.root, ..schema.records].fold(init=[], fn(expressions, record) {
+    expressions.append(context_record_expressions(record))
+    expressions
+  })
+}
+
+///|
+fn context_record_expressions(record : RecordDef) -> Array[Expr] {
   let expressions = []
-  for record in [schema.root, ..schema.records] {
-    let fields = record.fields.copy()
-    for instance in record.instances {
-      if instance.io is Some(value) {
-        expressions.push(value)
-      }
-      if instance.condition is Some(value) {
-        expressions.push(value)
-      }
-      match instance.kind {
-        Value(value) => expressions.push(value)
-        Parsed(field, position) => {
-          fields.push(field)
-          if position is Some(value) {
-            expressions.push(value)
-          }
+  let fields = record.fields.copy()
+  for instance in record.instances {
+    if instance.io is Some(value) {
+      expressions.push(value)
+    }
+    if instance.condition is Some(value) {
+      expressions.push(value)
+    }
+    match instance.kind {
+      Value(value) => expressions.push(value)
+      Parsed(field, position) => {
+        fields.push(field)
+        if position is Some(value) {
+          expressions.push(value)
         }
       }
     }
-    for field in fields {
-      expressions.append(context_kind_expressions(field.kind))
-      if field.predicate is Some(value) && !plain_predicate(field) {
-        expressions.push(value)
-      }
-      if field.condition is Some(value) {
-        expressions.push(value)
-      }
-      match field.count {
-        Some(Times(Calculated(value))) => expressions.push(value)
-        Some(Until(value)) if !plain_byte_until(value) =>
-          expressions.push(value)
-        _ => ()
-      }
+  }
+  for field in fields {
+    expressions.append(context_kind_expressions(field.kind))
+    if field.predicate is Some(value) && !plain_predicate(field) {
+      expressions.push(value)
+    }
+    if field.condition is Some(value) {
+      expressions.push(value)
+    }
+    match field.count {
+      Some(Times(Calculated(value))) => expressions.push(value)
+      Some(Until(value)) if !plain_byte_until(value) => expressions.push(value)
+      _ => ()
     }
   }
   expressions
@@ -485,7 +513,8 @@ fn context_all_expressions(schema : Schema) -> Array[Expr] {
 fn context_contains_cast(expression : Expr) -> Bool {
   match expression {
     Cast(base, target) =>
-      integer_cast(target) is None || context_contains_cast(base)
+      (integer_cast(target) is None && integer_array_cast(target) is None) ||
+      context_contains_cast(base)
     Member(base, _) | Decode(base, _) | ToEnum(base, _) | Unary(_, base) =>
       context_contains_cast(base)
     Index(base, index) | Binary(_, base, index) =>

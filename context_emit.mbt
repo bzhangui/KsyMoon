@@ -15,6 +15,8 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
   let object_values = []
   let mut stream_values = false
   for owner, record in graph.records {
+    stream_values = stream_values ||
+      record.parameters.iter().any(fn(p) { parameter_is_stream(p.kind) })
     for instance in record.instances {
       if instance.kind is Value(expression) {
         match
@@ -29,6 +31,10 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
                 object_values.push(name)
               }
             }
+          Sequence(element) if parameter_is_object(element) =>
+            graph.object_refs = true
+          Sequence(element) if parameter_is_stream(element) =>
+            stream_values = true
           _ => ()
         }
       }
@@ -64,6 +70,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
           (
             !(kind is Nested(_) || kind is Application(_, _)) &&
             !(kind is Switch(_, _, _, _) ||
+            kind is Enumerated(_, _) ||
             kind is BitInteger(_, _) ||
             kind is WideBitInteger(_, _))
           )
@@ -150,6 +157,11 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
   if stream_values {
     context_emit_stream_value(output, root, graph.bits)
   }
+  if graph.object_refs {
+    output.write_string(
+      "///|\npub struct \{root}ObjectRef {\n  priv arena : \{root}Arena\n  priv context : Int\n}\n\n",
+    )
+  }
   context_emit_runtime(
     output,
     root,
@@ -162,10 +174,14 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     rollback,
     graph.bits,
     schema.recursive,
-    !graph.module_roots.is_empty(),
+    !graph.module_roots.is_empty() || graph.object_refs,
     !graph.byte_orders.is_empty(),
     expressions.iter().any(context_contains_index),
     !object_values.is_empty() || expressions.iter().any(context_contains_cast),
+    records.length() == 1 &&
+    !has_instances &&
+    expressions.is_empty() &&
+    records[0].fields.is_empty(),
   )
   emit_endian_inheritance(output, root, graph)
   for index, record in records {
@@ -189,22 +205,121 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     }
   }
   context_emit_dispatch(output, records, root, id)
-  for name in context_hydrators(schema, object_values) {
-    context_emit_hydrator(output, graph, name, root, graph.tags[name])
+  let hydrated = if graph.object_refs {
+    graph.records.keys().collect()
+  } else {
+    context_hydrators(schema, object_values)
   }
-  let effect = if effects["@root"] {
+  for name in hydrated {
+    context_emit_hydrator(output, graph, name, root, graph.tags[name])
+    if graph.object_refs {
+      let accessor = if name == "@root" { "as_root" } else { "as_type_" + name }
+      output.write_string(
+        "///|\npub fn \{root}ObjectRef::\{accessor}(self : \{root}ObjectRef) -> \{context_type_name(root, name)} raise \{root}ParseError {\n  \{context_hydrate_name(root, name)}(self.arena, self.context, \{name.escape()})\n}\n\n",
+      )
+    }
+  }
+  context_emit_entry(
+    output,
+    schema.root,
+    "@root",
+    root,
+    id,
+    graph,
+    effects,
+    repeated,
+    accounting,
+  )
+  for name in schema.argument_readers {
+    context_emit_entry(
+      output,
+      graph.records[name],
+      name,
+      root,
+      id,
+      graph,
+      effects,
+      repeated,
+      accounting,
+    )
+  }
+  output.to_string()
+}
+
+///|
+fn context_emit_entry(
+  output : StringBuilder,
+  record : RecordDef,
+  owner : String,
+  root : String,
+  id : String,
+  graph : ContextGraph,
+  effects : Map[String, Bool],
+  repeated : Bool,
+  accounting : Bool,
+) -> Unit {
+  let object_parameters = record.parameters.filter(fn(p) {
+    parameter_is_object(p.kind)
+  })
+  let effect = if effects[owner] || !object_parameters.is_empty() {
     " raise " + root + "ParseError"
   } else {
     ""
   }
   let budget = if repeated { ", budget: [1_000_000, 3, 0, 0]" } else { "" }
-  let parameters = parameter_signature(schema.root.parameters)
-  let arguments = parameter_arguments(schema.root.parameters)
+  let parameters = record.parameters
+    .map(fn(p) {
+      ", arg_" + p.name + " : " + parameter_result_type(p.kind, root)
+    })
+    .join("")
+  let arguments = record.parameters
+    .map(fn(p) { ", " + parameter_input(p.kind, "arg_" + p.name, root) })
+    .join("")
   let accounts = if accounting { ", next_account: 1" } else { "" }
+  let fresh_arena = "{ frames: [], free: []\{accounts} }"
+  let (entry, reader, path) = if owner == "@root" {
+    ("parse_" + id, "read_" + id + "_root", id)
+  } else {
+    (
+      "parse_" + id + "_type_" + owner,
+      nested_reader(id, owner),
+      id + "." + owner,
+    )
+  }
   output.write_string(
-    "///|\npub fn parse_\{id}(input : Bytes\{parameters}) -> \{root}Record\{effect} {\n  let arena : \{root}Arena = { frames: [], free: []\{accounts} }\n  let reader : \{root}Reader = { input, offset: 0\{budget}\{bit_state(graph.bits)} }\n  read_\{id}_root(reader, \{id.escape()}, arena, -1\{arguments})\n}\n",
+    "///|\npub fn \{entry}(input : Bytes\{parameters}) -> \{context_type_name(root, owner)}\{effect} {\n",
   )
-  output.to_string()
+  if object_parameters.is_empty() {
+    output.write_string("  let arena : \{root}Arena = \{fresh_arena}\n")
+  } else {
+    output.write_string("  let objects : Array[\{root}ObjectRef] = []\n")
+    for p in object_parameters {
+      let insert = if p.kind is Sequence(_) { "append" } else { "push" }
+      output.write_string("  objects.\{insert}(arg_\{p.name})\n")
+    }
+    output.write_string(
+      "  let arena : \{root}Arena = match objects.get(0) { Some(object) => object.arena; None => \{fresh_arena} }\n  guard objects.iter().all(fn(object) { physical_equal(object.arena, arena) }) else { raise \{root}ContextError(field=\{path.escape()}, offset=0, message=\"object arguments belong to different parses\") }\n",
+    )
+    for p in object_parameters {
+      let sequence = p.kind is Sequence(_)
+      let kind = if p.kind is Sequence(element) { element } else { p.kind }
+      if kind is Object([name]) && name != "@any" {
+        let tag = graph.tags[name]
+        let field = (path + "." + p.name).escape()
+        let values = if sequence {
+          "arg_" + p.name
+        } else {
+          "[arg_" + p.name + "]"
+        }
+        output.write_string(
+          "  for object in \{values} {\n    guard arena.frame(object.context, \{field}).tag == \{tag} else { raise \{root}ContextError(field=\{field}, offset=0, message=\"object argument has the wrong type\") }\n  }\n",
+        )
+      }
+    }
+  }
+  output.write_string(
+    "  let reader : \{root}Reader = { input, offset: 0\{budget}\{bit_state(graph.bits)} }\n  \{reader}(reader, \{path.escape()}, arena, -1\{arguments})\n}\n",
+  )
 }
 
 ///|
@@ -244,15 +359,20 @@ fn context_emit_type(
   }
   output.write_string("///|\npub struct \{context_type_name(root, owner)} {\n")
   for p in record.parameters {
-    output.write_string("  \{p.name} : \{parameter_type(p)}\n")
+    output.write_string(
+      "  \{p.name} : \{parameter_result_type(p.kind, root)}\n",
+    )
   }
   for field in record.fields {
     output.write_string("  \{field.name} : \{field_result_type(field, root)}\n")
   }
-  if owner != "@root" || graph.root_referenced || !record.instances.is_empty() {
+  if owner != "@root" ||
+    graph.root_referenced ||
+    !record.instances.is_empty() ||
+    graph.object_refs {
     output.write_string("  priv _ksy_context : Int\n")
   }
-  if !record.instances.is_empty() {
+  if !record.instances.is_empty() || graph.object_refs {
     output.write_string("  priv _ksy_arena : \{root}Arena\n")
     for instance in record.instances {
       output.write_string(
@@ -261,6 +381,12 @@ fn context_emit_type(
     }
   }
   output.write_string("}\n\n")
+  if graph.object_refs {
+    let name = context_type_name(root, owner)
+    output.write_string(
+      "///|\npub fn \{name}::_ksy_object_ref(self : \{name}) -> \{root}ObjectRef {\n  { arena: self._ksy_arena, context: self._ksy_context }\n}\n\n",
+    )
+  }
 }
 
 ///|
@@ -270,10 +396,13 @@ fn context_emit_record_state(
   owner : String,
   record : RecordDef,
 ) -> Unit {
-  if owner != "@root" || graph.root_referenced || !record.instances.is_empty() {
+  if owner != "@root" ||
+    graph.root_referenced ||
+    !record.instances.is_empty() ||
+    graph.object_refs {
     output.write_string("    _ksy_context: context,\n")
   }
-  if !record.instances.is_empty() {
+  if !record.instances.is_empty() || graph.object_refs {
     output.write_string("    _ksy_arena: arena,\n")
     for instance in record.instances {
       output.write_string("    _ksy_cache_\{instance.name}: None,\n")
@@ -299,8 +428,8 @@ fn context_emit_reader(
     nested_reader(id, owner)
   }
   let effect = if raises { " raise " + root + "ParseError" } else { "" }
-  let parameters = parameter_signature(record.parameters)
-  let module_args = if graph.module_roots.is_empty() {
+  let parameters = parameter_signature(record.parameters, root)
+  let module_args = if graph.module_roots.is_empty() && !graph.object_refs {
     ""
   } else {
     let module_owner = graph.module_roots.get(owner).unwrap_or("@root")
@@ -320,12 +449,16 @@ fn context_emit_reader(
         field,
         message="parameter is outside its integer range",
       )
-      output.write_string(
-        "  guard arg_\{p.name} >= \{low}L && arg_\{p.name} <= \{high}L else { \{message} }\n",
-      )
+      let argument = "arg_" + p.name
+      let condition = if p.kind is Sequence(_) {
+        "\{argument}.iter().all(fn(item) { item >= \{low}L && item <= \{high}L })"
+      } else {
+        "\{argument} >= \{low}L && \{argument} <= \{high}L"
+      }
+      output.write_string("  guard \{condition} else { \{message} }\n")
     }
     output.write_string(
-      "  arena.frames[context].unwrap().fields[\{p.name.escape()}] = \{parameter_pack(p, root)}\n",
+      "  arena.frames[context].unwrap().fields[\{p.name.escape()}] = \{parameter_pack(p.kind, "arg_" + p.name, root)}\n",
     )
   }
   select_byte_order(output, graph, owner, root)
@@ -396,7 +529,9 @@ fn context_emit_reader(
   }
   output.write_string("  {\n")
   for p in record.parameters {
-    output.write_string("    \{p.name}: arg_\{p.name},\n")
+    output.write_string(
+      "    \{p.name}: \{parameter_result(p.kind, "arg_" + p.name, root)},\n",
+    )
   }
   for field in record.fields {
     output.write_string("    \{field.name}: v_\{field.name},\n")
@@ -645,7 +780,9 @@ fn context_emit_hydrator(
       "path",
       "frame.reader",
     )
-    output.write_string("    \{p.name}: \{result},\n")
+    output.write_string(
+      "    \{p.name}: \{parameter_result(p.kind, result, root)},\n",
+    )
   }
   for field in record.fields {
     output.write_string(

@@ -62,21 +62,36 @@ fn context_enum_label(
   label : String,
 ) -> (String, Int64) raise SchemaError {
   let names = scope.graph.enum_scopes[scope.owner]
-  let full = if names.get(name) is Some(full) {
-    full
-  } else if name.split_once("::") is Some((owner, label_name)) {
-    let visible = scope.graph.type_scopes[scope.owner]
-    let target = scoped_type_name(owner.to_owned(), visible)
-    target + "__" + label_name.to_owned()
-  } else {
-    "@" + name
-  }
+  let full = scoped_enum_name(name, scope.graph.type_scopes[scope.owner], names)
   let definition = context_enum(scope, full)
   guard definition.labels.iter().find_first(fn(item) { item.1 == label })
     is Some((value, _)) else {
     invalid(scope.path, "unknown enum label '" + name + "::" + label + "'")
   }
   (full, value)
+}
+
+///|
+fn scoped_enum_name(
+  name : String,
+  types : Map[String, String],
+  enums : Map[String, String],
+) -> String {
+  if enums.get(name) is Some(full) {
+    return full
+  }
+  if name.rev_split_once("::") is Some((owner, enum_name)) {
+    let first = owner
+      .split_once("::")
+      .map(fn(parts) { parts.0 })
+      .unwrap_or(owner)
+    if types.contains(first.to_owned()) {
+      return scoped_type_name(owner.to_owned(), types) +
+        "__" +
+        enum_name.to_owned()
+    }
+  }
+  "@" + name
 }
 
 ///|

@@ -47,6 +47,7 @@ jobs:
           python scripts/module-process-reference.py
           python scripts/numeric-endian-reference.py
           python scripts/expression-validation-reference.py
+          python scripts/type-parameter-reference.py
           python scripts/compatibility-report.py --runtime-report
           node examples/quickstart/run.mjs --source --all-targets
           python scripts/wav-reference.py --all-scenarios
@@ -63,6 +64,7 @@ jobs:
             _build/module-process-report.json
             _build/numeric-endian-report.json
             _build/expression-validation-report.json
+            _build/type-parameter-report.json
             _build/native-cli-report.json
             _build/image-reference-report.json
           if-no-files-found: error

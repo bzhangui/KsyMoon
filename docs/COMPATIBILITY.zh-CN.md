@@ -107,6 +107,10 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 字节和数组表达式可执行索引、长度、首尾和最小最大值操作。字节与字符串按字典序比较。`valid` 增加类型化等值、范围、`any-of` 和 `expr`，验证可定位到重复元素或惰性实例。新增对照包括官方预期的验证失败，检查错误类别和读取位置。 [对照脚本](../scripts/expression-validation-reference.py)
 
+## v0.9.0 开发版的参数与枚举
+
+参数增加布尔位、整数与字符串数组、流、对象引用及枚举。定位实例和复合参数可共享原对象、数组与流。调用方通过生成的对象引用访问对应的记录类型。枚举支持跨模块和多层类型作用域，以及能表示为 `Int64` 的位域和有符号 64 位字段。`python scripts/type-parameter-reference.py` 生成并构建 30 份原样上游描述，其中 24 份有对应的官方 Python 测试与 MoonBit 运行对照。
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -125,6 +129,7 @@ python scripts/native-cli-check.py
 python scripts/module-process-reference.py
 python scripts/numeric-endian-reference.py
 python scripts/expression-validation-reference.py
+python scripts/type-parameter-reference.py
 python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
 ```

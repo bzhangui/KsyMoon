@@ -63,8 +63,8 @@ fn context_value_code(
       })
       "\{root}Value::Items([\{items.join(", ")}])"
     }
-    Reference("_root") if scope.graph.module_roots.is_empty() =>
-      "\{root}Value::ObjectId(0)"
+    Reference("_root") if scope.graph.module_roots.is_empty() &&
+      !scope.graph.object_refs => "\{root}Value::ObjectId(0)"
     Reference("_parent") =>
       "\{root}Value::ObjectId(context).attribute(arena, \"_parent\", \{path})"
     Reference("_io") => "\{root}Value::Source(\{owner_reader})"
@@ -74,6 +74,8 @@ fn context_value_code(
       "\{context_pack_kind(scope.item.unwrap(), "item", root)}.attribute(arena, \{name[2:].escape()}, \{path})"
     Reference(name) =>
       "\{root}Value::ObjectId(context).attribute(arena, \{name.escape()}, \{path})"
+    Cast(base, target) if integer_array_cast(target) is Some(_) =>
+      context_value_code(scope, base, root, path, owner_reader)
     Cast(base, target) if integer_cast(target) is Some((bits, signed)) => {
       let code = context_expression_code(scope, base, root, path, owner_reader~)
       let value = if context_expression_type(scope, base) == WideInteger {
@@ -387,8 +389,7 @@ fn context_instance_result(
         Bytes => "BytesView"
         WideInteger => "UInt64"
         Real => "Double"
-        Sequence(element) =>
-          "Array[" + expression_result_type(element, instance.name) + "]"
+        Sequence(element) => parameter_result_type(Sequence(element), root)
         Stream => root + "Stream"
         Enum(name) => generated_enum_type(root, name)
         Object([name]) => context_type_name(root, name)
@@ -451,7 +452,12 @@ fn context_decode_value(
     }
     Enum(name) =>
       "\{generated_enum_type(root, name)}::from_code(\{context_unpack_expression(Enum(name), "value", root, "field", "reader")})"
-    kind => context_unpack_expression(kind, "value", root, "field", "reader")
+    kind =>
+      parameter_result(
+        kind,
+        context_unpack_expression(kind, "value", root, "field", "reader"),
+        root,
+      )
   }
 }
 

@@ -93,6 +93,7 @@ priv struct RecordDef {
 priv struct Schema {
   root : RecordDef
   records : Array[RecordDef]
+  argument_readers : Array[String]
   has_context : Bool
   recursive : Bool
   module_roots : Map[String, String]
@@ -531,10 +532,12 @@ fn parse_field(
     )
   }
   let kind = if field.get("enum") is Some(raw) {
-    guard kind is Unsigned(_, _) || kind is Signed(_, _) else {
+    guard kind
+      is (Unsigned(_, _) | Signed(_, _) | Signed64(_) | BitInteger(_, _)) ||
+      (kind is WideBitInteger(width, _) && width < 64) else {
       invalid(
         path + ".enum",
-        "enum requires a signed or unsigned integer field of at most 32 bits",
+        "enum requires an integer field whose code fits Int64",
       )
     }
     Enumerated(kind, as_string(raw, path + ".enum"))
@@ -554,6 +557,8 @@ fn parse_record(
   instances : @yaml.Yaml?,
   params~ : @yaml.Yaml? = None,
   navigation~ : Bool = false,
+  visible~ : Map[String, String] = Map([]),
+  enums~ : Map[String, String] = Map([]),
 ) -> RecordDef raise SchemaError {
   guard value is @yaml.Array(sequence) else {
     invalid(path, "expected a sequence")
@@ -577,7 +582,13 @@ fn parse_record(
   } else {
     path[:path.length() - 3].to_owned() + "instances"
   }
-  let parameters = parse_parameters(params, path + ".params")
+  let parameters = parse_parameters(
+    params,
+    path + ".params",
+    visible,
+    enums,
+    type_names,
+  )
   let parsed_instances = parse_instances(
     instances,
     fields,
@@ -639,6 +650,67 @@ fn collect_records(
       }
     }
   }
+}
+
+///|
+fn collect_argument_records(
+  definitions : Map[String, RecordDef],
+  collected : Map[String, RecordDef],
+  type_scopes : Map[String, Map[String, String]],
+  recursive : Array[Bool],
+) -> Array[String] {
+  let roots = []
+  let inspected : Map[String, Unit] = Map([])
+  let mut pending = ["@root", ..collected.keys().collect()]
+  while !pending.is_empty() {
+    for owner in pending {
+      inspected[owner] = ()
+      let record = definitions[owner]
+      let targets = []
+      for parameter in record.parameters {
+        let kind = if parameter.kind is Sequence(element) {
+          element
+        } else {
+          parameter.kind
+        }
+        if kind is Object([name]) && name != "@any" {
+          targets.push(name)
+        }
+      }
+      for expression in context_record_expressions(record) {
+        ignore(
+          expression_any(expression, fn(part) {
+            if part is Cast(_, name) {
+              let full = scoped_type_name(name, type_scopes[owner])
+              if definitions.contains(full) {
+                targets.push(full)
+              }
+            }
+            false
+          }),
+        )
+      }
+      for name in targets {
+        if name != "@root" && !collected.contains(name) {
+          let target = definitions[name]
+          roots.push(name)
+          collected[name] = target
+          collect_records(
+            target,
+            definitions,
+            ["@root", name],
+            collected,
+            recursive,
+          )
+        }
+      }
+    }
+    pending = collected
+      .keys()
+      .filter(fn(name) { !inspected.contains(name) })
+      .collect()
+  }
+  roots
 }
 
 ///|
@@ -769,6 +841,8 @@ fn load_schema(
       mapping.get("instances"),
       params=mapping.get("params"),
       navigation=has_context,
+      visible=type_scopes[name],
+      enums=enum_scopes[name],
     )
   }
   let root_record = parse_record(
@@ -780,6 +854,8 @@ fn load_schema(
     root.get("instances"),
     params=root.get("params"),
     navigation=has_context,
+    visible=type_scopes["@root"],
+    enums=enum_scopes["@root"],
   )
   for record in [root_record, ..definitions.values().collect()] {
     if !has_context {
@@ -790,6 +866,9 @@ fn load_schema(
   let recursion = [false]
   definitions["@root"] = root_record
   collect_records(root_record, definitions, ["@root"], reachable, recursion)
+  let argument_readers = collect_argument_records(
+    definitions, reachable, type_scopes, recursion,
+  )
   if recursion[0] {
     let checked = Map([])
     check_eager_type_cycles("@root", root_record, definitions, [], checked)
@@ -802,6 +881,7 @@ fn load_schema(
   let schema : Schema = {
     root: root_record,
     records: reachable.values().collect(),
+    argument_readers,
     has_context,
     recursive,
     module_roots,
@@ -822,6 +902,7 @@ fn load_schema(
       }
     })
     .collect(),
+    argument_readers,
     has_context,
     recursive,
     module_roots,

@@ -416,15 +416,7 @@ fn rewrite_field_type(
 ) -> @yaml.Yaml raise SchemaError {
   let field = as_mapping(value, "field").copy()
   if field.get("enum") is Some(@yaml.String(name)) {
-    let resolved = if visible_enums.get(name) is Some(full) {
-      full
-    } else if name.split_once("::") is Some((owner, label_name)) &&
-      visible.get(owner.to_owned()) is Some(full) {
-      full + "__" + label_name.to_owned()
-    } else {
-      "@" + name
-    }
-    field["enum"] = @yaml.String(resolved)
+    field["enum"] = @yaml.String(scoped_enum_name(name, visible, visible_enums))
   }
   match field.get("type") {
     Some(@yaml.String(name)) =>
