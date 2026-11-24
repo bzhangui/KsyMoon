@@ -37,6 +37,23 @@ moon -C examples/consumer run --target js .
 
 `check INPUT.ksy` 只校验描述。通过时返回状态 0，输入无法读取或描述超出支持范围时返回非零状态并打印诊断。库接口提供 `validate(source)` 和 `generate(source)`。
 
+## Native 命令行
+
+从当前开发分支用 MoonBit v0.10.19 构建。文件读取、诊断、依赖解析和批量写入均由 MoonBit 实现。构建后的可执行文件可直接运行，运行时无需 Node.js。
+
+```powershell
+moon update
+moon build --frozen --release --target native cmd/ksymoon_native
+moon run --frozen --target native cmd/ksymoon_native -- check fixtures/udp_datagram.ksy --json
+moon run --frozen --target native cmd/ksymoon_native -- deps fixtures/stl.ksy
+moon run --frozen --target native cmd/ksymoon_native -- generate fixtures/udp_datagram.ksy --out udp.mbt
+moon run --frozen --target native cmd/ksymoon_native -- batch --out-dir generated fixtures/udp_datagram.ksy fixtures/stl.ksy
+```
+
+`moon build` 输出独立二进制的路径。`check --json` 返回 `ok` 和 `diagnostics`，错误记录含 `code`、`schema_path`、`message`，并返回非零退出码。`deps` 输出入口与解析后的依赖边，包含级联导入。三个命令与 `batch` 都支持 `--root`、`-I` 和 `--import`。
+
+`batch` 在写入前先生成全部解析器并检查重名，按描述文件名输出 `generated/<名称>/<名称>.mbt`。每个解析器拥有独立的 MoonBit 包。把 `generated` 放在自己的 MoonBit 模块下即可构建。已有 `moon.pkg` 会保留，首次生成 zlib 包时会写入所需的标准库依赖声明。运行 `python scripts/native-cli-check.py` 可复验命令与生成源文件的四后端运行。
+
 ## 多文件描述和字节处理器
 
 `v0.5.0` 允许 CLI 自动加载 `meta.imports`。相对路径从声明所在文件的目录查找，以 `/` 开头的描述依次查找 `-I` 目录和项目根目录。目录需要位于 `--root` 内。省略 `--root` 时使用输入描述所在目录。已有的 `--import NAME FILE.ksy` 可以显式覆盖指定名称。
@@ -45,7 +62,7 @@ moon -C examples/consumer run --target js .
 moon run --target js cmd/ksymoon -- generate formats/media/wav.ksy --root formats --out wav.mbt
 ```
 
-库的 `generate_project` 和 `validate_project` 接收项目根下的入口相对路径、搜索目录和读取函数。导入子流的 `_root` 指向该次导入模块的根，模块内的 `_parent` 指向所属对象。可终止的递归引用受 64 层读取深度约束。
+库的 `generate_project` 和 `validate_project` 接收项目根下的入口相对路径、搜索目录和读取函数。开发版还可用 `on_import` 回调接收解析后的依赖边。导入子流的 `_root` 指向该次导入模块的根，模块内的 `_parent` 指向所属对象。可终止的递归引用受 64 层读取深度约束。
 
 `process` 支持 `xor`、`rol`、`ror` 与 `zlib`。原始字段先完成字节边界读取，再处理字节，用户类型在处理结果的独立子流中解析。XOR 支持单字节值、字节数组常量和先前读取的字节字段。zlib 解压使用 MoonBit 标准库，单块解压上限为 16 MiB。使用 zlib 的生成包需要声明以下依赖。
 

@@ -18,6 +18,14 @@ pub fn generate_with_imports(
 }
 
 ///|
+/// A resolved import, using project-relative paths or an @-prefixed alias.
+pub(all) struct ImportEdge {
+  importer : String
+  import_name : String
+  target : String
+}
+
+///|
 /// Compiles a project using slash-separated paths relative to its root.
 /// Read callbacks receive normalized in-project paths ending in .ksy.
 pub fn generate_project(
@@ -26,9 +34,10 @@ pub fn generate_project(
   search : Array[String],
   read : (String) -> String?,
   imports~ : Map[String, String] = Map([]),
+  on_import~ : (ImportEdge) -> Unit = fn(_) { () },
 ) -> String raise SchemaError {
   generate_schema(
-    load_schema(source, imports~, entry=Some(entry), search~, read~),
+    load_schema(source, imports~, entry=Some(entry), search~, read~, on_import~),
   )
 }
 
@@ -40,8 +49,11 @@ pub fn validate_project(
   search : Array[String],
   read : (String) -> String?,
   imports~ : Map[String, String] = Map([]),
+  on_import~ : (ImportEdge) -> Unit = fn(_) { () },
 ) -> Unit raise SchemaError {
-  ignore(load_schema(source, imports~, entry=Some(entry), search~, read~))
+  ignore(
+    load_schema(source, imports~, entry=Some(entry), search~, read~, on_import~),
+  )
 }
 
 ///|
@@ -53,6 +65,7 @@ priv struct SchemaImports {
   modules : Map[String, @yaml.Yaml]
   visibility : Map[String, Map[String, String]]
   root_id : String
+  on_import : (ImportEdge) -> Unit
 }
 
 ///|
@@ -160,6 +173,11 @@ fn resolve_import(
 ) -> (String, String) raise SchemaError {
   let path = "meta.imports." + key
   let (file, location, source) = import_source(graph, from, key, path)
+  (graph.on_import)({
+    importer: from.unwrap_or("@" + graph.root_id),
+    import_name: key,
+    target: file,
+  })
   if graph.files.get(file) is Some(owner) {
     return (if owner == "@root" { graph.root_id } else { owner }, owner)
   }
@@ -230,6 +248,7 @@ fn link_imports(
   entry : String?,
   search : Array[String],
   read : (String) -> String?,
+  on_import : (ImportEdge) -> Unit,
 ) -> (Map[String, @yaml.Yaml], Map[String, Map[String, String]]) raise SchemaError {
   if import_names(meta, "meta.imports").is_empty() {
     return (root, Map([]))
@@ -242,6 +261,7 @@ fn link_imports(
     modules: Map([]),
     visibility: Map([]),
     root_id: id,
+    on_import,
   }
   graph.visibility["@root"] = import_scope(graph, meta, entry, "meta.imports")
   let types = match root.get("types") {

@@ -45,6 +45,11 @@ def main():
             "fixtures/udp_datagram.ksy", "fixtures/stl.ksy", "fixtures/stm32_sample_frame.ksy",
             "fixtures/vp8_duck_ivf.ksy",
         })
+        if (ROOT / "cmd/ksymoon_native/moon.pkg").exists():
+            required.update({
+                "cmd/ksymoon_native/moon.pkg", "cmd/ksymoon_native/main.mbt",
+                "cmd/ksymoon_native/project.mbt", "scripts/native-cli-check.py",
+            })
         assert required.issubset(files), f"Missing source, fixture or license: {required.difference(files)}"
         assert all(not path.endswith(("/wav.ksy", "/riff.ksy")) for path in files), "WAV/RIFF descriptions should be fetched on demand"
         assert before == hashlib.sha256(PROPOSAL.read_bytes()).hexdigest(), "Proposal was modified"

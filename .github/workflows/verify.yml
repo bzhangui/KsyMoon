@@ -43,6 +43,7 @@ jobs:
             exit 1
           fi
           node scripts/verify.mjs --kaitai-reference
+          python scripts/native-cli-check.py
           python scripts/module-process-reference.py
           python scripts/numeric-endian-reference.py
           python scripts/expression-validation-reference.py
@@ -61,4 +62,5 @@ jobs:
             _build/module-process-report.json
             _build/numeric-endian-report.json
             _build/expression-validation-report.json
+            _build/native-cli-report.json
           if-no-files-found: error

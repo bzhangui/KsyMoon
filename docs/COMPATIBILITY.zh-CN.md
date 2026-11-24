@@ -121,7 +121,10 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 ```powershell
 python -m pip install kaitaistruct==0.11
 node scripts/verify.mjs --kaitai-reference
+python scripts/native-cli-check.py
 python scripts/module-process-reference.py
+python scripts/numeric-endian-reference.py
+python scripts/expression-validation-reference.py
 python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
 ```
@@ -129,6 +132,8 @@ python scripts/wav-reference.py --all-scenarios
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。兼容盘点脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
 
 `generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。v0.4.0 的固定盘点为 **160 份生成、179 份保留诊断**，全部 339 份都保留结果。51 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P3—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
+
+开发版在同一固定语料中已有 **231 份生成并构建、108 份保留诊断**。动态字节序与宽数值、表达式与 `valid`、模块与处理器的运行对照分别输出报告，条目可能与基础对照重叠。Native CLI 的报告单独记录运行平台、依赖解析与批量生成后的四后端验证。
 
 [v0.4.0 固定语料报告](reports/kaitai-0.11-p4-2026-11-24.json)保留全部 339 行。WAV 与 RIFF 是额外的格式库用例，单独计入 [WAV/RIFF 报告](reports/wav-riff-2026-11-24.json)。
 

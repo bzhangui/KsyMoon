@@ -681,6 +681,7 @@ fn load_schema(
   entry~ : String? = None,
   search~ : Array[String] = [],
   read~ : (String) -> String? = fn(_) { None },
+  on_import~ : (ImportEdge) -> Unit = fn(_) { () },
 ) -> Schema raise SchemaError {
   let root = document_mapping(source, "schema")
   check_keys(
@@ -701,7 +702,7 @@ fn load_schema(
   check_identifier(id, "meta.id")
   let endian = byte_endian(meta.get("endian"), "meta.endian")
   let (root, imports_visibility) = link_imports(
-    root, meta, id, imports, entry, search, read,
+    root, meta, id, imports, entry, search, read, on_import,
   )
   let type_scopes = Map([])
   let enum_scopes = Map([])
