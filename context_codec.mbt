@@ -43,7 +43,77 @@ fn context_value_code(
   path : String,
   owner_reader : String,
 ) -> String raise SchemaError {
+  let value = context_raw_value_code(
+    scope, expression, root, path, owner_reader,
+  )
+  if context_may_read_selected(scope, expression) &&
+    context_expression_type(scope, expression)
+    is (Integer | WideInteger | Boolean | Text | Bytes | Real | Enum(_)) {
+    "(match \{value} { \{root}Value::Selected(_, payload) => payload; value => value })"
+  } else {
+    value
+  }
+}
+
+///|
+fn context_may_read_selected(
+  scope : ContextScope,
+  expression : Expr,
+) -> Bool raise SchemaError {
+  let find = fn(owners : Array[String], name : String) {
+    owners
+    .iter()
+    .any(fn(owner) {
+      guard scope.graph.records.get(owner) is Some(record) else { return false }
+      record.fields
+      .iter()
+      .any(fn(field) { field.name == name && is_switch_value(field.kind) }) ||
+      record.instances
+      .iter()
+      .any(fn(instance) {
+        instance.name == name &&
+        instance.kind is Parsed(field, _) &&
+        is_switch_value(field.kind)
+      })
+    })
+  }
   match expression {
+    Reference(name) if name == "_" || scope.validated_field == Some(name) =>
+      scope.item is Some(kind) && is_switch_value(kind)
+    Reference(name) if name.has_prefix("_.") => {
+      guard scope.item is Some(kind) &&
+        context_kind_type(kind, scope.path) is Object(owners) else {
+        return false
+      }
+      find(owners, name[2:].to_owned())
+    }
+    Reference(name) => find([scope.owner], name)
+    Member(base, name) =>
+      context_expression_type(scope, base) is Object(owners) &&
+      find(owners, name)
+    Index(base, _) => context_may_read_selected(scope, base)
+    _ => false
+  }
+}
+
+///|
+fn is_switch_value(kind : FieldKind) -> Bool {
+  kind is (Switch(_, _, _, _) | Bounded(Switch(_, _, _, _), _))
+}
+
+///|
+fn context_raw_value_code(
+  scope : ContextScope,
+  expression : Expr,
+  root : String,
+  path : String,
+  owner_reader : String,
+) -> String raise SchemaError {
+  match expression {
+    Member(_, "_sizeof" | "_bitsizeof")
+    | Reference("_sizeof" | "_bitsizeof")
+    | TypeSize(_, _) =>
+      "\{root}Value::Number(\{size_expression(scope, expression)}L)"
     ArrayLiteral(values) => {
       let kind = context_expression_type(scope, expression)
       let items = values.map(fn(value) raise SchemaError {
@@ -69,7 +139,8 @@ fn context_value_code(
       "\{root}Value::ObjectId(context).attribute(arena, \"_parent\", \{path})"
     Reference("_io") => "\{root}Value::Source(\{owner_reader})"
     Reference("_index") => "\{root}Value::Number(index.to_int64())"
-    Reference("_") => context_pack_kind(scope.item.unwrap(), "item", root)
+    Reference(name) if name == "_" || scope.validated_field == Some(name) =>
+      context_pack_kind(scope.item.unwrap(), "item", root)
     Reference(name) if name.has_prefix("_.") =>
       "\{context_pack_kind(scope.item.unwrap(), "item", root)}.attribute(arena, \{name[2:].escape()}, \{path})"
     Reference(name) =>
@@ -132,12 +203,20 @@ fn context_value_code(
       "\{context_value_code(scope, base, root, path, owner_reader)}.attribute(arena, \"length\", \{path})"
     Member(base, "to_i") if context_expression_type(scope, base) is Enum(_) =>
       context_value_code(scope, base, root, path, owner_reader)
+    Member(base, "length") if context_expression_type(scope, base) == Text =>
+      "\{root}Value::Number(\{context_expression_code(scope, base, root, path, owner_reader~)}.to_array().length().to_int64())"
+    Substring(_, _, _) =>
+      "\{root}Value::StringValue(\{context_expression_code(scope, expression, root, path, owner_reader~)})"
+    Member(_, "_in_enum") =>
+      "\{root}Value::Flag(\{context_expression_code(scope, expression, root, path, owner_reader~)})"
     Member(base, "to_s") if context_expression_type(scope, base) is Integer =>
       "\{root}Value::StringValue(\{context_expression_code(scope, base, root, path, owner_reader~)}.to_string())"
     Member(base, name) =>
       "\{context_value_code(scope, base, root, path, owner_reader)}.attribute(arena, \{name.escape()}, \{path})"
     Index(base, index) =>
       "\{context_value_code(scope, base, root, path, owner_reader)}.element(arena, \{context_expression_code(scope, index, root, path, owner_reader~)}, \{path}, \{owner_reader}.offset)"
+    Choose(_, _, _) if context_expression_type(scope, expression) == Real =>
+      "\{root}Value::RealValue(\{context_expression_code(scope, expression, root, path, owner_reader~)})"
     Choose(condition, yes, no) =>
       "(if \{context_expression_code(scope, condition, root, path, owner_reader~)} { \{context_value_code(scope, yes, root, path, owner_reader)} } else { \{context_value_code(scope, no, root, path, owner_reader)} })"
     _ => {
@@ -172,6 +251,43 @@ fn context_expression_code(
 ) -> String raise SchemaError {
   let kind = context_expression_type(scope, expression)
   match expression {
+    Substring(value, start, end) => {
+      let value = context_expression_code(
+        scope,
+        value,
+        root,
+        path,
+        owner_reader~,
+      )
+      let start = context_expression_code(
+        scope,
+        start,
+        root,
+        path,
+        owner_reader~,
+      )
+      let end = context_expression_code(scope, end, root, path, owner_reader~)
+      let error = context_error(
+        root,
+        path,
+        reader=owner_reader,
+        message="substring index is out of range",
+      )
+      "{ let chars = (\{value}).to_array(); let begin = \{start}; let end = \{end}; guard begin >= 0L && end >= begin && end <= chars.length().to_int64() else { \{error} }; String::from_array(chars[begin.to_int():end.to_int()]) }"
+    }
+    Member(base, "_in_enum") => {
+      guard context_expression_type(scope, base) is Enum(name) else {
+        invalid(scope.path, "in-enum requires an enum field")
+      }
+      let codes = context_enum(scope, name).labels
+        .map(fn(item) { "\{item.0}L" })
+        .join(" | ")
+      let raw = context_expression_code(scope, base, root, path, owner_reader~)
+      "(\{raw} is (\{codes}))"
+    }
+    Member(_, "_sizeof" | "_bitsizeof")
+    | Reference("_sizeof" | "_bitsizeof")
+    | TypeSize(_, _) => "\{size_expression(scope, expression)}L"
     Reference(_)
     | Member(_, _)
     | Index(_, _)
@@ -193,8 +309,23 @@ fn context_expression_code(
       context_lexical_code(scope, op, left, right, root, path, owner_reader)
     Binary(op, left, right) if context_real_binary(scope, left, right) =>
       context_real_code(scope, op, left, right, root, path, owner_reader)
-    Choose(condition, yes, no) =>
-      "(if \{context_expression_code(scope, condition, root, path, owner_reader~)} { \{context_expression_code(scope, yes, root, path, owner_reader~)} } else { \{context_expression_code(scope, no, root, path, owner_reader~)} })"
+    Choose(condition, yes, no) => {
+      let branch = fn(value) raise SchemaError {
+        let code = context_expression_code(
+          scope,
+          value,
+          root,
+          path,
+          owner_reader~,
+        )
+        if kind == Real && context_expression_type(scope, value) == Integer {
+          "(\{code}).to_double()"
+        } else {
+          code
+        }
+      }
+      "(if \{context_expression_code(scope, condition, root, path, owner_reader~)} { \{branch(yes)} } else { \{branch(no)} })"
+    }
     _ => {
       let references : Map[String, String] = Map([])
       let navigation : Array[(Expr, String)] = []
@@ -472,6 +603,7 @@ fn context_has_reference(expression : Expr) -> Bool {
     | EnumLiteral(_, _)
     | ToEnum(_, _)
     | ArrayLiteral(_) => true
+    TypeSize(_, _) | Substring(_, _, _) => true
     Unary(_, child) => context_has_reference(child)
     Binary(_, a, b) => context_has_reference(a) || context_has_reference(b)
     Choose(a, b, c) =>
@@ -591,6 +723,8 @@ fn context_expression_parts(
     | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
+    | TypeSize(_, _)
+    | Substring(_, _, _)
     | ArrayLiteral(_) =>
       navigation.push(
         (
@@ -679,6 +813,11 @@ fn context_field_evaluator(
     _ => ()
   }
   let codes = expressions.map(fn(value) raise SchemaError {
+    let scope = if field.predicate == Some(value) {
+      { ..scope, validated_field: Some(field.name), }
+    } else {
+      scope
+    }
     (
       value,
       context_expression_code(scope, value, root, path, owner_reader=reader),

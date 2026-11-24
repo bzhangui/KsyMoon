@@ -54,6 +54,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
   let mut has_bounded = false
   let mut has_byte_options = false
   let mut has_strings = false
+  let mut single_byte_encoding = false
   let mut has_open_repeats = false
   let processors = []
   for record in records {
@@ -117,6 +118,8 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
         has_contents = has_contents || kind is Contents(_)
         has_bounded = has_bounded || kind is Bounded(_, _)
         has_strings = has_strings || kind is Text(_, _)
+        single_byte_encoding = single_byte_encoding ||
+          kind is Text(_, "WINDOWS-1252" | "ISO-8859-1")
         match kind {
           ByteField(options) | Text(options, _) | Bounded(_, options) =>
             has_byte_options = has_byte_options ||
@@ -152,6 +155,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
     has_bounded~,
     has_byte_options~,
     has_strings~,
+    single_byte_encoding~,
     has_open_repeats~,
     has_numeric_fields~,
     has_uint64~,
@@ -299,7 +303,9 @@ fn emit_record_type(
   output.write_string("///|\npub struct \{type_name} {\n")
   for field in record.fields {
     let type_name = field_result_type(field, root_type)
-    output.write_string("  \{field.name} : \{type_name}\n")
+    output.write_string(
+      "  \{generated_member_name(field.name)} : \{type_name}\n",
+    )
   }
   if !record.instances.is_empty() {
     output.write_string(
@@ -553,7 +559,9 @@ fn emit_record_reader(
   }
   output.write_string("  {\n")
   for field in record.fields {
-    output.write_string("    \{field.name}: v_\{field.name},\n")
+    output.write_string(
+      "    \{generated_member_name(field.name)}: v_\{field.name},\n",
+    )
   }
   if !record.instances.is_empty() {
     output.write_string("    _ksy_reader: reader,\n    _ksy_path: path,\n")

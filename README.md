@@ -147,7 +147,8 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 - `if/value/pos` 支持类型化表达式，包括算术、比较、位运算、逻辑短路、条件表达式、实例依赖及 `_io.pos/_io.size`。字节和数组支持索引、长度及选定的首尾和极值操作，字节和字符串可按字典序比较。 [兼容范围与复现](docs/COMPATIBILITY.zh-CN.md)
 - 生成的解析器读取描述指定的前缀。UDP 校验和作为字段返回，由调用者按使用场景校验。
 - 对象、数组和流属性也可用于无 `io` 的描述。对象或流可作为惰性值实例返回，`.as<T>` 可将对象分支转换为确定的本地记录类型，类型不匹配时报告错误。
-- 支持 32 位以内整数枚举、枚举字面量、条件与分支、值实例枚举及 `to_i`。未知枚举码保留在 `UnknownCode(Int64)` 中。支持整数、布尔和字符串参数，包含根解析入口及参数化本地类型调用。
+- 枚举支持多层与跨模块作用域、位字段、有符号 64 位字段和 `to_i`。未知枚举码保留在 `UnknownCode(Int64)` 中。参数支持标量、数组、流、对象引用和枚举。
+- `_sizeof`、`_bitsizeof`、`sizeof<T>` 和 `bitsizeof<T>` 可在编译时计算固定布局的尺寸。字符串支持长度与切片，文本解码支持 ISO-8859-1 和 Windows-1252。
 - 导入支持相对和绝对查找，以及显式覆盖；字节处理支持 XOR、循环位移和 zlib。跨类型递归可经惰性实例进入，最多支持 64 层对象嵌套。
 - 当前兼容盘点和剩余能力按 Kaitai Struct 0.11 语义矩阵记录。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
 
@@ -161,7 +162,7 @@ WAV 与 RIFF 描述从相同固定修订按需下载，分别保留上游文件�
 
 动态字节序对照脚本按需下载同一修订的 Exif 描述，核对 SHA-256 并保存在本地构建目录，保留其 CC0-1.0 许可。 [原样 Exif](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/exif.ksy)
 
-`python scripts/image-reference.py` 对同一修订的原样 GIF 描述运行四后端验证。对照项包括画布尺寸、区块类型以及完整样本和所有真前缀的处理结果。GIF 描述按需下载并校验 SHA-256。 [原样 GIF](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/gif.ksy)
+`python scripts/image-reference.py` 在开发版运行原样 GIF、BMP 和 PNG 的四后端对照。测试覆盖 GIF 区块、BMP DIB 与 Windows-1252 链接配置文件、PNG 的 Latin-1 文本与 ICC、Exif 导入，以及截断结果。五份描述按固定修订下载并校验 SHA-256。 [原样 GIF](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/gif.ksy) · [原样 BMP](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/bmp.ksy) · [原样 PNG](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/png.ksy) · [原样 ICC](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/icc_4.ksy)
 
 WAV/RIFF 实现通过 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45331862218)。固定语料的 339 份描述中，160 份可生成并在四后端构建，179 份保留诊断，51 份有运行对照。WAV 与 RIFF 的官方对照和递归限制共 9 项测试在四后端通过。 [固定语料报告](docs/reports/kaitai-0.11-p4-2026-11-24.json) · [WAV/RIFF 报告](docs/reports/wav-riff-2026-11-24.json)
 

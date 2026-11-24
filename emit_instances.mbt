@@ -83,7 +83,7 @@ fn emit_instances(
     let name = instance.name
     let result_type = instance_result_type(record, instance, root_type)
     output.write_string(
-      "///|\npub fn \{type_name}::\{name}(self : \{type_name}) -> \{result_type} raise \{root_type}ParseError {\n",
+      "///|\npub fn \{type_name}::\{generated_member_name(name)}(self : \{type_name}) -> \{result_type} raise \{root_type}ParseError {\n",
     )
     output.write_string(
       "  if self._ksy_cache_\{name} is Some(value) { return value }\n",

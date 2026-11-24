@@ -7,6 +7,7 @@ fn emit_stream_reader(
   strings : Bool,
   repeated : Bool,
   bits : Bool,
+  single_byte_encoding : Bool,
 ) -> Unit {
   if bounded {
     let budget = if repeated { ", budget: self.budget" } else { "" }
@@ -103,6 +104,14 @@ fn emit_stream_reader(
       #|  output.to_string()
       #|}
       #|
+    let block = if single_byte_encoding {
+      block.replace_all(
+        old="    } else if first >= 128 {",
+        new="    } else if encoding == \"ISO-8859-1\" { () } else if encoding == \"WINDOWS-1252\" {\n      if first >= 0x80 && first < 0xA0 {\n        let table : FixedArray[Int] = [0x20AC, -1, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, -1, 0x017D, -1, -1, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, -1, 0x017E, 0x0178]\n        code = table[first - 0x80]\n        guard code >= 0 else { raise __ROOT__InvalidEncoding(field~, offset=start + i, encoding~) }\n      }\n    } else if first >= 128 {",
+      )
+    } else {
+      block
+    }
     write_reader_block(output, block, root_type)
   }
 }

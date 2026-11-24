@@ -36,6 +36,7 @@ FAILURES = {
     "valid_fail_repeat_eq_int": "bcd_user_type_be.bin",
     "valid_fail_repeat_max_int": "nav_parent_switch.bin",
     "valid_fail_repeat_min_int": "process_coerce_bytes.bin",
+    "valid_fail_in_enum": "enum_0.bin",
 }
 
 

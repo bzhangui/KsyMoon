@@ -118,9 +118,11 @@ fn expression_needs_context(expression : Expr) -> Bool {
     | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
+    | TypeSize(_, _)
+    | Substring(_, _, _)
     | ArrayLiteral(_)
     | ByteLiteral(_) => true
-    Reference("_root" | "_parent" | "_io") => true
+    Reference("_root" | "_parent" | "_io" | "_sizeof" | "_bitsizeof") => true
     Unary(_, value) => expression_needs_context(value)
     Binary(_, left, right) =>
       expression_needs_context(left) || expression_needs_context(right)
@@ -168,6 +170,7 @@ priv struct ContextScope {
   path : String
   active : Array[String]
   item : FieldKind?
+  validated_field : String?
   index_allowed : Bool
   earlier : Int32?
 }
@@ -230,11 +233,12 @@ fn context_scope(
   owner : String,
   path : String,
   item~ : FieldKind? = None,
+  validated_field~ : String? = None,
   index_allowed~ : Bool = false,
   earlier~ : Int32? = None,
   active~ : Array[String] = [],
 ) -> ContextScope {
-  { graph, owner, path, item, index_allowed, earlier, active, }
+  { graph, owner, path, item, validated_field, index_allowed, earlier, active, }
 }
 
 ///|
@@ -426,6 +430,8 @@ fn context_member_type(
       element
     Bytes if ["first", "last", "min", "max"].contains(name) => Integer
     Enum(_) if name == "to_i" => Integer
+    Enum(_) if name == "_in_enum" => Boolean
+    Text if name == "length" => Integer
     Integer if name == "to_s" => Text
     _ =>
       invalid(
@@ -472,11 +478,15 @@ fn context_expression_type(
     }
     Decode(bytes, encoding) => {
       context_require(scope, bytes, Bytes)
-      guard ["UTF-8", "UTF8", "ASCII", "UTF-16LE", "UTF-16BE"].contains(
-        encoding,
-      ) else {
+      guard supported_encoding(encoding) else {
         invalid(scope.path, "encoding is awaiting implementation: " + encoding)
       }
+      Text
+    }
+    Substring(value, start, end) => {
+      context_require(scope, value, Text)
+      context_require(scope, start, Integer)
+      context_require(scope, end, Integer)
       Text
     }
     EnumLiteral(name, label) => Enum(context_enum_label(scope, name, label).0)
@@ -514,6 +524,12 @@ fn context_expression_type(
       }
       Object([name])
     }
+    Member(_, "_sizeof" | "_bitsizeof")
+    | Reference("_sizeof" | "_bitsizeof")
+    | TypeSize(_, _) => {
+      ignore(size_expression(scope, expression))
+      Integer
+    }
     Member(base, name) =>
       context_member_type(scope, context_expression_type(scope, base), name)
     Index(base, index) => {
@@ -535,12 +551,14 @@ fn context_expression_type(
       }
       Integer
     }
-    Reference(name) if name == "_" || name.has_prefix("_.") => {
+    Reference(name) if name == "_" ||
+      scope.validated_field == Some(name) ||
+      name.has_prefix("_.") => {
       guard scope.item is Some(kind) else {
         invalid(scope.path, "current item is only available in repeat-until")
       }
       let element = context_kind_type(kind, scope.path)
-      if name == "_" {
+      if name == "_" || scope.validated_field == Some(name) {
         element
       } else {
         context_member_type(scope, element, name[2:].to_owned())
@@ -549,13 +567,15 @@ fn context_expression_type(
     Reference(name) => context_attribute_type(scope, scope.owner, name)
     Choose(condition, yes, no) => {
       context_require(scope, condition, Boolean)
-      context_merge(
-        [
-          context_expression_type(scope, yes),
-          context_expression_type(scope, no),
-        ],
-        scope.path,
+      let types = (
+        context_expression_type(scope, yes),
+        context_expression_type(scope, no),
       )
+      if types is ((Integer, Real) | (Real, Integer)) {
+        Real
+      } else {
+        context_merge([types.0, types.1], scope.path)
+      }
     }
     Unary(op, value) => {
       let kind = context_expression_type(scope, value)
@@ -686,10 +706,14 @@ fn check_context_kind(
         let expected = parameters[index].kind
         let actual = context_expression_type(scope, argument)
         guard parameter_kind_matches(actual, expected) else {
-          invalid(
-            scope.path,
-            "type mismatch for parameter '" + parameters[index].name + "'",
-          )
+          if expected is (Object(_) | Sequence(_)) {
+            invalid(
+              scope.path,
+              "type mismatch for parameter '" + parameters[index].name + "'",
+            )
+          }
+          context_require(scope, argument, expected)
+          continue
         }
       }
     }
@@ -765,6 +789,7 @@ fn check_context_field(
         scope.path,
         earlier=scope.earlier,
         item=Some(field.kind),
+        validated_field=Some(field.name),
         index_allowed=field.count is Some(_),
       ),
       predicate,

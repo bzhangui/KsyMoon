@@ -111,6 +111,10 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 参数增加布尔位、整数与字符串数组、流、对象引用及枚举。定位实例和复合参数可共享原对象、数组与流。调用方通过生成的对象引用访问对应的记录类型。枚举支持跨模块和多层类型作用域，以及能表示为 `Int64` 的位域和有符号 64 位字段。`python scripts/type-parameter-reference.py` 生成并构建 30 份原样上游描述，其中 24 份有对应的官方 Python 测试与 MoonBit 运行对照。
 
+## v0.9.0 开发版的图像与尺寸语义
+
+固定尺寸表达式计算字段、子流和嵌套记录的宽度。新增 4 份原样尺寸用例，补充根对象参数的上下文检查，以及 `valid: in-enum`、字符串切片和单字节解码的运行对照。PNG 与 ICC、Exif 的链接描述可包含最多 256 个类型定义，运行时递归深度与既有资源预算仍分别检查。`python scripts/image-reference.py` 验证原样 GIF、BMP、PNG 的正常字段、已知截断差异和惰性配置文件读取。
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -132,13 +136,14 @@ python scripts/expression-validation-reference.py
 python scripts/type-parameter-reference.py
 python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
+python scripts/image-reference.py
 ```
 
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。兼容盘点脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
 
 `generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。v0.4.0 的固定盘点为 **160 份生成、179 份保留诊断**，全部 339 份都保留结果。51 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P3—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
 
-开发版在同一固定语料中已有 **231 份生成并构建、108 份保留诊断**。动态字节序与宽数值、表达式与 `valid`、模块与处理器的运行对照分别输出报告，条目可能与基础对照重叠。Native CLI 的报告单独记录运行平台、依赖解析与批量生成后的四后端验证。
+开发版在同一固定语料中已有 **270 份生成并构建、69 份保留诊断**。相比 `v0.8.0` 候选基线有 39 份新增通过，原有 231 份保留。数值、校验、模块、参数和图像的运行对照分别输出报告，条目可能与基础对照重叠。Native CLI 的报告单独记录运行平台、依赖解析与批量生成后的四后端验证。
 
 [v0.4.0 固定语料报告](reports/kaitai-0.11-p4-2026-11-24.json)保留全部 339 行。WAV 与 RIFF 是额外的格式库用例，单独计入 [WAV/RIFF 报告](reports/wav-riff-2026-11-24.json)。
 

@@ -51,6 +51,13 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
   let mut bounded = false
   let mut options = false
   let mut strings = false
+  let mut single_byte_encoding = expressions
+    .iter()
+    .any(fn(expr) {
+      expression_any(expr, fn(part) {
+        part is Decode(_, "WINDOWS-1252" | "ISO-8859-1")
+      })
+    })
   let mut open_repeats = false
   for record in records {
     let fields = record.fields.copy()
@@ -82,6 +89,8 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
         contents = contents || kind is Contents(_)
         bounded = bounded || kind is Bounded(_, _)
         strings = strings || kind is Text(_, _)
+        single_byte_encoding = single_byte_encoding ||
+          kind is Text(_, "WINDOWS-1252" | "ISO-8859-1")
         match kind {
           ByteField(bytes) | Text(bytes, _) | Bounded(_, bytes) =>
             options = options ||
@@ -136,6 +145,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     has_bounded=bounded,
     has_byte_options=options,
     has_strings=strings || decode,
+    single_byte_encoding~,
     has_open_repeats=open_repeats,
     has_numeric_fields=numeric,
     has_uint64=wide,
@@ -178,10 +188,18 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     !graph.byte_orders.is_empty(),
     expressions.iter().any(context_contains_index),
     !object_values.is_empty() || expressions.iter().any(context_contains_cast),
-    records.length() == 1 &&
     !has_instances &&
-    expressions.is_empty() &&
-    records[0].fields.is_empty(),
+    !expressions
+    .iter()
+    .any(fn(expr) {
+      expression_any(expr, fn(part) {
+        match part {
+          Reference("_" | "_index" | "_io") | Member(_, "_in_enum") => false
+          Reference(_) | Member(_, _) => true
+          _ => false
+        }
+      })
+    }),
   )
   emit_endian_inheritance(output, root, graph)
   for index, record in records {
@@ -364,7 +382,9 @@ fn context_emit_type(
     )
   }
   for field in record.fields {
-    output.write_string("  \{field.name} : \{field_result_type(field, root)}\n")
+    output.write_string(
+      "  \{generated_member_name(field.name)} : \{field_result_type(field, root)}\n",
+    )
   }
   if owner != "@root" ||
     graph.root_referenced ||
@@ -534,7 +554,9 @@ fn context_emit_reader(
     )
   }
   for field in record.fields {
-    output.write_string("    \{field.name}: v_\{field.name},\n")
+    output.write_string(
+      "    \{generated_member_name(field.name)}: v_\{field.name},\n",
+    )
   }
   context_emit_record_state(output, graph, owner, record)
   output.write_string("  }\n}\n\n")
@@ -675,14 +697,25 @@ fn context_emit_instance(
   let type_name = context_type_name(root, owner)
   let result_type = context_instance_result(graph, owner, instance, root)
   output.write_string(
-    "///|\npub fn \{type_name}::\{name}(self : \{type_name}) -> \{result_type} raise \{root}ParseError {\n  if self._ksy_cache_\{name} is Some(value) { return value }\n  let arena = self._ksy_arena\n  let context = self._ksy_context\n  let frame = arena.frame(context, \{name.escape()})\n  let reader = frame.reader\n  let field = frame.path + \".\{name}\"\n  let raw = \{root}Value::ObjectId(context).attribute(arena, \{name.escape()}, field)\n",
+    "///|\npub fn \{type_name}::\{generated_member_name(name)}(self : \{type_name}) -> \{result_type} raise \{root}ParseError {\n  if self._ksy_cache_\{name} is Some(value) { return value }\n  let arena = self._ksy_arena\n  let context = self._ksy_context\n  let frame = arena.frame(context, \{name.escape()})\n  let reader = frame.reader\n  let field = frame.path + \".\{name}\"\n  let raw = \{root}Value::ObjectId(context).attribute(arena, \{name.escape()}, field)\n",
   )
   let decode = match instance.kind {
     Parsed(field, _) => context_unpack_field(field, "value", root, "field")
     Value(expression) => context_decode_value(scope, expression, root, name)
   }
   let decode = if instance.condition is Some(_) {
-    "(match raw { \{root}Value::Absent => None; value => Some(\{decode}) })"
+    let option_names_in_enums = graph.enums
+      .values()
+      .any(fn(definition) {
+        definition.labels
+        .iter()
+        .any(fn(label) { generated_enum_label(label.1) is ("None" | "Some") })
+      })
+    if option_names_in_enums {
+      "(match raw { \{root}Value::Absent => Option::None; value => Option::Some(\{decode}) })"
+    } else {
+      "(match raw { \{root}Value::Absent => None; value => Some(\{decode}) })"
+    }
   } else {
     "{ let value = raw; \{decode} }"
   }
@@ -786,7 +819,7 @@ fn context_emit_hydrator(
   }
   for field in record.fields {
     output.write_string(
-      "    \{field.name}: \{context_unpack_field(field, "frame.fields.get(" + field.name.escape() + ").unwrap_or(" + root + "Value::Absent)", root, "path", reader="frame.reader")},\n",
+      "    \{generated_member_name(field.name)}: \{context_unpack_field(field, "frame.fields.get(" + field.name.escape() + ").unwrap_or(" + root + "Value::Absent)", root, "path", reader="frame.reader")},\n",
     )
   }
   context_emit_record_state(output, graph, name, record)

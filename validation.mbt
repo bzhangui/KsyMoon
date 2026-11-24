@@ -41,7 +41,15 @@ fn validation_expression(
   }
   match value {
     @yaml.Map(options) => {
-      check_keys(options, ["eq", "min", "max", "any-of", "expr"], path)
+      check_keys(
+        options,
+        ["eq", "min", "max", "any-of", "expr", "in-enum"],
+        path,
+      )
+      if options.get("in-enum") is Some(@yaml.Boolean(true)) &&
+        options.length() == 1 {
+        return Member(actual, "_in_enum")
+      }
       if options.get("expr") is Some(expr) && options.length() == 1 {
         return parse_expression(expr, path)
       }

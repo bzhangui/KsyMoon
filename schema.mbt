@@ -234,6 +234,15 @@ fn is_moonbit_keyword(name : String) -> Bool {
 }
 
 ///|
+fn generated_member_name(name : String) -> String {
+  if is_moonbit_keyword(name) {
+    name + "_"
+  } else {
+    name
+  }
+}
+
+///|
 fn parse_decimal(text : StringView, path : String) -> Int64 raise SchemaError {
   guard !text.is_empty() && text.iter().all(is_ascii_digit) else {
     invalid(path, "expected a nonnegative decimal integer")
@@ -452,9 +461,6 @@ fn parse_field(
   )
   let name = as_string(get_required(field, "id", path), path + ".id")
   check_identifier(name, path + ".id")
-  guard !is_moonbit_keyword(name) else {
-    invalid(path + ".id", "field name is a MoonBit keyword")
-  }
   guard !earlier.contains(name) else {
     invalid(path + ".id", "duplicate field '\{name}'")
   }
@@ -680,7 +686,7 @@ fn collect_argument_records(
       for expression in context_record_expressions(record) {
         ignore(
           expression_any(expression, fn(part) {
-            if part is Cast(_, name) {
+            if part is (Cast(_, name) | TypeSize(name, _)) {
               let full = scoped_type_name(name, type_scopes[owner])
               if definitions.contains(full) {
                 targets.push(full)
@@ -797,8 +803,10 @@ fn load_schema(
     Some(value) => as_mapping(value, "types")
     None => Map([])
   }
-  guard types.length() <= 64 else {
-    invalid("types", "at most 64 nested type definitions are supported")
+  guard types.length() <= 256 else {
+    invalid(
+      "types", "at most 256 type definitions are supported in a linked description",
+    )
   }
   let has_context = !byte_orders.is_empty() ||
     !imports_visibility.is_empty() ||

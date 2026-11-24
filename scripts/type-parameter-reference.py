@@ -50,6 +50,14 @@ CASES = {
     "imports_params_def_usertype_imported": [("hw.one", ".hw.one"), ("two.hw_one", ".two.hw_one()")],
     "enum_to_i_class_border_1": [("pet_1", ".pet_1.to_i()"), ("pet_2", ".pet_2.to_i()"), ("checker.is_dog", ".checker().is_dog()")],
 }
+SIZE_CASES = {
+    "expr_sizeof_type_0": ("sizeof_block",),
+    "expr_sizeof_type_1": ("sizeof_block", "sizeof_subblock"),
+    "expr_sizeof_value_0": ("self_sizeof", "sizeof_block", "sizeof_block_a", "sizeof_block_b", "sizeof_block_c"),
+    "expr_sizeof_value_sized": ("self_sizeof", "sizeof_block", "sizeof_block_a", "sizeof_block_b", "sizeof_block_c"),
+}
+for case, fields in SIZE_CASES.items():
+    CASES[case] = [(field, f".{field}()") for field in fields]
 HELPERS = (
     "cast_to_imported", "cast_to_imported2", "enum_to_i_class_border_2",
     "params_def_array_usertype_imported", "params_def_enum_imported", "params_def_usertype_imported",
@@ -119,16 +127,30 @@ def main():
             reference = getattr(importlib.import_module("testformats." + name), "".join(part.title() for part in name.split("_")))
             vector = vectors[name]
             (package / "reference_wbtest.mbt").write_text(create_test(name, vector, reference.from_bytes(vector)), encoding="utf-8")
+        if name == "params_def_array_usertype_imported":
+            (package / "root_arguments_wbtest.mbt").write_text('''///|
+test "typed root argument keeps the record context and rejects mixed arenas" {
+  let a = parse_params_def_array_usertype_imported_type_hello_world(b"\\x11")
+  let b = parse_params_def_array_usertype_imported_type_hello_world(b"\\x22")
+  let record = parse_params_def_array_usertype_imported(b"", [a._ksy_object_ref(), a._ksy_object_ref()])
+  assert_eq(record.hw0_one(), 17L)
+  assert_eq(record.hw1_one(), 17L)
+  try parse_params_def_array_usertype_imported(b"", [a._ksy_object_ref(), b._ksy_object_ref()]) catch {
+    ParamsDefArrayUsertypeImportedContextError(message~, ..) => assert_eq(message, "object arguments belong to different parses")
+    error => raise error
+  } noraise { _ => fail("accepted records from different parse contexts") }
+}
+''', encoding="utf-8")
     for action in ("check", "build", "test"):
         subprocess.run(["moon", action, "--frozen", "--target", "all", "--deny-warn"], cwd=consumer, check=True)
     report = {
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "official_compiler": "0.11", "upstream_revision": CORPUS["REVISION"],
         "targets": ["js", "wasm", "wasm-gc", "native"], "schemas": source_names,
-        "official_tests": len(CASES), "tests_per_target": len(CASES),
+        "official_tests": len(CASES), "tests_per_target": len(CASES) + 1,
     }
     (build / "type-parameter-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"Types and parameters: {len(source_names)} original schemas, {len(CASES)} runtime comparisons per target")
+    print(f"Types, parameters and sizes: {len(source_names)} original schemas, {len(CASES)} runtime comparisons and one context test per target")
 
 
 if __name__ == "__main__":

@@ -107,7 +107,7 @@ fn context_emit_runtime(
   contextual_endian : Bool,
   index : Bool,
   objects : Bool,
-  parameter_only : Bool,
+  local_expressions_only : Bool,
 ) -> Unit {
   output.write_string(
     "///|\npriv enum \{root}Value {\n  Number(Int64)\n  Flag(Bool)\n  ObjectId(Int)\n  Source(\{root}Reader)\n  Absent\n",
@@ -304,7 +304,7 @@ fn context_emit_runtime(
   }
   let block =
     #|///|
-    #|__PARAMETER_ONLY__fn __ROOT__Value::attribute(self : __ROOT__Value, arena : __ROOT__Arena, name : String, field : String) -> __ROOT__Value raise __ROOT__ParseError {
+    #|__LOCAL_EXPRESSIONS_ONLY__fn __ROOT__Value::attribute(self : __ROOT__Value, arena : __ROOT__Arena, name : String, field : String) -> __ROOT__Value raise __ROOT__ParseError {
     #|  match self {
     #|    ObjectId(context) => {
     #|      let frame = arena.frame(context, field)
@@ -384,8 +384,12 @@ fn context_emit_runtime(
     output,
     block
     .replace_all(
-      old="__PARAMETER_ONLY__",
-      new=if parameter_only { "#warnings(\"-unused_value\")\n" } else { "" },
+      old="__LOCAL_EXPRESSIONS_ONLY__",
+      new=if local_expressions_only {
+        "#warnings(\"-unused_value\")\n"
+      } else {
+        ""
+      },
     )
     .replace_all(old="__EXTRA_CASES__", new=extra.to_string()[:])
     .replace_all(
@@ -455,7 +459,7 @@ fn context_contains_index(expression : Expr) -> Bool {
     | ToEnum(base, _)
     | Unary(_, base) => context_contains_index(base)
     Binary(_, a, b) => context_contains_index(a) || context_contains_index(b)
-    Choose(a, b, c) =>
+    Choose(a, b, c) | Substring(a, b, c) =>
       context_contains_index(a) ||
       context_contains_index(b) ||
       context_contains_index(c)
@@ -519,7 +523,7 @@ fn context_contains_cast(expression : Expr) -> Bool {
       context_contains_cast(base)
     Index(base, index) | Binary(_, base, index) =>
       context_contains_cast(base) || context_contains_cast(index)
-    Choose(a, b, c) =>
+    Choose(a, b, c) | Substring(a, b, c) =>
       context_contains_cast(a) ||
       context_contains_cast(b) ||
       context_contains_cast(c)
@@ -572,7 +576,7 @@ fn context_contains_decode(expression : Expr) -> Bool {
       context_contains_decode(base)
     Binary(_, a, b) | Index(a, b) =>
       context_contains_decode(a) || context_contains_decode(b)
-    Choose(a, b, c) =>
+    Choose(a, b, c) | Substring(a, b, c) =>
       context_contains_decode(a) ||
       context_contains_decode(b) ||
       context_contains_decode(c)

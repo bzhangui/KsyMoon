@@ -52,7 +52,7 @@ fn parse_instances(
   for name, value in mapping {
     let path = path + "." + name
     check_identifier(name, path)
-    guard !is_moonbit_keyword(name) && !earlier.contains(name) else {
+    guard !earlier.contains(name) else {
       invalid(path, "instance name conflicts with a field or MoonBit keyword")
     }
     let properties = as_mapping(value, path)

@@ -1,4 +1,11 @@
 ///|
+fn supported_encoding(encoding : String) -> Bool {
+  [
+    "UTF-8", "UTF8", "ASCII", "UTF-16LE", "UTF-16BE", "WINDOWS-1252", "ISO-8859-1",
+  ].contains(encoding)
+}
+
+///|
 fn boolean_option(
   field : Map[String, @yaml.Yaml],
   key : String,
@@ -118,9 +125,7 @@ fn parse_field_kind(
         get_required(field, "encoding", path),
         path + ".encoding",
       ).to_upper()
-      guard ["UTF-8", "UTF8", "ASCII", "UTF-16LE", "UTF-16BE"].contains(
-        encoding,
-      ) else {
+      guard supported_encoding(encoding) else {
         invalid(
           path + ".encoding",
           "encoding is awaiting implementation: " + encoding,

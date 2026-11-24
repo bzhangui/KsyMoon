@@ -11,8 +11,10 @@ priv enum Expr {
   Index(Expr, Expr)
   Cast(Expr, String)
   Decode(Expr, String)
+  Substring(Expr, Expr, Expr)
   EnumLiteral(String, String)
   ToEnum(Expr, String)
+  TypeSize(String, Bool)
   StreamPosition
   StreamSize
   StreamEof
@@ -209,6 +211,25 @@ fn ExprParser::parse(
     "not" => Unary(token, self.parse(3))
     "true" => Boolean(true)
     "false" => Boolean(false)
+    "sizeof" | "bitsizeof" if self.peek() == "<" => {
+      self.index += 1
+      let parts = []
+      while true {
+        let name = self.peek()
+        check_identifier(name, self.path)
+        self.index += 1
+        parts.push(name)
+        if self.peek() != "::" {
+          break
+        }
+        self.index += 1
+      }
+      guard self.peek() == ">" else {
+        invalid(self.path, "expected '>' after size type")
+      }
+      self.index += 1
+      TypeSize(parts.join("::"), token == "bitsizeof")
+    }
     "_io" =>
       if self.peek() != "." {
         Reference("_io")
@@ -223,21 +244,12 @@ fn ExprParser::parse(
           _ => invalid(self.path, "expected _io.pos or _io.size")
         }
       }
-    "_root" | "_parent" => Reference(token)
+    "_root" | "_parent" | "_sizeof" | "_bitsizeof" => Reference(token)
     number if number[0] >= '0' && number[0] <= '9' =>
       parse_number_literal(number, self.path)
     quoted if quoted[0] == '\'' || quoted[0] == '"' =>
       Text(parse_quoted(quoted, self.path))
-    "_" | "_index" =>
-      if token == "_" && self.peek() == "." {
-        self.index += 1
-        let attribute = self.peek()
-        check_identifier(attribute, self.path)
-        self.index += 1
-        Reference("_." + attribute)
-      } else {
-        Reference(token)
-      }
+    "_" | "_index" => Reference(token)
     name if name[0] >= 'a' && name[0] <= 'z' => {
       check_identifier(name, self.path)
       if self.peek() == "::" {
@@ -263,7 +275,20 @@ fn ExprParser::parse(
     if operation == "." {
       let attribute = self.peek()
       self.index += 1
-      if attribute == "to_s" && self.peek() == "(" {
+      if attribute == "substring" && self.peek() == "(" {
+        self.index += 1
+        let start = self.parse(1)
+        guard self.peek() == "," else {
+          invalid(self.path, "substring requires two indices")
+        }
+        self.index += 1
+        let end = self.parse(1)
+        guard self.peek() == ")" else {
+          invalid(self.path, "expected ')' after substring indices")
+        }
+        self.index += 1
+        left = Substring(left, start, end)
+      } else if attribute == "to_s" && self.peek() == "(" {
         self.index += 1
         let encoding = self.peek()
         guard encoding.has_prefix("'") || encoding.has_prefix("\"") else {
@@ -303,10 +328,18 @@ fn ExprParser::parse(
         let suffix = if is_array { "[]" } else { "" }
         left = Cast(left, parts.join("::") + suffix)
       } else {
-        if attribute != "_io" && attribute != "_root" && attribute != "_parent" {
+        if attribute != "_io" &&
+          attribute != "_root" &&
+          attribute != "_parent" &&
+          attribute != "_sizeof" &&
+          attribute != "_bitsizeof" {
           check_identifier(attribute, self.path)
         }
-        left = Member(left, attribute)
+        left = if left is Reference("_") && attribute != "length" {
+          Reference("_." + attribute)
+        } else {
+          Member(left, attribute)
+        }
       }
     } else {
       let index = self.parse(1)
@@ -410,7 +443,7 @@ fn check_expression_depth(
       check_expression_depth(left, depth + 1, path)
       check_expression_depth(right, depth + 1, path)
     }
-    Choose(condition, yes, no) => {
+    Choose(condition, yes, no) | Substring(condition, yes, no) => {
       check_expression_depth(condition, depth + 1, path)
       check_expression_depth(yes, depth + 1, path)
       check_expression_depth(no, depth + 1, path)
@@ -439,6 +472,8 @@ fn expression_type(
     | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
+    | TypeSize(_, _)
+    | Substring(_, _, _)
     | ArrayLiteral(_) =>
       match navigation {
         Some(resolve) => resolve(expression)
@@ -559,6 +594,8 @@ fn expression_code(
     | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
+    | TypeSize(_, _)
+    | Substring(_, _, _)
     | ArrayLiteral(_) => navigation.unwrap()(expression)
     StreamPosition => "\{stream_reader}.offset.to_int64()"
     StreamSize => "\{stream_reader}.input.length().to_int64()"
@@ -686,7 +723,7 @@ fn expression_any(expr : Expr, predicate : (Expr) -> Bool) -> Bool {
     | Unary(_, base) => expression_any(base, predicate)
     Index(a, b) | Binary(_, a, b) =>
       expression_any(a, predicate) || expression_any(b, predicate)
-    Choose(a, b, c) =>
+    Choose(a, b, c) | Substring(a, b, c) =>
       expression_any(a, predicate) ||
       expression_any(b, predicate) ||
       expression_any(c, predicate)
