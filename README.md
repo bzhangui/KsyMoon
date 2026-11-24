@@ -39,7 +39,7 @@ moon -C examples/consumer run --target js .
 
 ## Native 命令行
 
-从当前开发分支用 MoonBit v0.10.19 构建。文件读取、诊断、依赖解析和批量写入均由 MoonBit 实现。构建后的可执行文件可直接运行，运行时无需 Node.js。
+从当前源码用 MoonBit v0.10.19 构建。文件读取、诊断、依赖解析和批量写入均由 MoonBit 实现。构建后的可执行文件可直接运行，运行时无需 Node.js。
 
 ```powershell
 moon update
@@ -160,6 +160,8 @@ KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按
 WAV 与 RIFF 描述从相同固定修订按需下载，分别保留上游文件声明的 BSD-3-Clause-Attribution 与 CC0-1.0。WAV 描述由 John Byrd（Gigantic Software）编写。两份描述和相应生成文件保存在本地构建目录。 [原样 WAV](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/wav.ksy) · [原样 RIFF](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/common/riff.ksy) · [WAV 许可](https://spdx.org/licenses/BSD-3-Clause-Attribution.html)
 
 动态字节序对照脚本按需下载同一修订的 Exif 描述，核对 SHA-256 并保存在本地构建目录，保留其 CC0-1.0 许可。 [原样 Exif](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/exif.ksy)
+
+`python scripts/image-reference.py` 对同一修订的原样 GIF 描述运行四后端验证。对照项包括画布尺寸、区块类型以及完整样本和所有真前缀的处理结果。GIF 描述按需下载并校验 SHA-256。 [原样 GIF](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/gif.ksy)
 
 WAV/RIFF 实现通过 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45331862218)。固定语料的 339 份描述中，160 份可生成并在四后端构建，179 份保留诊断，51 份有运行对照。WAV 与 RIFF 的官方对照和递归限制共 9 项测试在四后端通过。 [固定语料报告](docs/reports/kaitai-0.11-p4-2026-11-24.json) · [WAV/RIFF 报告](docs/reports/wav-riff-2026-11-24.json)
 

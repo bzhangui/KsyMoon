@@ -50,6 +50,7 @@ jobs:
           python scripts/compatibility-report.py --runtime-report
           node examples/quickstart/run.mjs --source --all-targets
           python scripts/wav-reference.py --all-scenarios
+          python scripts/image-reference.py
           python scripts/package-check.py
       - name: Upload complete compatibility inventory
         uses: actions/upload-artifact@v4
@@ -63,4 +64,5 @@ jobs:
             _build/numeric-endian-report.json
             _build/expression-validation-report.json
             _build/native-cli-report.json
+            _build/image-reference-report.json
           if-no-files-found: error
