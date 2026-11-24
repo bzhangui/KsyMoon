@@ -4,19 +4,19 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。仓库已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
 
-`v0.4.0` 已发布，增加显式模块导入、位域及经过对照验证的 WAV/RIFF 解析。发布包重新生成的六个解析器与同版本 CI 的源码输出逐字节一致，四后端各通过 25 项消费测试。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.4.0) · [发布验收记录](docs/reports/mooncakes-0.4.0.json) · [发布版 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45344575642)
+`v0.5.0` 支持多文件导入、跨模块读取、XOR、循环位移和 zlib。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.5.0)
 
 ## 快速开始
 
-使用 MoonBit v0.10.19 和 Node.js 24，从本仓库检出 `v0.4.0` 后运行：
+使用 MoonBit v0.10.19 和 Node.js 24，从本仓库检出 `v0.5.0` 后运行：
 
 ```powershell
 node examples/quickstart/run.mjs
 ```
 
-脚本在新模块中执行 `moon add bzhangui/ksymoon@0.4.0`，调用安装的生成器，把原样 UDP 和跨流实例描述转换为独立 MoonBit 源码，再检查、构建、测试和运行。正常输出包含 `UDP: 1234 -> 5678, ABC` 与 `Cross-stream names: the, rainy, day it is`，两个截断样本均被拒绝。加 `--all-targets` 检查四后端，加 `--source` 从当前 Git 源码运行同一示例。
+脚本在新模块中执行 `moon add bzhangui/ksymoon@0.5.0`，调用安装的生成器，把原样 UDP 和跨流实例描述转换为独立 MoonBit 源码，再检查、构建、测试和运行。正常输出包含 `UDP: 1234 -> 5678, ABC` 与 `Cross-stream names: the, rainy, day it is`，两个截断样本均被拒绝。加 `--all-targets` 检查四后端，加 `--source` 从当前 Git 源码运行同一示例。
 
-在自己的模块中，先执行 `moon add bzhangui/ksymoon@0.4.0`，在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。`@ksymoon.generate(source)` 返回 MoonBit 源码。`@ksymoon.validate(source)` 校验描述。把生成结果写入新包后，以输入字节调用生成的 `parse_<id>`。
+在自己的模块中，先执行 `moon add bzhangui/ksymoon@0.5.0`，在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。`@ksymoon.generate(source)` 返回 MoonBit 源码。`@ksymoon.validate(source)` 校验描述。把生成结果写入新包后，以输入字节调用生成的 `parse_<id>`。
 
 ## 生成并运行
 
@@ -39,7 +39,7 @@ moon -C examples/consumer run --target js .
 
 ## 多文件描述和字节处理器
 
-`0.5.0-dev.1` 允许 CLI 自动加载 `meta.imports`。相对路径从声明所在文件的目录查找，以 `/` 开头的描述依次查找 `-I` 目录和项目根目录。目录需要位于 `--root` 内。省略 `--root` 时使用输入描述所在目录。已有的 `--import NAME FILE.ksy` 可以显式覆盖指定名称。
+`v0.5.0` 允许 CLI 自动加载 `meta.imports`。相对路径从声明所在文件的目录查找，以 `/` 开头的描述依次查找 `-I` 目录和项目根目录。目录需要位于 `--root` 内。省略 `--root` 时使用输入描述所在目录。已有的 `--import NAME FILE.ksy` 可以显式覆盖指定名称。
 
 ```powershell
 moon run --target js cmd/ksymoon -- generate formats/media/wav.ksy --root formats --out wav.mbt
@@ -58,7 +58,7 @@ options("allow-experimental-packages": ["moonbitlang/core/compress/zlib"])
 
 ```powershell
 python -m pip install kaitaistruct==0.11
-python scripts/module-process-reference.py
+python scripts/module-process-reference.py --registry
 ```
 
 ## WAV 与 RIFF
@@ -70,7 +70,7 @@ python -m pip install kaitaistruct==0.11
 python scripts/wav-reference.py --registry
 ```
 
-脚本在空白模块从 Mooncakes 安装 `bzhangui/ksymoon@0.4.0`，再在另一个空白模块重新生成并测试 WAV、RIFF、UDP、二进制 STL、STM32 采样帧和 IVF。WAV 与 RIFF 的原样描述来自固定修订并经过 SHA-256 核对。PCM、扩展 WAV、带填充的未知块、嵌套 LIST/INFO 和截断样本与 Kaitai 0.11 官方 Python 解析器对照。四个后端均执行检查、构建及测试。源码模式先运行 `moon update`，再运行 `python scripts/wav-reference.py --all-scenarios`。
+脚本在空白模块从 Mooncakes 安装 `bzhangui/ksymoon@0.5.0`，再在另一个空白模块重新生成并测试 WAV、RIFF、UDP、二进制 STL、STM32 采样帧和 IVF。WAV 与 RIFF 的原样描述来自固定修订并经过 SHA-256 核对。PCM、扩展 WAV、带填充的未知块、嵌套 LIST/INFO 和截断样本与 Kaitai 0.11 官方 Python 解析器对照。四个后端均执行检查、构建及测试。源码模式先运行 `moon update`，再运行 `python scripts/wav-reference.py --all-scenarios`。
 
 使用自己的描述时，库接口 `generate_with_imports(source, imports)` 和 `validate_with_imports(source, imports)` 接受 `Map[String, String]`，键为 `meta.imports` 中的名字，值为原样描述文本。CLI 对应参数为 `--import NAME FILE.ksy`。例如：
 
@@ -131,7 +131,7 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 - 生成的解析器读取描述指定的前缀。UDP 校验和作为字段返回，由调用者按使用场景校验。
 - 对象、数组和流属性也可用于无 `io` 的描述。对象或流可作为惰性值实例返回，`.as<T>` 可将对象分支转换为确定的本地记录类型，类型不匹配时报告错误。
 - 支持 32 位以内整数枚举、枚举字面量、条件与分支、值实例枚举及 `to_i`。未知枚举码保留在 `UnknownCode(Int64)` 中。支持整数、布尔和字符串参数，包含根解析入口及参数化本地类型调用。
-- `v0.4.0` 支持 `b1…b32`、默认位序及类型后缀、显式 `imports`、字节索引与指定编码的解码。跨类型递归可经惰性实例进入，限制最多 64 层对象嵌套。
+- `v0.5.0` 支持 `b1…b32`、默认位序及类型后缀、显式 `imports`、字节索引与指定编码的解码。跨类型递归可经惰性实例进入，限制最多 64 层对象嵌套。
 - 剩余能力包括更多类型与表达式、跨模块根/父对象引用、动态字节序、处理器和更多编码。未支持的描述返回诊断。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
 
 ## 来源与许可

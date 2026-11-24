@@ -1,4 +1,5 @@
 """Compare the multi-file and byte-processing parsers with Kaitai Struct 0.11."""
+import argparse
 import importlib
 import json
 from pathlib import Path
@@ -57,9 +58,8 @@ types:
 }
 
 
-def invoke_cli(arguments, *, diagnostic=None):
-    cli = ROOT / "_build/js/release/build/cmd/ksymoon/ksymoon.js"
-    result = subprocess.run(["node", str(cli), *map(str, arguments)], cwd=ROOT,
+def invoke_cli(cli, cwd, arguments, *, diagnostic=None):
+    result = subprocess.run([*cli, *map(str, arguments)], cwd=cwd,
                             text=True, encoding="utf-8", capture_output=True)
     if diagnostic is None:
         if result.returncode != 0:
@@ -153,6 +153,9 @@ def compare(name, constructor, data, fields):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--registry", action="store_true", help="generate through the published Mooncakes module")
+    args = parser.parse_args()
     build = ROOT / "_build"
     build.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="module-process-", dir=build))
@@ -172,12 +175,21 @@ def main():
         for name, (sample, _) in CASES.items():
             (spec / f"test_{name}.py").write_bytes(archive.read(prefix + f"spec/python/spec/test_{name}.py"))
             (samples / sample).write_bytes(archive.read(prefix + f"src/{sample}"))
-    subprocess.run(["moon", "build", "--frozen", "--release", "--target", "js", "cmd/ksymoon"], cwd=ROOT, check=True)
+    dependency = None
+    if args.registry:
+        registry_generator = runpy.run_path(str(ROOT / "scripts/wav-reference.py"))["generator_command"]
+        generator, cli, dependency = registry_generator(work, True)
+    else:
+        generator = ROOT
+        subprocess.run(["moon", "build", "--frozen", "--release", "--target", "js", "cmd/ksymoon"],
+                       cwd=ROOT, check=True)
+        cli = ["node", str(ROOT / "_build/js/release/build/cmd/ksymoon/ksymoon.js")]
+
     sources = {name: formats / f"{name}.ksy" for name in (*CASES, "container")}
     options = ["--root", formats, "-I", formats / "ks_path"]
     escaped = formats / "outside.ksy"
     escaped.write_text("meta: {id: outside, imports: [../outside]}\n", encoding="utf-8")
-    invoke_cli(["check", escaped, *options], diagnostic="import path leaves the project root")
+    invoke_cli(cli, generator, ["check", escaped, *options], diagnostic="import path leaves the project root")
     subprocess.run([*REFERENCE["compiler_command"](work), "--target", "python", "--python-package", "testformats", "--import-path",
                     str(formats / "ks_path"), "--outdir", str(refs), *map(str, sources.values())], check=True)
     subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "spec"], cwd=work, check=True)
@@ -194,7 +206,7 @@ def main():
         package = consumer / name
         package.mkdir()
         output = package / "parser.mbt"
-        invoke_cli(["generate", source, "--out", output, *options])
+        invoke_cli(cli, generator, ["generate", source, "--out", output, *options])
         manifest = CORPUS["parser_package"](output.read_text(encoding="utf-8"))
         (package / "moon.pkg").write_text(manifest, encoding="utf-8")
         if name == "container":
@@ -214,10 +226,11 @@ def main():
         subprocess.run(["moon", action, "--frozen", "--target", "all", "--deny-warn"], cwd=consumer, check=True)
     result = {
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "upstream_specs": len(CASES), "schemas": list(sources), "targets": ["js", "wasm", "wasm-gc", "native"],
+        "generator_dependency": dependency, "upstream_specs": len(CASES), "schemas": list(sources), "targets": ["js", "wasm", "wasm-gc", "native"],
         "tests_per_target": sum(test.count('\ntest "') for test in checks), "prefixes": prefixes, "rejected_prefixes": rejected,
     }
-    (build / "module-process-report.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    report = "registry-module-process-report.json" if args.registry else "module-process-report.json"
+    (build / report).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(f"Modules/processors: {len(sources)} schemas, {prefixes} prefix outcomes ({rejected} rejected); four backends passed")
 
 
