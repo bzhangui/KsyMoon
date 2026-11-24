@@ -95,7 +95,7 @@ python scripts/wav-reference.py --registry
 moon run --target js cmd/ksymoon -- generate wav.ksy --out wav.mbt --import /common/riff riff.ksy
 ```
 
-缺失、重复与循环导入会报告描述诊断。导入文件来自显式传入的映射。加载上游 WAV/RIFF 文件的来源和许可证见下方。
+命令中的显式映射会覆盖 `/common/riff` 的自动查找结果。缺失导入、重复声明、冲突的模块 ID 和无法终止的类型递归会报告诊断。条件终止的循环导入有对应测试。加载上游 WAV/RIFF 文件的来源和许可证见下方。
 
 ## 复现验收
 
@@ -135,8 +135,8 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 ## 当前实现与兼容进度
 
 - `meta.id`、`meta.endian`、`meta.encoding`、`seq` 和按作用域解析的非递归本地及多层嵌套 `types`。
-- `u1`、`u2`、`u4`、`u8`、`s1`、`s2`、`s4`、`f4`。多字节类型采用 `meta.endian` 或类型的显式大小端后缀，`u8` 生成为 `UInt64`。
-- `contents` 固定签名支持 UTF-8 字符串，以及包含字符串和字节整数的数组。`valid` 支持 32 位以内整数标量的常量、`eq`、`min` 和 `max`。
+- `u1/u2/u4/u8`、`s1/s2/s4/s8`、`f4/f8` 和 `b1…b64`。`u8` 为 `UInt64`，`s8` 为 `Int64`。多字节类型可使用固定或按字段选择的 `meta.endian`，也可用类型后缀指定大小端。
+- `contents` 固定签名支持 UTF-8 字符串，以及包含字符串和字节整数的数组。`valid` 支持类型化等值、范围、`any-of` 和 `expr`，可校验重复元素和惰性定位实例。
 - `size`、`size-eos: true`、终止符字节字段及用户类型有界子流。父流一次消费完整边界，子流从 0 计数，内部 `pos` 被限制在子流内，惰性实例保留其所属流。
 - `repeat: expr/eos/until` 数组。Until 在读取后判断并保留结束元素，支持 `_`、`_.整数成员`、`_index`、当前流位置和 EOF 条件。EOS 检查流边界和无进展迭代，重复项共享预算。长度与计数表达式支持非负常量、先前的 `u1/u2/u4` 标量字段，以及该字段减去非负整数。使用跨流实例的描述也支持经过检查的整数长度与计数表达式。
 - `switch-on/cases` 支持常量整数、字符串及布尔标签，生成带载荷的 MoonBit 枚举。显式 `_` 默认分支按对应类型读取，未匹配的有界分支返回原始字节，未匹配的无界分支返回 `Unknown` 并跳过读取。
@@ -144,12 +144,12 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 - `if` 条件标量、字节字段、嵌套记录和数组，结果生成为 `Option[T]`。条件为假时跳过读取、约束及重复项预留。
 - `instances` 的 `pos` 定位读取、计数数组和 `value` 计算值，均按需求值并缓存成功结果，使用生成记录的同名方法访问，如 `record.entries()`。条件实例在求值为假时跳过定位与读取。
 - `instances.io` 可选择当前流、根流、父对象流、字段或实例的子流，也支持按数组索引和条件选流。`pos` 相对所选流定位，实例表达式中的 `_io` 保持为所属对象的流。无 `pos` 时推进所选流，成功结果按需缓存。 [跨流用例](examples/consumer/io_wbtest.mbt)
-- `if/value/pos` 的有类型整数、布尔及基础字符串字面量表达式，支持括号、算术、比较、位运算、逻辑短路、条件表达式、实例依赖和 `_io.pos/_io.size`。当前数字引用为 32 位以内非可选字段，计算类型为 Int64。 [新增回归](examples/consumer/conditional_wbtest.mbt)
+- `if/value/pos` 支持类型化表达式，包括算术、比较、位运算、逻辑短路、条件表达式、实例依赖及 `_io.pos/_io.size`。字节和数组支持索引、长度及选定的首尾和极值操作，字节和字符串可按字典序比较。 [兼容范围与复现](docs/COMPATIBILITY.zh-CN.md)
 - 生成的解析器读取描述指定的前缀。UDP 校验和作为字段返回，由调用者按使用场景校验。
 - 对象、数组和流属性也可用于无 `io` 的描述。对象或流可作为惰性值实例返回，`.as<T>` 可将对象分支转换为确定的本地记录类型，类型不匹配时报告错误。
 - 支持 32 位以内整数枚举、枚举字面量、条件与分支、值实例枚举及 `to_i`。未知枚举码保留在 `UnknownCode(Int64)` 中。支持整数、布尔和字符串参数，包含根解析入口及参数化本地类型调用。
-- `v0.5.0` 支持 `b1…b32`、默认位序及类型后缀、显式 `imports`、字节索引与指定编码的解码。跨类型递归可经惰性实例进入，限制最多 64 层对象嵌套。
-- 剩余能力包括更多类型与表达式、跨模块根/父对象引用、动态字节序、处理器和更多编码。未支持的描述返回诊断。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
+- 导入支持相对和绝对查找，以及显式覆盖；字节处理支持 XOR、循环位移和 zlib。跨类型递归可经惰性实例进入，最多支持 64 层对象嵌套。
+- 当前兼容盘点和剩余能力按 Kaitai Struct 0.11 语义矩阵记录。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
 
 ## 来源与许可
 
@@ -158,6 +158,8 @@ KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按
 51 份兼容描述与其中 47 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
 
 WAV 与 RIFF 描述从相同固定修订按需下载，分别保留上游文件声明的 BSD-3-Clause-Attribution 与 CC0-1.0。WAV 描述由 John Byrd（Gigantic Software）编写。两份描述和相应生成文件保存在本地构建目录。 [原样 WAV](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/wav.ksy) · [原样 RIFF](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/common/riff.ksy) · [WAV 许可](https://spdx.org/licenses/BSD-3-Clause-Attribution.html)
+
+动态字节序对照脚本按需下载同一修订的 Exif 描述，核对 SHA-256 并保存在本地构建目录，保留其 CC0-1.0 许可。 [原样 Exif](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/exif.ksy)
 
 WAV/RIFF 实现通过 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45331862218)。固定语料的 339 份描述中，160 份可生成并在四后端构建，179 份保留诊断，51 份有运行对照。WAV 与 RIFF 的官方对照和递归限制共 9 项测试在四后端通过。 [固定语料报告](docs/reports/kaitai-0.11-p4-2026-11-24.json) · [WAV/RIFF 报告](docs/reports/wav-riff-2026-11-24.json)
 
