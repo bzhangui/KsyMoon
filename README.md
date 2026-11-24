@@ -4,19 +4,19 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。仓库已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
 
-`v0.5.0` 支持多文件导入、跨模块读取、XOR、循环位移和 zlib。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.5.0) · [发布复验记录](docs/reports/mooncakes-0.5.0.json)
+`v0.9.0` 支持独立 Native CLI、动态字节序、复合参数、跨模块枚举和固定尺寸表达式。原样 GIF、BMP、PNG 及此前六个场景均纳入四后端验证。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.9.0) · [兼容说明](docs/COMPATIBILITY.zh-CN.md)
 
 ## 快速开始
 
-使用 MoonBit v0.10.19 和 Node.js 24，从本仓库检出 `v0.5.0` 后运行：
+使用 MoonBit v0.10.19 和 Node.js 24，从本仓库检出 `v0.9.0` 后运行：
 
 ```powershell
 node examples/quickstart/run.mjs
 ```
 
-脚本在新模块中执行 `moon add bzhangui/ksymoon@0.5.0`，调用安装的生成器，把原样 UDP 和跨流实例描述转换为独立 MoonBit 源码，再检查、构建、测试和运行。正常输出包含 `UDP: 1234 -> 5678, ABC` 与 `Cross-stream names: the, rainy, day it is`，两个截断样本均被拒绝。加 `--all-targets` 检查四后端，加 `--source` 从当前 Git 源码运行同一示例。
+脚本在新模块中安装 `bzhangui/ksymoon@0.9.0`，把原样 UDP 和跨流实例描述转换为独立 MoonBit 源码，再检查、构建、测试和运行。正常输出包含 `UDP: 1234 -> 5678, ABC` 与 `Cross-stream names: the, rainy, day it is`，两个截断样本均被拒绝。加 `--all-targets` 检查四后端，加 `--source` 从当前 Git 源码运行同一示例。
 
-在自己的模块中，先执行 `moon add bzhangui/ksymoon@0.5.0`，在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。`@ksymoon.generate(source)` 返回 MoonBit 源码。`@ksymoon.validate(source)` 校验描述。把生成结果写入新包后，以输入字节调用生成的 `parse_<id>`。
+在自己的模块中，先执行 `moon add bzhangui/ksymoon@0.9.0`，在调用包的 `moon.pkg` 中导入 `"bzhangui/ksymoon" @ksymoon`。`@ksymoon.generate(source)` 返回 MoonBit 源码。`@ksymoon.validate(source)` 校验描述。把生成结果写入新包后，以输入字节调用生成的 `parse_<id>`。
 
 ## 生成并运行
 
@@ -85,9 +85,10 @@ python scripts/module-process-reference.py --registry
 ```powershell
 python -m pip install kaitaistruct==0.11
 python scripts/wav-reference.py --registry
+python scripts/image-reference.py --registry
 ```
 
-脚本在空白模块从 Mooncakes 安装 `bzhangui/ksymoon@0.5.0`，再在另一个空白模块重新生成并测试 WAV、RIFF、UDP、二进制 STL、STM32 采样帧和 IVF。WAV 与 RIFF 的原样描述来自固定修订并经过 SHA-256 核对。PCM、扩展 WAV、带填充的未知块、嵌套 LIST/INFO 和截断样本与 Kaitai 0.11 官方 Python 解析器对照。四个后端均执行检查、构建及测试。源码模式先运行 `moon update`，再运行 `python scripts/wav-reference.py --all-scenarios`。
+两个脚本各从 Mooncakes 在空白模块安装 `bzhangui/ksymoon@0.9.0`，再使用独立模块重新生成并测试 WAV、RIFF、UDP、二进制 STL、STM32 采样帧、IVF、GIF、BMP 和 PNG。上游格式取自固定修订并核对 SHA-256。四个后端均执行检查、构建和测试，并与 Kaitai 0.11 Python 目标对照。源码模式先运行 `moon update`，再运行 `python scripts/wav-reference.py --all-scenarios` 和 `python scripts/image-reference.py`。
 
 使用自己的描述时，库接口 `generate_with_imports(source, imports)` 和 `validate_with_imports(source, imports)` 接受 `Map[String, String]`，键为 `meta.imports` 中的名字，值为原样描述文本。CLI 对应参数为 `--import NAME FILE.ksy`。例如：
 

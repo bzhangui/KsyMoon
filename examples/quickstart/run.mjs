@@ -9,7 +9,7 @@ const sample = fileURLToPath(new URL("./", import.meta.url));
 const build = join(root, "_build");
 const fromSource = process.argv.includes("--source");
 const allTargets = process.argv.includes("--all-targets");
-const version = "0.5.0";
+const version = "0.9.0";
 function moon(cwd, ...args) {
   const run = spawnSync("moon", args, { cwd, stdio: "inherit" });
   if (run.error) throw run.error;
