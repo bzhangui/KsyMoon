@@ -45,6 +45,7 @@ jobs:
           node scripts/verify.mjs --kaitai-reference
           python scripts/compatibility-report.py --runtime-report
           node examples/quickstart/run.mjs --source --all-targets
+          python scripts/wav-reference.py
           python scripts/package-check.py
       - name: Upload complete compatibility inventory
         uses: actions/upload-artifact@v4
@@ -53,4 +54,5 @@ jobs:
           path: |
             _build/compatibility-report.json
             _build/package-content-report.json
+            _build/wav-reference-report.json
           if-no-files-found: error

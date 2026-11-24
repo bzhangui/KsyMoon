@@ -17,9 +17,15 @@ fn emit_reader(
   has_read_fields~ : Bool,
   has_input~ : Bool,
   has_context~ : Bool = false,
+  has_bits~ : Bool = false,
 ) -> Unit {
   let validation_error = if has_validation {
     "  __ROOT__InvalidValue(field~ : String, offset~ : Int, value~ : Int64, minimum~ : Int64, maximum~ : Int64)\n"
+  } else {
+    ""
+  }
+  let bit_error = if has_bits {
+    "  __ROOT__BitOrder(field~ : String, offset~ : Int)\n"
   } else {
     ""
   }
@@ -97,6 +103,7 @@ fn emit_reader(
         ""
       }) +
       arithmetic_error +
+      bit_error +
       (if has_byte_options {
         "  __ROOT__MissingTerminator(field~ : String, offset~ : Int)\n"
       } else {
@@ -119,7 +126,11 @@ fn emit_reader(
     header
     .replace_all(
       old="  __ROOT__Truncated(field~ : String, offset~ : Int, needed~ : Int64, remaining~ : Int)\n",
-      new="",
+      new=if has_bits {
+        "  __ROOT__Truncated(field~ : String, offset~ : Int, needed~ : Int64, remaining~ : Int)\n"
+      } else {
+        ""
+      },
     )
     .replace_all(
       old="  __ROOT__InvalidLength(field~ : String, offset~ : Int, length~ : Int64)\n",
@@ -131,7 +142,11 @@ fn emit_reader(
     )
     .replace_all(
       old="  mut offset : Int",
-      new=if has_positions { "  mut offset : Int" } else { "  offset : Int" },
+      new=if has_positions || has_bits {
+        "  mut offset : Int"
+      } else {
+        "  offset : Int"
+      },
     )
   }
   let header = if has_input {
@@ -146,10 +161,30 @@ fn emit_reader(
     .replace_all(old="__INSTANCE_ERROR__", new=instance_error[:])
     .replace_all(old="__POSITION_ERROR__", new=position_error[:])
     .replace_all(old="__ARITHMETIC_ERROR__", new=arithmetic_error[:])
-    .replace_all(old="__REPEAT_STATE__", new=repeat_state[:])
+    .replace_all(
+      old="__REPEAT_STATE__",
+      new=(repeat_state +
+        (if has_bits {
+          "  mut bits_left : Int\n  mut bit_little : Bool\n"
+        } else {
+          ""
+        }))[:],
+    )
+  let header = if has_bits {
+    header.replace_all(
+      old="  guard length >= 0L else",
+      new="  self.bits_left = 0\n  guard length >= 0L else",
+    )
+  } else {
+    header
+  }
   write_reader_block(output, header, root_type)
+  if has_bits {
+    emit_bit_reader(output, root_type)
+  }
   emit_stream_reader(
     output, root_type, has_bounded, has_byte_options, has_strings, has_repeated_fields,
+    has_bits,
   )
   if has_positions {
     let seek =
@@ -161,6 +196,14 @@ fn emit_reader(
       #|  self.offset = position.to_int()
       #|}
       #|
+    let seek = if has_bits {
+      seek.replace_all(
+        old="  self.offset = position.to_int()",
+        new="  self.bits_left = 0\n  self.offset = position.to_int()",
+      )
+    } else {
+      seek
+    }
     write_reader_block(output, seek, root_type)
   }
   if has_arithmetic {

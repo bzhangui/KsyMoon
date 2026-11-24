@@ -8,6 +8,10 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
   let effects = context_read_effects(schema)
   let flags = context_flags(schema)
   let expressions = context_all_expressions(schema)
+  let decode = expressions.iter().any(context_contains_decode)
+  if decode && !flags.contains("text") {
+    flags.push("text")
+  }
   let object_values = []
   let mut stream_values = false
   for owner, record in graph.records {
@@ -57,7 +61,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
         reads = reads ||
           (
             !(kind is Nested(_) || kind is Application(_, _)) &&
-            !(kind is Switch(_, _, _, _))
+            !(kind is Switch(_, _, _, _) || kind is BitInteger(_, _))
           )
         numeric = numeric ||
           kind is Unsigned(_, _) ||
@@ -120,7 +124,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     root,
     has_bounded=bounded,
     has_byte_options=options,
-    has_strings=strings,
+    has_strings=strings || decode,
     has_open_repeats=open_repeats,
     has_numeric_fields=numeric,
     has_uint64=wide,
@@ -133,18 +137,22 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     has_read_fields=reads,
     has_input=true,
     has_context=true,
+    has_bits=graph.bits,
   )
   if stream_values {
-    context_emit_stream_value(output, root)
+    context_emit_stream_value(output, root, graph.bits)
   }
   context_emit_runtime(
     output,
     root,
     flags,
-    rollback || effects.values().any(fn(value) { value }),
+    rollback ||
+    records.iter().any(fn(record) { context_record_raises(record, effects) }),
     has_instances,
     accounting,
     rollback,
+    graph.bits,
+    schema.recursive,
     expressions.iter().any(context_contains_index),
     !object_values.is_empty() || expressions.iter().any(context_contains_cast),
   )
@@ -159,6 +167,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
       id,
       index,
       effects[owner],
+      context_record_raises(record, effects),
     )
     for instance in record.instances {
       context_emit_instance(
@@ -180,7 +189,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
   let arguments = parameter_arguments(schema.root.parameters)
   let accounts = if accounting { ", next_account: 1" } else { "" }
   output.write_string(
-    "///|\npub fn parse_\{id}(input : Bytes\{parameters}) -> \{root}Record\{effect} {\n  let arena : \{root}Arena = { frames: [], free: []\{accounts} }\n  let reader : \{root}Reader = { input, offset: 0\{budget} }\n  read_\{id}_root(reader, \{id.escape()}, arena, -1\{arguments})\n}\n",
+    "///|\npub fn parse_\{id}(input : Bytes\{parameters}) -> \{root}Record\{effect} {\n  let arena : \{root}Arena = { frames: [], free: []\{accounts} }\n  let reader : \{root}Reader = { input, offset: 0\{budget}\{bit_state(graph.bits)} }\n  read_\{id}_root(reader, \{id.escape()}, arena, -1\{arguments})\n}\n",
   )
   output.to_string()
 }
@@ -268,6 +277,7 @@ fn context_emit_reader(
   id : String,
   tag : Int32,
   raises : Bool,
+  body_raises : Bool,
 ) -> Unit raise SchemaError {
   let name = if owner == "@root" {
     "read_" + id + "_root"
@@ -279,7 +289,7 @@ fn context_emit_reader(
   output.write_string(
     "///|\nfn \{name}(reader : \{root}Reader, path : String, arena : \{root}Arena, parent : Int\{parameters}) -> \{context_type_name(root, owner)}\{effect} {\n  let context = arena.create(\{tag}, parent, reader, path)\n",
   )
-  if raises {
+  if body_raises {
     output.write_string("  errdefer { arena.release(context) }\n")
   }
   for p in record.parameters {
@@ -348,6 +358,7 @@ fn context_emit_reader(
       evaluate=Some(evaluate),
       parent_context=Some("context"),
       publish_items=publish,
+      bits=graph.bits,
     )
     if field.condition is Some(_) {
       output.write_string("    Some(v_\{name})\n  } else { None }\n")
@@ -427,9 +438,7 @@ fn context_emit_instance(
       }
       output.write_string("    let reader = \{reader}\n")
       if position is Some(_) {
-        output.write_string(
-          "    let saved = reader.offset\n    defer { reader.offset = saved }\n",
-        )
+        output.write_string(save_position("    ", graph.bits))
       }
       if repeated {
         output.write_string(
@@ -491,6 +500,7 @@ fn context_emit_instance(
         evaluate=Some(evaluate),
         parent_context=Some("context"),
         publish_items=publish,
+        bits=graph.bits,
       )
       if repeated {
         output.write_string(

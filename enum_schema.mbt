@@ -104,10 +104,20 @@ fn emit_enums(
   names.sort()
   for name in names {
     let kind = generated_enum_type(root, name)
-    let labels = enums[name].labels
+    let raw = enums[name].labels
+    let labels = raw.map(fn(item) {
+      let (code, name) = item
+      let label = generated_enum_label(name)
+      let collides = raw
+        .iter()
+        .any(fn(other) {
+          other.1 != name && generated_enum_label(other.1) == label
+        })
+      (code, if collides { label + "_" + name } else { label })
+    })
     output.write_string("///|\npub(all) enum \{kind} {\n")
     for (_, label) in labels {
-      output.write_string("  \{generated_enum_label(label)}\n")
+      output.write_string("  \{label}\n")
     }
     output.write_string(
       "  UnknownCode(Int64)\n} derive(Eq)\n\n///|\npub extend \{kind} with Eq::{not_equal, equal}\n\n",
@@ -116,16 +126,14 @@ fn emit_enums(
       "///|\npub fn \{kind}::from_code(code : Int64) -> \{kind} {\n  match code {\n",
     )
     for (code, label) in labels {
-      output.write_string(
-        "    \{code}L => \{kind}::\{generated_enum_label(label)}\n",
-      )
+      output.write_string("    \{code}L => \{kind}::\{label}\n")
     }
     output.write_string("    _ => \{kind}::UnknownCode(code)\n  }\n}\n\n")
     output.write_string(
       "///|\npub fn \{kind}::to_i(self : \{kind}) -> Int64 {\n  match self {\n",
     )
     for (code, label) in labels {
-      output.write_string("    \{generated_enum_label(label)} => \{code}L\n")
+      output.write_string("    \{label} => \{code}L\n")
     }
     output.write_string("    UnknownCode(code) => code\n  }\n}\n\n")
   }

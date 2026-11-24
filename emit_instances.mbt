@@ -57,7 +57,7 @@ fn instance_reference(record : RecordDef, name : String) -> String {
     .unwrap()
   match instance.kind {
     Value(_) => "self.\{name}()"
-    Parsed({ kind: Text(_, _), .. }, _) => "self.\{name}()"
+    Parsed({ kind: Text(_, _) | BitInteger(1, _), .. }, _) => "self.\{name}()"
     Parsed(_, _) => "self.\{name}().to_int64()"
   }
 }
@@ -71,6 +71,7 @@ fn emit_instances(
   has_repeated_fields : Bool,
   effects : Map[String, Bool],
   is_root~ : Bool,
+  has_bits~ : Bool,
 ) -> Unit raise SchemaError {
   let type_name = if is_root {
     root_type + "Record"
@@ -96,9 +97,7 @@ fn emit_instances(
       "  self._ksy_busy_\{name} = true\n  defer { self._ksy_busy_\{name} = false }\n",
     )
     if instance.kind is Parsed(_, Some(_)) {
-      output.write_string(
-        "  let saved = reader.offset\n  defer { reader.offset = saved }\n",
-      )
+      output.write_string(save_position("  ", has_bits))
     }
     let rollback = match instance.kind {
       Parsed(field, position) =>
@@ -119,21 +118,30 @@ fn emit_instances(
     let reference = fn(name) { instance_reference(record, name) }
     if instance.condition is Some(condition) {
       output.write_string(
-        "    if \{expression_code(condition, reference, "field")} {\n",
+        "    if \{expression_code(condition, reference, "field", bit_stream=has_bits)} {\n",
       )
     }
     match instance.kind {
       Value(expression) =>
         output.write_string(
-          "    let result = \{expression_code(expression, reference, "field")}\n",
+          "    let result = \{expression_code(expression, reference, "field", bit_stream=has_bits)}\n",
         )
       Parsed(field, position) => {
         if position is Some(position) {
           output.write_string(
-            "    reader.seek(\{expression_code(position, reference, "field")}, field)\n",
+            "    reader.seek(\{expression_code(position, reference, "field", bit_stream=has_bits)}, field)\n",
           )
         }
-        emit_field_read(output, field, "result", id, "field", reference, true)
+        emit_field_read(
+          output,
+          field,
+          "result",
+          id,
+          "field",
+          reference,
+          true,
+          bits=has_bits,
+        )
       }
     }
     output.write_string(

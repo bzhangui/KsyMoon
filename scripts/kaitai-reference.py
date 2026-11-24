@@ -20,10 +20,9 @@ COMPILER_SHA256 = "ff89389d9dc9e770d78a24af328763cb1f8e7b31ce7766c9edf10669a060f
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def compile_references():
+def compiler_command(work):
     cache = ROOT / "_build" / "kaitai-reference"
     cache.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix="oracle-", dir=cache))
     name = f"kaitai-struct-compiler-{VERSION}"
     archive = cache / f"{name}.zip"
     if archive.exists():
@@ -38,6 +37,14 @@ def compile_references():
         archive.write_bytes(binary)
     with zipfile.ZipFile(io.BytesIO(binary)) as compiler:
         compiler.extractall(work)
+    return ["java", "-cp", str(work / name / "lib" / "*"), "io.kaitai.struct.JavaMain"]
+
+
+def compile_references():
+    cache = ROOT / "_build" / "kaitai-reference"
+    cache.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="oracle-", dir=cache))
+    compiler = compiler_command(work)
     manifest = json.loads((ROOT / "fixtures/kaitai/manifest.json").read_text(encoding="utf-8"))
     schemas = {
         name: ROOT / "fixtures" / f"{name}.ksy"
@@ -45,8 +52,7 @@ def compile_references():
     }
     schemas.update({entry["schema"]: ROOT / "fixtures" / entry["source"] for entry in manifest["fixtures"]})
     subprocess.run(
-        ["java", "-cp", str(work / name / "lib" / "*"), "io.kaitai.struct.JavaMain",
-         "--target", "python", "--outdir", str(work),
+        [*compiler, "--target", "python", "--outdir", str(work),
          *(str(path) for path in schemas.values())],
         check=True,
     )
@@ -219,6 +225,8 @@ def stream_tests(references):
                 checks.append(f"  assert_eq({path}.to_owned(), {bytes_literal(value)})")
             elif isinstance(value, str):
                 checks.append(f"  assert_eq({path}, {json.dumps(value, ensure_ascii=False)})")
+            elif isinstance(value, bool):
+                checks.append(f"  assert_eq({path}, {str(value).lower()})")
             elif isinstance(value, int):
                 # Compare through Int64 for all <=32-bit signed/unsigned scalars.
                 if name == "switch_integers" and field == "body" and owner.code == 8:

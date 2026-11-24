@@ -193,11 +193,12 @@ fn IoPartialSeqValue::attribute(self : IoPartialSeqValue, arena : IoPartialSeqAr
 }
 
 ///|
-fn IoPartialSeqValue::element(self : IoPartialSeqValue, index : Int64, field : String, offset : Int) -> IoPartialSeqValue raise IoPartialSeqParseError {
-  guard self is Items(items) && index >= 0L && index < items.length().to_int64() else {
-    raise IoPartialSeqContextError(field~, offset~, message="array index is outside the available values")
+fn IoPartialSeqValue::element(self : IoPartialSeqValue, arena : IoPartialSeqArena, index : Int64, field : String, offset : Int) -> IoPartialSeqValue raise IoPartialSeqParseError {
+  guard self.attribute(arena, "length", field) is Number(length) && index >= 0L && index < length else { raise IoPartialSeqContextError(field~, offset~, message="array index is outside the available values") }
+  match self {
+    Items(items) => items[index.to_int()]
+    _ => { raise IoPartialSeqContextError(field~, offset~, message="array index is outside the available values") }
   }
-  items[index.to_int()]
 }
 
 ///|
@@ -251,7 +252,7 @@ fn instance_io_partial_seq_type_entry_previous(arena : IoPartialSeqArena, contex
   frame.busy["previous"] = true
   defer { frame.busy["previous"] = false }
   let value = {
-    let reader = (match IoPartialSeqValue::ObjectId(0).attribute(arena, "entries", field).element(0L, field, owner_reader.offset).attribute(arena, "_io", field) { IoPartialSeqValue::Source(value) => value; _ => { raise IoPartialSeqContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match IoPartialSeqValue::ObjectId(0).attribute(arena, "entries", field).element(arena, 0L, field, owner_reader.offset).attribute(arena, "_io", field) { IoPartialSeqValue::Source(value) => value; _ => { raise IoPartialSeqContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]

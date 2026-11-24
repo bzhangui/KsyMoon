@@ -72,7 +72,8 @@ fn kind_expression_type(
   path : String,
 ) -> ExprType raise SchemaError {
   match kind {
-    Unsigned(_, _) | Signed(_, _) => Integer
+    BitInteger(1, _) => Boolean
+    Unsigned(_, _) | Signed(_, _) | BitInteger(_, _) => Integer
     Text(_, _) => Text
     _ =>
       invalid(
@@ -157,12 +158,30 @@ fn parse_field_kind(
       let result = []
       let mut fallback = None
       for key, value in cases {
-        let kind = parse_kind(
-          as_string(value, path + ".type.cases." + key),
-          endian,
-          type_names,
-          path + ".type.cases." + key,
-        )
+        let case_path = path + ".type.cases." + key
+        let kind = match value {
+          @yaml.String("strz") => {
+            let case = Map([("type", value)])
+            if field.get("encoding") is Some(encoding) {
+              case["encoding"] = encoding
+            }
+            parse_field_kind(
+              case,
+              earlier,
+              endian,
+              type_names,
+              case_path,
+              navigation~,
+            )
+          }
+          _ =>
+            parse_kind(
+              as_string(value, case_path),
+              endian,
+              type_names,
+              case_path,
+            )
+        }
         if key == "_" {
           fallback = Some(kind)
         } else {
@@ -205,7 +224,8 @@ fn parse_field_kind(
     ]
     .iter()
     .any(fn(key) { field.contains(key) })
-  guard !field.contains("encoding") else {
+  guard !field.contains("encoding") ||
+    walk_kinds(kind).iter().any(fn(kind) { kind is Text(_, _) }) else {
     invalid(path + ".encoding", "encoding requires a string type")
   }
   if has_options {
@@ -249,23 +269,38 @@ fn flatten_types(
   inherited_enums : Map[String, String],
   enum_scopes : Map[String, Map[String, String]],
   enums : Map[String, EnumDef],
+  imports_visibility : Map[String, Array[String]],
+  imported_types : Array[String],
+  imported~ : Bool = false,
 ) -> Map[String, @yaml.Yaml] raise SchemaError {
   let types = match mapping.get("types") {
     Some(value) => as_mapping(value, "types")
     None => Map([])
-  }
-  let visible = inherited.copy()
-  for name, _ in types {
-    check_identifier(name, "types." + name)
-    visible[name] = prefix + name
   }
   let owner = if prefix == "" {
     "@root"
   } else {
     prefix[:prefix.length() - 1].to_owned()
   }
+  if imported {
+    imported_types.push(owner)
+  }
+  let visible = match imports_visibility.get(owner) {
+    Some(aliases) => Map(aliases.map(fn(name) { (name, name) }))
+    None => inherited.copy()
+  }
+  for name, _ in types {
+    check_identifier(name, "types." + name)
+    if owner != "@root" || !imports_visibility.contains(name) {
+      visible[name] = prefix + name
+    }
+  }
   type_scopes[owner] = visible
-  let visible_enums = inherited_enums.copy()
+  let visible_enums = if owner != "@root" && imports_visibility.contains(owner) {
+    Map([])
+  } else {
+    inherited_enums.copy()
+  }
   if mapping.get("enums") is Some(raw_enums) {
     for enum_name, raw_values in as_mapping(raw_enums, owner + ".enums") {
       let path = owner + ".enums." + enum_name
@@ -295,6 +330,10 @@ fn flatten_types(
         visible_enums,
         enum_scopes,
         enums,
+        imports_visibility,
+        imported_types,
+        imported=imported ||
+          (owner == "@root" && imports_visibility.contains(name)),
       ),
     )
   }
@@ -303,14 +342,16 @@ fn flatten_types(
   if result.get("seq") is Some(@yaml.Array(fields)) {
     result["seq"] = @yaml.Array(
       fields.map(fn(value) raise SchemaError {
-        rewrite_field_type(value, visible, visible_enums)
+        rewrite_field_type(value, visible, visible_enums, imports_visibility)
       }),
     )
   }
   if result.get("instances") is Some(@yaml.Map(instances)) {
     let rewritten = Map([])
     for name, value in instances {
-      rewritten[name] = rewrite_field_type(value, visible, visible_enums)
+      rewritten[name] = rewrite_field_type(
+        value, visible, visible_enums, imports_visibility,
+      )
     }
     result["instances"] = @yaml.Map(rewritten)
   }
@@ -338,10 +379,31 @@ fn scoped_type_name(name : String, visible : Map[String, String]) -> String {
 }
 
 ///|
+fn scoped_field_type(
+  name : String,
+  visible : Map[String, String],
+  imports_visibility : Map[String, Array[String]],
+) -> String raise SchemaError {
+  let base = match name.split_once("(") {
+    Some((base, _)) => base.trim().to_owned()
+    None => name
+  }
+  let first = match base.split_once("::") {
+    Some((qualifier, _)) => qualifier.to_owned()
+    None => base
+  }
+  if imports_visibility.contains(first) && !visible.contains(first) {
+    invalid("type", "module '" + first + "' must be imported by this document")
+  }
+  scoped_type_name(name, visible)
+}
+
+///|
 fn rewrite_field_type(
   value : @yaml.Yaml,
   visible : Map[String, String],
   visible_enums : Map[String, String],
+  imports_visibility : Map[String, Array[String]],
 ) -> @yaml.Yaml raise SchemaError {
   let field = as_mapping(value, "field").copy()
   if field.get("enum") is Some(@yaml.String(name)) {
@@ -357,14 +419,18 @@ fn rewrite_field_type(
   }
   match field.get("type") {
     Some(@yaml.String(name)) =>
-      field["type"] = @yaml.String(scoped_type_name(name, visible))
+      field["type"] = @yaml.String(
+        scoped_field_type(name, visible, imports_visibility),
+      )
     Some(@yaml.Map(mapping)) => {
       let mapping = mapping.copy()
       if mapping.get("cases") is Some(@yaml.Map(cases)) {
         let cases = cases.copy()
         for tag, kind in cases {
           if kind is @yaml.String(name) {
-            cases[tag] = @yaml.String(scoped_type_name(name, visible))
+            cases[tag] = @yaml.String(
+              scoped_field_type(name, visible, imports_visibility),
+            )
           }
         }
         mapping["cases"] = @yaml.Map(cases)
@@ -377,40 +443,120 @@ fn rewrite_field_type(
 }
 
 ///|
-fn inherit_encoding(
+fn schema_endian(
+  value : @yaml.Yaml?,
+  path : String,
+) -> Endian? raise SchemaError {
+  match value {
+    None => None
+    Some(@yaml.String("le")) => Some(Little)
+    Some(@yaml.String("be")) => Some(Big)
+    _ => invalid(path, "expected 'le' or 'be'")
+  }
+}
+
+///|
+fn inherit_read_defaults(
   mapping : Map[String, @yaml.Yaml],
-  encoding : @yaml.Yaml?,
+  inherited : Map[String, @yaml.Yaml],
+  imports_visibility : Map[String, Array[String]],
+  root~ : Bool = true,
 ) -> Map[String, @yaml.Yaml] raise SchemaError {
+  let defaults = inherited.copy()
+  if mapping.get("meta") is Some(value) {
+    let meta = as_mapping(value, "type.meta")
+    if !root {
+      check_keys(meta, ["endian", "encoding", "bit-endian"], "type.meta")
+    }
+    for key in ["endian", "encoding", "bit-endian"] {
+      if meta.get(key) is Some(value) {
+        defaults[key] = value
+      }
+    }
+  }
+  let bit_order = if schema_endian(
+      defaults.get("bit-endian"),
+      "meta.bit-endian",
+    )
+    is Some(Little) {
+    "le"
+  } else {
+    "be"
+  }
+  let normalize_type = fn(value : @yaml.Yaml) {
+    if value is @yaml.String(name) &&
+      bit_width(name) is Some(_) &&
+      !name.has_suffix("be") &&
+      !name.has_suffix("le") {
+      @yaml.String(name + bit_order)
+    } else {
+      value
+    }
+  }
   let result = mapping.copy()
+  result["meta"] = @yaml.Map(defaults)
   let apply = fn(value) raise SchemaError {
     let field = as_mapping(value, "field").copy()
-    if !field.contains("encoding") &&
-      encoding is Some(encoding) &&
-      (
-        field.get("type") == Some(@yaml.String("str")) ||
-        field.get("type") == Some(@yaml.String("strz"))
-      ) {
-      field["encoding"] = encoding
+    match field.get("type") {
+      Some(@yaml.Map(kind)) if kind.get("cases") is Some(@yaml.Map(cases)) => {
+        let kind = kind.copy()
+        let normalized = Map([])
+        for key, value in cases {
+          normalized[key] = normalize_type(value)
+        }
+        kind["cases"] = @yaml.Map(normalized)
+        field["type"] = @yaml.Map(kind)
+      }
+      Some(value) => field["type"] = normalize_type(value)
+      None => ()
+    }
+    let text = match field.get("type") {
+      Some(@yaml.String("str" | "strz")) => true
+      Some(@yaml.Map(kind)) =>
+        match kind.get("cases") {
+          Some(@yaml.Map(cases)) =>
+            cases
+            .values()
+            .any(fn(value) { value is @yaml.String("str" | "strz") })
+          _ => false
+        }
+      _ => false
+    }
+    if text &&
+      !field.contains("encoding") &&
+      defaults.get("encoding") is Some(value) {
+      field["encoding"] = value
     }
     @yaml.Map(field)
   }
   if result.get("seq") is Some(@yaml.Array(fields)) {
     result["seq"] = @yaml.Array(fields.map(apply))
   }
-  for section in ["types", "instances"] {
-    if result.get(section) is Some(@yaml.Map(entries)) {
-      let rewritten = Map([])
-      for name, value in entries {
-        rewritten[name] = if section == "types" {
-          @yaml.Map(
-            inherit_encoding(as_mapping(value, "types." + name), encoding),
-          )
-        } else {
-          apply(value)
-        }
-      }
-      result[section] = @yaml.Map(rewritten)
+  if result.get("instances") is Some(@yaml.Map(entries)) {
+    let rewritten = Map([])
+    for name, value in entries {
+      rewritten[name] = apply(value)
     }
+    result["instances"] = @yaml.Map(rewritten)
+  }
+  if result.get("types") is Some(@yaml.Map(entries)) {
+    let rewritten = Map([])
+    for name, value in entries {
+      let defaults = if root && imports_visibility.contains(name) {
+        Map([])
+      } else {
+        defaults
+      }
+      rewritten[name] = @yaml.Map(
+        inherit_read_defaults(
+          as_mapping(value, "types." + name),
+          defaults,
+          imports_visibility,
+          root=false,
+        ),
+      )
+    }
+    result["types"] = @yaml.Map(rewritten)
   }
   result
 }

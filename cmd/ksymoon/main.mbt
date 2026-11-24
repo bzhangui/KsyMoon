@@ -1,5 +1,5 @@
 ///|
-const USAGE = "Usage:\n  ksymoon check INPUT.ksy\n  ksymoon generate INPUT.ksy --out OUTPUT.mbt"
+const USAGE = "Usage:\n  ksymoon check INPUT.ksy [--import NAME FILE.ksy ...]\n  ksymoon generate INPUT.ksy --out OUTPUT.mbt [--import NAME FILE.ksy ...]"
 
 ///|
 extern "js" fn read_schema(path : String) -> FixedArray[String] =
@@ -43,7 +43,11 @@ extern "js" fn report_error(message : String) -> Unit =
   #|}
 
 ///|
-fn process_file(input : String, output : String?) -> Unit {
+fn process_file(
+  input : String,
+  output : String?,
+  imports : Map[String, String],
+) -> Unit {
   guard read_schema(input) is [source] else {
     report_error("could not read '\{input}'")
     return
@@ -51,11 +55,11 @@ fn process_file(input : String, output : String?) -> Unit {
   try {
     match output {
       None => {
-        @codegen.validate(source)
+        @codegen.validate_with_imports(source, imports)
         println("Valid schema: \{input}")
       }
       Some(path) => {
-        let code = @codegen.generate(source)
+        let code = @codegen.generate_with_imports(source, imports)
         let message = write_source(path, code)
         if !message.is_empty() {
           report_error("could not write '\{path}': \{message}")
@@ -68,13 +72,50 @@ fn process_file(input : String, output : String?) -> Unit {
 }
 
 ///|
+fn run_command(
+  input : String,
+  arguments : ArrayView[String],
+  generates : Bool,
+) -> Unit {
+  let imports = Map([])
+  let mut output = None
+  let mut index = 0
+  while index < arguments.length() {
+    match arguments[index:] {
+      ["--out", path, ..] if generates && output is None => {
+        if !path.has_suffix(".mbt") {
+          report_error("output path must end in .mbt")
+          return
+        }
+        output = Some(path)
+        index += 2
+      }
+      ["--import", key, path, ..] if !imports.contains(key) => {
+        guard read_schema(path) is [source] else {
+          report_error("could not read import '\{path}'")
+          return
+        }
+        imports[key] = source
+        index += 3
+      }
+      _ => {
+        report_error(USAGE)
+        return
+      }
+    }
+  }
+  if generates && output is None {
+    report_error(USAGE)
+    return
+  }
+  process_file(input, output, imports)
+}
+
+///|
 fn main {
   match @env.args()[:] {
-    [_, _, "check", input] => process_file(input, None)
-    [_, _, "generate", input, "--out", output] if output.has_suffix(".mbt") =>
-      process_file(input, Some(output))
-    [_, _, "generate", _, "--out", _] =>
-      report_error("output path must end in .mbt")
+    [_, _, "check", input, .. args] => run_command(input, args, false)
+    [_, _, "generate", input, .. args] => run_command(input, args, true)
     [_, _, "--help"] | [_, _, "-h"] => println(USAGE)
     _ => report_error(USAGE)
   }

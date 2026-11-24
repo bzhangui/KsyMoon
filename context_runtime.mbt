@@ -53,6 +53,8 @@ fn context_emit_runtime(
   has_instances : Bool,
   accounting : Bool,
   rollback : Bool,
+  bits : Bool,
+  recursive : Bool,
   index : Bool,
   objects : Bool,
 ) -> Unit {
@@ -85,7 +87,7 @@ fn context_emit_runtime(
     #|  cache : Map[String, __ROOT__Value]
     #|  partial : Map[String, __ROOT__Value]
     #|__BUSY_FIELD__
-    #|__ACCOUNT_FIELD__}
+    #|__DEPTH_FIELD____ACCOUNT_FIELD__}
     #|
     #|///|
     #|priv struct __ROOT__Arena {
@@ -102,8 +104,8 @@ fn context_emit_runtime(
     #|}
     #|
     #|///|
-    #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, __PATH_ARG__ : String) -> Int {
-    #|  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____ACCOUNT_INIT__ }
+    #|fn __ROOT__Arena::create(self : __ROOT__Arena, tag : Int, parent : Int, reader : __ROOT__Reader, __PATH_ARG__ : String) -> Int__CREATE_EFFECT__ {
+    #|__DEPTH_CHECK__  let frame : __ROOT__Context = { tag, parent, reader, __PATH_INIT__children: [], fields: Map([]), cache: Map([]), partial: Map([])__BUSY_INIT____DEPTH_INIT____ACCOUNT_INIT__ }
     #|  let context = match self.free.pop() {
     #|    Some(context) => { self.frames[context] = Some(frame); context }
     #|    None => { self.frames.push(Some(frame)); self.frames.length() - 1 }
@@ -112,7 +114,25 @@ fn context_emit_runtime(
     #|  context
     #|}
     #|
+  let depth_check = if recursive {
+    "  let depth = if parent < 0 { 0 } else { self.frames[parent].unwrap().depth + 1 }\n  guard depth <= 64 else { raise __ROOT__ContextError(field=path, offset=reader.offset, message=\"record nesting exceeds 64\") }\n"
+  } else {
+    ""
+  }
   let block = block
+    .replace_all(
+      old="__DEPTH_FIELD__",
+      new=if recursive { "  depth : Int\n" } else { "" },
+    )
+    .replace_all(old="__DEPTH_CHECK__", new=depth_check[:])
+    .replace_all(
+      old="__DEPTH_INIT__",
+      new=if recursive { ", depth" } else { "" },
+    )
+    .replace_all(
+      old="__CREATE_EFFECT__",
+      new=if recursive { " raise __ROOT__ParseError" } else { "" },
+    )
     .replace_all(
       old="__PATH_FIELD__\n",
       new=if has_instances { "  path : String\n" } else { "" },
@@ -194,7 +214,7 @@ fn context_emit_runtime(
     #|    Source(reader) => match name {
     #|      "pos" => Number(reader.offset.to_int64())
     #|      "size" => Number(reader.input.length().to_int64())
-    #|      "eof" => Flag(reader.offset == reader.input.length())
+    #|      "eof" => Flag(__BIT_EOF__reader.offset == reader.input.length())
     #|      _ => Absent
     #|    }
     #|__EXTRA_CASES__    Number(value) => { ignore(value); Absent }
@@ -236,7 +256,12 @@ fn context_emit_runtime(
   }
   write_reader_block(
     output,
-    block.replace_all(old="__EXTRA_CASES__", new=extra.to_string()[:]),
+    block
+    .replace_all(old="__EXTRA_CASES__", new=extra.to_string()[:])
+    .replace_all(
+      old="__BIT_EOF__",
+      new=if bits { "reader.bits_left == 0 && " } else { "" },
+    ),
     root,
   )
   if objects {
@@ -250,16 +275,28 @@ fn context_emit_runtime(
     )
   }
   if index {
-    let block =
-      #|///|
-      #|fn __ROOT__Value::element(self : __ROOT__Value, index : Int64, field : String, offset : Int) -> __ROOT__Value raise __ROOT__ParseError {
-      #|  guard self is Items(items) && index >= 0L && index < items.length().to_int64() else {
-      #|    raise __ROOT__ContextError(field~, offset~, message="array index is outside the available values")
-      #|  }
-      #|  items[index.to_int()]
-      #|}
-      #|
-    write_reader_block(output, block, root)
+    output.write_string(
+      "///|\nfn \{root}Value::element(self : \{root}Value, arena : \{root}Arena, index : Int64, field : String, offset : Int) -> \{root}Value raise \{root}ParseError {\n",
+    )
+    let error = "raise \{root}ContextError(field~, offset~, message=\"array index is outside the available values\")"
+    output.write_string(
+      "  guard self.attribute(arena, \"length\", field) is Number(length) && index >= 0L && index < length else { \{error} }\n",
+    )
+    output.write_string("  match self {\n")
+    if flags.contains("items") {
+      output.write_string("    Items(items) => items[index.to_int()]\n")
+    }
+    if flags.contains("binary") {
+      output.write_string(
+        "    Binary(bytes) => Number(bytes[index.to_int()].to_int64())\n",
+      )
+    }
+    if flags.contains("selected") {
+      output.write_string(
+        "    Selected(_, value) => value.element(arena, index, field, offset)\n",
+      )
+    }
+    output.write_string("    _ => { \{error} }\n  }\n}\n\n")
   }
 }
 
@@ -267,8 +304,11 @@ fn context_emit_runtime(
 fn context_contains_index(expression : Expr) -> Bool {
   match expression {
     Index(_, _) => true
-    Member(base, _) | Cast(base, _) | ToEnum(base, _) | Unary(_, base) =>
-      context_contains_index(base)
+    Member(base, _)
+    | Cast(base, _)
+    | Decode(base, _)
+    | ToEnum(base, _)
+    | Unary(_, base) => context_contains_index(base)
     Binary(_, a, b) => context_contains_index(a) || context_contains_index(b)
     Choose(a, b, c) =>
       context_contains_index(a) ||
@@ -319,7 +359,7 @@ fn context_all_expressions(schema : Schema) -> Array[Expr] {
 fn context_contains_cast(expression : Expr) -> Bool {
   match expression {
     Cast(_, _) => true
-    Member(base, _) | ToEnum(base, _) | Unary(_, base) =>
+    Member(base, _) | Decode(base, _) | ToEnum(base, _) | Unary(_, base) =>
       context_contains_cast(base)
     Index(base, index) | Binary(_, base, index) =>
       context_contains_cast(base) || context_contains_cast(index)
@@ -332,7 +372,11 @@ fn context_contains_cast(expression : Expr) -> Bool {
 }
 
 ///|
-fn context_emit_stream_value(output : StringBuilder, root : String) -> Unit {
+fn context_emit_stream_value(
+  output : StringBuilder,
+  root : String,
+  bits : Bool,
+) -> Unit {
   let block =
     #|///|
     #|pub struct __ROOT__Stream {
@@ -351,8 +395,31 @@ fn context_emit_stream_value(output : StringBuilder, root : String) -> Unit {
     #|
     #|///|
     #|pub fn __ROOT__Stream::eof(self : __ROOT__Stream) -> Bool {
-    #|  self.reader.offset == self.reader.input.length()
+    #|  __BIT_EOF__self.reader.offset == self.reader.input.length()
     #|}
     #|
-  write_reader_block(output, block, root)
+  write_reader_block(
+    output,
+    block.replace_all(
+      old="__BIT_EOF__",
+      new=if bits { "self.reader.bits_left == 0 && " } else { "" },
+    ),
+    root,
+  )
+}
+
+///|
+fn context_contains_decode(expression : Expr) -> Bool {
+  match expression {
+    Decode(_, _) => true
+    Member(base, _) | Cast(base, _) | ToEnum(base, _) | Unary(_, base) =>
+      context_contains_decode(base)
+    Binary(_, a, b) | Index(a, b) =>
+      context_contains_decode(a) || context_contains_decode(b)
+    Choose(a, b, c) =>
+      context_contains_decode(a) ||
+      context_contains_decode(b) ||
+      context_contains_decode(c)
+    _ => false
+  }
 }

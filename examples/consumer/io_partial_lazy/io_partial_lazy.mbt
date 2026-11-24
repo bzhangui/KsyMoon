@@ -195,11 +195,12 @@ fn IoPartialLazyValue::attribute(self : IoPartialLazyValue, arena : IoPartialLaz
 }
 
 ///|
-fn IoPartialLazyValue::element(self : IoPartialLazyValue, index : Int64, field : String, offset : Int) -> IoPartialLazyValue raise IoPartialLazyParseError {
-  guard self is Items(items) && index >= 0L && index < items.length().to_int64() else {
-    raise IoPartialLazyContextError(field~, offset~, message="array index is outside the available values")
+fn IoPartialLazyValue::element(self : IoPartialLazyValue, arena : IoPartialLazyArena, index : Int64, field : String, offset : Int) -> IoPartialLazyValue raise IoPartialLazyParseError {
+  guard self.attribute(arena, "length", field) is Number(length) && index >= 0L && index < length else { raise IoPartialLazyContextError(field~, offset~, message="array index is outside the available values") }
+  match self {
+    Items(items) => items[index.to_int()]
+    _ => { raise IoPartialLazyContextError(field~, offset~, message="array index is outside the available values") }
   }
-  items[index.to_int()]
 }
 
 ///|
@@ -298,7 +299,7 @@ fn instance_io_partial_lazy_type_entry_previous(arena : IoPartialLazyArena, cont
   frame.busy["previous"] = true
   defer { frame.busy["previous"] = false }
   let value = {
-    let reader = (match IoPartialLazyValue::ObjectId(0).attribute(arena, "entries", field).element(0L, field, owner_reader.offset).attribute(arena, "_io", field) { IoPartialLazyValue::Source(value) => value; _ => { raise IoPartialLazyContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
+    let reader = (match IoPartialLazyValue::ObjectId(0).attribute(arena, "entries", field).element(arena, 0L, field, owner_reader.offset).attribute(arena, "_io", field) { IoPartialLazyValue::Source(value) => value; _ => { raise IoPartialLazyContextError(field=field, offset=owner_reader.offset, message="value is unavailable or has the wrong type") } })
     let saved = reader.offset
     defer { reader.offset = saved }
     let previous_account = reader.budget[1]

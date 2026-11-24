@@ -155,7 +155,9 @@ test "recursive type definitions cannot generate unbounded parsing" {
     #|    seq:
     #|      - id: next
     #|        type: node
-  expect_schema_error(source, "types.node: recursive type reference")
+  expect_schema_error(
+    source, "types.node: recursive type reference in sequential fields",
+  )
 }
 
 ///|
@@ -375,5 +377,89 @@ test "enums reject undefined labels and incompatible enum comparisons" {
   expect_schema_error(
     source.replace_all(old="enum: kinds", new="enum: missing"),
     "@root.seq.opcode: unknown enum 'missing'",
+  )
+}
+
+///|
+test "explicit imports diagnose missing dependencies and import cycles" {
+  let source =
+    #|meta: {id: example, imports: [/data/message]}
+    #|seq: [{id: payload, type: message::body}]
+  let message =
+    #|meta: {id: message, endian: be}
+    #|types:
+    #|  body:
+    #|    seq: [{id: number, type: u2}]
+  expect_schema_error(
+    source, "meta.imports./data/message: missing imported description '/data/message'",
+  )
+  let code = generate_with_imports(source, Map([("/data/message", message)]))
+  assert_true(code.contains("reader.read_bits(2, false, path_number)"))
+  let wrong_root =
+    #|meta: {id: message}
+    #|types:
+    #|  body:
+    #|    instances:
+    #|      root_size: {value: _root._io.size}
+  try
+    validate_with_imports(source, Map([("/data/message", wrong_root)]))
+  catch {
+    InvalidSchema(error) =>
+      assert_true(
+        error.contains(
+          "root and parent navigation on imported records awaits implementation",
+        ),
+      )
+  } noraise {
+    _ => fail("used the caller's root as the imported root")
+  }
+  let parent =
+    #|meta: {id: message, imports: [number]}
+    #|types:
+    #|  body:
+    #|    seq: [{id: content, type: number}]
+  let number =
+    #|meta: {id: number}
+    #|seq: [{id: n, type: u1}]
+  let graph = Map([("/data/message", parent), ("number", number)])
+  validate_with_imports(source, graph)
+  try
+    validate_with_imports(
+      source.replace_all(old="message::body", new="number"),
+      graph,
+    )
+  catch {
+    InvalidSchema(message) =>
+      assert_eq(
+        message, "type: module 'number' must be imported by this document",
+      )
+  } noraise {
+    _ => fail("resolved a transitive import outside its scope")
+  }
+  let circular =
+    #|meta: {id: message, imports: [/data/message]}
+    #|seq: [{id: marker, type: u1}]
+  try validate_with_imports(source, Map([("/data/message", circular)])) catch {
+    InvalidSchema(message) =>
+      assert_eq(
+        message, "meta.imports./data/message: cyclic import: /data/message -> /data/message",
+      )
+  } noraise {
+    _ => fail("accepted a cyclic import")
+  }
+}
+
+///|
+test "eager recursion is rejected even when instances are present" {
+  let source =
+    #|meta: {id: example}
+    #|seq: [{id: node, type: node}]
+    #|types:
+    #|  node:
+    #|    seq: [{id: child, type: node}]
+    #|    instances:
+    #|      root_size: {value: _root._io.size}
+  expect_schema_error(
+    source, "types.node: recursive type reference in sequential fields",
   )
 }

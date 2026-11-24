@@ -2,7 +2,9 @@
 
 KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进制解析器。生成的源码只依赖 MoonBit 标准库。
 
-项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。本版为 `0.3.0`，已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
+项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。仓库已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
+
+Mooncakes 验收版为 `0.3.0`。当前 Git 开发版 `0.4.0-dev.1` 增加显式模块导入和经过对照验证的 WAV/RIFF 解析。 [发布包](https://mooncakes.io/docs/bzhangui/ksymoon@0.3.0) · [发布验收记录](docs/reports/mooncakes-0.3.0.json)
 
 ## 快速开始
 
@@ -34,6 +36,26 @@ moon -C examples/consumer run --target js .
 `examples/consumer` 有自己的 `moon.mod`，从自身的 `udp`、`stl` 和 `stm32` 包调用生成的解析器。在自己的模块里使用时，先创建目标包和 `moon.pkg`，再把生成的文件写入该包。
 
 `check INPUT.ksy` 只校验描述。通过时返回状态 0，输入无法读取或描述超出支持范围时返回非零状态并打印诊断。库接口提供 `validate(source)` 和 `generate(source)`。
+
+## WAV 与 RIFF（开发版）
+
+安装 Java 21、Python、Node.js 24 与 MoonBit v0.10.19，在本仓库运行：
+
+```powershell
+moon update
+python -m pip install kaitaistruct==0.11
+python scripts/wav-reference.py
+```
+
+脚本获取固定修订的原样描述并校验 SHA-256，用同一输入分别生成官方 Python 与 KsyMoon 解析器。在独立 MoonBit 模块比较 PCM、扩展格式的声道位图、带填充的未知块、嵌套 LIST/INFO 和截断样本，覆盖四后端。
+
+使用自己的描述时，库接口 `generate_with_imports(source, imports)` 和 `validate_with_imports(source, imports)` 接受 `Map[String, String]`，键为 `meta.imports` 中的名字，值为原样描述文本。CLI 对应参数为 `--import NAME FILE.ksy`。例如：
+
+```powershell
+moon run --target js cmd/ksymoon -- generate wav.ksy --out wav.mbt --import /common/riff riff.ksy
+```
+
+缺失、重复与循环导入会报告描述诊断。导入文件来自显式传入的映射。加载上游 WAV/RIFF 文件的来源和许可证见下方。
 
 ## 复现验收
 
@@ -86,13 +108,16 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 - 生成的解析器读取描述指定的前缀。UDP 校验和作为字段返回，由调用者按使用场景校验。
 - 对象、数组和流属性也可用于无 `io` 的描述。对象或流可作为惰性值实例返回，`.as<T>` 可将对象分支转换为确定的本地记录类型，类型不匹配时报告错误。
 - 支持 32 位以内整数枚举、枚举字面量、条件与分支、值实例枚举及 `to_i`。未知枚举码保留在 `UnknownCode(Int64)` 中。支持整数、布尔和字符串参数，包含根解析入口及参数化本地类型调用。
-- 待实现能力包括 imports、更多参数与数值类型、完整集合表达式、受限递归、位域、更多编码与处理器。未支持的描述返回诊断。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
+- 开发版支持 `b1…b32`、默认位序及类型后缀、显式 `imports`、字节索引与指定编码的解码。跨类型递归可经惰性实例进入，限制最多 64 层对象嵌套。
+- 剩余能力包括更多类型与表达式、跨模块根/父对象引用、动态字节序、处理器和更多编码。未支持的描述返回诊断。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
 
 ## 来源与许可
 
 KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy) · [IVF 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/vp8_duck_ivf.ksy)
 
 47 份兼容描述与其中 43 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
+
+WAV 与 RIFF 描述从相同固定修订按需下载，分别保留上游文件声明的 BSD-3-Clause-Attribution 与 CC0-1.0。WAV 描述由 John Byrd（Gigantic Software）编写。两份描述和相应生成文件保存在本地构建目录。 [原样 WAV](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/wav.ksy) · [原样 RIFF](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/common/riff.ksy) · [WAV 许可](https://spdx.org/licenses/BSD-3-Clause-Attribution.html)
 
 本轮 P3 实现由 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45191577558) 验证。固定语料的 339 份描述中，143 份可生成并在四后端构建，196 份保留待支持诊断，47 份有运行对照。 [公开完整报告](docs/reports/kaitai-0.11-p3-2026-11-23.json)
 

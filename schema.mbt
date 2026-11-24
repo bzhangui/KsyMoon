@@ -46,6 +46,7 @@ priv struct ByteOptions {
 priv enum FieldKind {
   Unsigned(Byte, Endian)
   Unsigned64(Endian)
+  BitInteger(Int32, Endian)
   Signed(Byte, Endian)
   Float32(Endian)
   Contents(Bytes)
@@ -87,6 +88,8 @@ priv struct Schema {
   root : RecordDef
   records : Array[RecordDef]
   has_context : Bool
+  recursive : Bool
+  imported_types : Array[String]
   type_scopes : Map[String, Map[String, String]]
   enum_scopes : Map[String, Map[String, String]]
   enums : Map[String, EnumDef]
@@ -292,6 +295,19 @@ fn parse_kind(
     }
     return Application(base, parse_type_application(args.to_owned(), path))
   }
+  if bit_width(type_name) is Some(width) {
+    guard width >= 1 && width <= 32 else {
+      invalid(path, "bit integer width must be 1..32")
+    }
+    return BitInteger(
+      width,
+      if type_name.has_suffix("le") {
+        Little
+      } else {
+        Big
+      },
+    )
+  }
   match type_name {
     "u1" => Unsigned(1, Big)
     "u2" => Unsigned(2, default_endian(endian, path))
@@ -418,7 +434,7 @@ fn parse_field(
     [
       "id", "type", "size", "contents", "valid", "repeat", "repeat-expr", "doc",
       "enum", "doc-ref", "if", "repeat-until", "size-eos", "encoding", "terminator",
-      "pad-right", "include", "consume", "eos-error",
+      "pad-right", "include", "consume", "eos-error", "-orig-id",
     ],
     path,
   )
@@ -594,22 +610,22 @@ fn collect_records(
   definitions : Map[String, RecordDef],
   active : Array[String],
   collected : Map[String, RecordDef],
-) -> Unit raise SchemaError {
-  let all_fields = record.fields.copy()
+  recursive : Array[Bool],
+) -> Unit {
+  let fields = record.fields.copy()
   for instance in record.instances {
     if instance.kind is Parsed(field, _) {
-      all_fields.push(field)
+      fields.push(field)
     }
   }
-  for field in all_fields {
+  for field in fields {
     for name in kind_references(field.kind) {
-      guard !active.contains(name) else {
-        invalid("types.\{name}", "recursive type reference")
-      }
-      if !collected.contains(name) {
+      if active.contains(name) {
+        recursive[0] = true
+      } else if !collected.contains(name) {
         let nested = definitions[name]
         active.push(name)
-        collect_records(nested, definitions, active, collected)
+        collect_records(nested, definitions, active, collected, recursive)
         ignore(active.pop())
         collected[name] = nested
       }
@@ -618,12 +634,41 @@ fn collect_records(
 }
 
 ///|
-fn load_schema(source : String) -> Schema raise SchemaError {
-  let documents = load_ksy_yaml(source)
-  guard documents is [document] else {
-    invalid("schema", "expected one YAML document")
+fn check_eager_type_cycles(
+  name : String,
+  record : RecordDef,
+  definitions : Map[String, RecordDef],
+  active : Array[String],
+  checked : Map[String, Bool],
+) -> Unit raise SchemaError {
+  guard !active.contains(name) else {
+    invalid("types." + name, "recursive type reference in sequential fields")
   }
-  let root = as_mapping(document, "schema")
+  if checked.contains(name) {
+    return
+  }
+  active.push(name)
+  defer ignore(active.pop())
+  for field in record.fields {
+    for child in kind_references(field.kind) {
+      check_eager_type_cycles(
+        child,
+        definitions[child],
+        definitions,
+        active,
+        checked,
+      )
+    }
+  }
+  checked[name] = true
+}
+
+///|
+fn load_schema(
+  source : String,
+  imports~ : Map[String, String] = Map([]),
+) -> Schema raise SchemaError {
+  let root = document_mapping(source, "schema")
   check_keys(
     root,
     ["meta", "seq", "types", "instances", "doc", "doc-ref", "enums", "params"],
@@ -634,33 +679,29 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     meta,
     [
       "id", "endian", "title", "application", "file-extension", "xref", "license",
-      "tags", "ks-version", "encoding",
+      "tags", "ks-version", "encoding", "imports", "bit-endian",
     ],
     "meta",
   )
   let id = as_string(get_required(meta, "id", "schema.meta"), "meta.id")
   check_identifier(id, "meta.id")
-  let endian = match meta.get("endian") {
-    None => None
-    Some(@yaml.String("le")) => Some(Little)
-    Some(@yaml.String("be")) => Some(Big)
-    _ => invalid("meta.endian", "expected 'le' or 'be'")
-  }
+  let endian = schema_endian(meta.get("endian"), "meta.endian")
+  let (root, imports_visibility) = link_imports(root, meta, id, imports)
   let type_scopes = Map([])
   let enum_scopes = Map([])
   let enums = Map([])
-  let root = inherit_encoding(
-    flatten_types(
-      root,
-      "",
-      Map([]),
-      Map([]),
-      type_scopes,
-      Map([]),
-      enum_scopes,
-      enums,
-    ),
-    meta.get("encoding"),
+  let imported_types = []
+  let root = flatten_types(
+    inherit_read_defaults(root, Map([]), imports_visibility),
+    "",
+    Map([]),
+    Map([]),
+    type_scopes,
+    Map([]),
+    enum_scopes,
+    enums,
+    imports_visibility,
+    imported_types,
   )
   let types = match root.get("types") {
     Some(value) => as_mapping(value, "types")
@@ -669,7 +710,8 @@ fn load_schema(source : String) -> Schema raise SchemaError {
   guard types.length() <= 64 else {
     invalid("types", "at most 64 nested type definitions are supported")
   }
-  let has_context = !enums.is_empty() ||
+  let has_context = !imports_visibility.is_empty() ||
+    !enums.is_empty() ||
     root.contains("params") ||
     types
     .values()
@@ -685,13 +727,21 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     let mapping = as_mapping(value, path)
     check_keys(
       mapping,
-      ["seq", "instances", "doc", "doc-ref", "enums", "params"],
+      ["seq", "instances", "doc", "doc-ref", "enums", "params", "meta"],
       path,
+    )
+    let defaults = as_mapping(
+      get_required(mapping, "meta", path),
+      path + ".meta",
+    )
+    let local_endian = schema_endian(
+      defaults.get("endian"),
+      path + ".meta.endian",
     )
     definitions[name] = parse_record(
       name,
       mapping.get("seq").unwrap_or(@yaml.Array([])),
-      endian,
+      local_endian,
       names,
       path + ".seq",
       mapping.get("instances"),
@@ -715,11 +765,22 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     }
   }
   let reachable : Map[String, RecordDef] = Map([])
-  collect_records(root_record, definitions, [], reachable)
+  let recursion = [false]
+  collect_records(root_record, definitions, [], reachable, recursion)
+  if recursion[0] {
+    let checked = Map([])
+    for name, record in reachable {
+      check_eager_type_cycles(name, record, definitions, [], checked)
+    }
+  }
+  let has_context = has_context || recursion[0]
+  let recursive = recursion[0]
   let schema : Schema = {
     root: root_record,
     records: reachable.values().collect(),
     has_context,
+    recursive,
+    imported_types,
     type_scopes,
     enum_scopes,
     enums,
@@ -728,6 +789,8 @@ fn load_schema(source : String) -> Schema raise SchemaError {
     root: root_record,
     records: definitions.values().collect(),
     has_context,
+    recursive,
+    imported_types,
     type_scopes,
     enum_scopes,
     enums,

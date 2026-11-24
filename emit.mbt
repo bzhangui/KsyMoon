@@ -1,7 +1,11 @@
 ///|
 /// Compiles one supported Kaitai Struct description to self-contained MoonBit source.
 pub fn generate(source : String) -> String raise SchemaError {
-  let schema = load_schema(source)
+  generate_schema(load_schema(source))
+}
+
+///|
+fn generate_schema(schema : Schema) -> String raise SchemaError {
   let needs_context = schema.has_context &&
     (
       !context_all_expressions(schema).is_empty() ||
@@ -28,6 +32,7 @@ pub fn generate(source : String) -> String raise SchemaError {
   let root_record_type = root_type + "Record"
   let records = [schema.root, ..schema.records]
   let effects = read_effects(schema.records)
+  let has_bits = schema_has_bits(schema)
   let mut has_numeric_fields = false
   let mut has_uint64 = false
   let mut has_repeated_fields = false
@@ -80,7 +85,9 @@ pub fn generate(source : String) -> String raise SchemaError {
         has_stream_size = has_stream_size || expression_stream_size(expression)
       }
       for kind in walk_kinds(field.kind) {
-        if !(kind is Nested(_)) && !(kind is Switch(_, _, _, _)) {
+        if !(kind is Nested(_) ||
+          kind is Switch(_, _, _, _) ||
+          kind is BitInteger(_, _)) {
           has_read_fields = true
         }
         has_numeric_fields = has_numeric_fields ||
@@ -136,7 +143,8 @@ pub fn generate(source : String) -> String raise SchemaError {
     has_positions~,
     has_arithmetic~,
     has_read_fields~,
-    has_input=has_read_fields || has_stream_size || has_positions,
+    has_input=has_read_fields || has_stream_size || has_positions || has_bits,
+    has_bits~,
   )
   for record in schema.records {
     let name = nested_reader(id, record.name)
@@ -148,6 +156,7 @@ pub fn generate(source : String) -> String raise SchemaError {
       id,
       root_type,
       effects,
+      has_bits,
     )
   }
   emit_record_reader(
@@ -158,6 +167,7 @@ pub fn generate(source : String) -> String raise SchemaError {
     id,
     root_type,
     effects,
+    has_bits,
   )
   for index, record in records {
     emit_instances(
@@ -168,6 +178,7 @@ pub fn generate(source : String) -> String raise SchemaError {
       has_repeated_fields,
       effects,
       is_root=index == 0,
+      has_bits~,
     )
   }
   let effect = if !schema.root.fields
@@ -177,7 +188,10 @@ pub fn generate(source : String) -> String raise SchemaError {
   } else {
     " raise \{root_type}ParseError"
   }
-  let input_arg = if has_read_fields || has_stream_size || has_positions {
+  let input_arg = if has_read_fields ||
+    has_stream_size ||
+    has_positions ||
+    has_bits {
     "input"
   } else {
     "_input"
@@ -190,13 +204,16 @@ pub fn generate(source : String) -> String raise SchemaError {
   } else {
     ""
   }
-  let input_state = if has_read_fields || has_stream_size || has_positions {
+  let input_state = if has_read_fields ||
+    has_stream_size ||
+    has_positions ||
+    has_bits {
     "input, "
   } else {
     ""
   }
   output.write_string(
-    "  let reader : \{root_type}Reader = { \{input_state}offset: 0\{repeat_budget} }\n",
+    "  let reader : \{root_type}Reader = { \{input_state}offset: 0\{repeat_budget}\{bit_state(has_bits)} }\n",
   )
   output.write_string("  read_\{id}_root(reader, \"\{id}\")\n}\n")
   output.to_string()
@@ -226,7 +243,8 @@ fn nested_reader(id : String, name : String) -> String {
 ///|
 fn field_type(kind : FieldKind, root_type : String) -> String {
   match kind {
-    Unsigned(_, _) => "UInt"
+    BitInteger(1, _) => "Bool"
+    Unsigned(_, _) | BitInteger(_, _) => "UInt"
     Unsigned64(_) => "UInt64"
     Signed(_, _) => "Int"
     Float32(_) => "Float"
@@ -299,8 +317,17 @@ fn read_code(
   reference~ : (String) -> String = fn(name) { "v_\{name}.to_int64()" },
   evaluate~ : ((Expr) -> String)? = None,
   parent_context~ : String? = None,
+  bits~ : Bool = false,
 ) -> String {
   match kind {
+    BitInteger(width, endian) => {
+      let code = "reader.read_bit_integer(\{width}, \{endian is Little}, \{path})"
+      if width == 1 {
+        "(\{code} != 0U)"
+      } else {
+        code
+      }
+    }
     Unsigned(width, endian) =>
       "reader.read_bits(\{width.to_int()}, \{endian_flag(endian)}, \{path})"
     Unsigned64(endian) =>
@@ -324,7 +351,7 @@ fn read_code(
       "reader.read_contents(Bytes::from_array([\{values.join(", ")}]), \{path})"
     }
     Enumerated(inner, name) =>
-      "\{generated_enum_type(pascal_case(id), name)}::from_code(\{read_code(inner, id, path, in_instance~, reference~, evaluate~, parent_context~)}.to_int64())"
+      "\{generated_enum_type(pascal_case(id), name)}::from_code(\{read_code(inner, id, path, in_instance~, reference~, evaluate~, parent_context~, bits~)}.to_int64())"
     Application(name, arguments) => {
       let values = arguments
         .map(fn(expression) { ", " + evaluate.unwrap()(expression) })
@@ -368,6 +395,7 @@ fn read_code(
             selector_override=Some("ksy_selector"),
             evaluate~,
             parent_context~,
+            bits~,
           )
         _ =>
           read_code(
@@ -378,6 +406,7 @@ fn read_code(
             reference~,
             evaluate~,
             parent_context~,
+            bits~,
           )
       }
       let selection = match inner {
@@ -402,6 +431,7 @@ fn read_code(
         in_instance,
         evaluate~,
         parent_context~,
+        bits~,
       )
   }
 }
@@ -415,6 +445,7 @@ fn emit_record_reader(
   id : String,
   root_type : String,
   effects : Map[String, Bool],
+  bits : Bool,
 ) -> Unit {
   let effect = if !record.fields
     .iter()
@@ -446,6 +477,7 @@ fn emit_record_reader(
       field_path,
       fn(name) { record_reference(record, name, false) },
       false,
+      bits~,
     )
     if field.condition is Some(_) {
       output.write_string("    Some(v_\{name})\n  } else { None }\n")

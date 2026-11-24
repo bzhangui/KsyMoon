@@ -7,10 +7,12 @@ priv enum Expr {
   Member(Expr, String)
   Index(Expr, Expr)
   Cast(Expr, String)
+  Decode(Expr, String)
   EnumLiteral(String, String)
   ToEnum(Expr, String)
   StreamPosition
   StreamSize
+  StreamEof
   Unary(String, Expr)
   Binary(String, Expr, Expr)
   Choose(Expr, Expr, Expr)
@@ -169,7 +171,7 @@ fn ExprParser::parse(
         match attribute {
           "pos" => StreamPosition
           "size" => StreamSize
-          "eof" => Binary("==", StreamPosition, StreamSize)
+          "eof" => StreamEof
           _ => invalid(self.path, "expected _io.pos or _io.size")
         }
       }
@@ -217,7 +219,19 @@ fn ExprParser::parse(
     if operation == "." {
       let attribute = self.peek()
       self.index += 1
-      if attribute == "as" && self.peek() == "<" {
+      if attribute == "to_s" && self.peek() == "(" {
+        self.index += 1
+        let encoding = self.peek()
+        guard encoding.has_prefix("'") || encoding.has_prefix("\"") else {
+          invalid(self.path, "byte decoding requires a literal encoding")
+        }
+        self.index += 1
+        guard self.peek() == ")" else {
+          invalid(self.path, "expected ')' after encoding")
+        }
+        self.index += 1
+        left = Decode(left, parse_quoted(encoding, self.path).to_upper())
+      } else if attribute == "as" && self.peek() == "<" {
         self.index += 1
         let parts = []
         while true {
@@ -304,7 +318,7 @@ fn check_expression_depth(
 ) -> Unit raise SchemaError {
   guard depth <= 64 else { invalid(path, "expression nesting exceeds 64") }
   match expression {
-    Member(value, _) | Cast(value, _) | ToEnum(value, _) =>
+    Member(value, _) | Cast(value, _) | Decode(value, _) | ToEnum(value, _) =>
       check_expression_depth(value, depth + 1, path)
     Index(value, index) => {
       check_expression_depth(value, depth + 1, path)
@@ -333,12 +347,13 @@ fn expression_type(
 ) -> ExprType raise SchemaError {
   match expression {
     Integer(_) | StreamPosition | StreamSize => Integer
-    Boolean(_) => Boolean
+    Boolean(_) | StreamEof => Boolean
     Text(_) => Text
     Reference(name) => lookup(name)
     Member(_, _)
     | Index(_, _)
     | Cast(_, _)
+    | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _) =>
       match navigation {
@@ -423,9 +438,17 @@ fn expression_code(
   path : String,
   navigation~ : ((Expr) -> String)? = None,
   stream_reader~ : String = "reader",
+  bit_stream~ : Bool = false,
 ) -> String {
   let child = fn(value) {
-    expression_code(value, reference, path, navigation~, stream_reader~)
+    expression_code(
+      value,
+      reference,
+      path,
+      navigation~,
+      stream_reader~,
+      bit_stream~,
+    )
   }
   match expression {
     Integer(n) => "\{n}L"
@@ -435,10 +458,17 @@ fn expression_code(
     Member(_, _)
     | Index(_, _)
     | Cast(_, _)
+    | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _) => navigation.unwrap()(expression)
     StreamPosition => "\{stream_reader}.offset.to_int64()"
     StreamSize => "\{stream_reader}.input.length().to_int64()"
+    StreamEof =>
+      if bit_stream {
+        "(\{stream_reader}.bits_left == 0 && \{stream_reader}.offset == \{stream_reader}.input.length())"
+      } else {
+        "(\{stream_reader}.offset.to_int64() == \{stream_reader}.input.length().to_int64())"
+      }
     Unary("not", value) => "(!\{child(value)})"
     Unary("+", value) => child(value)
     Unary("~", value) => "(\{child(value)}.lnot())"
@@ -463,7 +493,7 @@ fn expression_code(
 ///|
 fn expression_arithmetic(expression : Expr) -> Bool {
   match expression {
-    Member(value, _) | Cast(value, _) | ToEnum(value, _) =>
+    Member(value, _) | Cast(value, _) | Decode(value, _) | ToEnum(value, _) =>
       expression_arithmetic(value)
     Index(value, index) =>
       expression_arithmetic(value) || expression_arithmetic(index)
@@ -483,7 +513,7 @@ fn expression_arithmetic(expression : Expr) -> Bool {
 ///|
 fn expression_stream_size(expression : Expr) -> Bool {
   match expression {
-    StreamSize => true
+    StreamSize | StreamEof => true
     Cast(value, _) | ToEnum(value, _) => expression_stream_size(value)
     Member(value, attribute) =>
       attribute == "size" || expression_stream_size(value)

@@ -6,12 +6,13 @@ fn emit_stream_reader(
   byte_options : Bool,
   strings : Bool,
   repeated : Bool,
+  bits : Bool,
 ) -> Unit {
   if bounded {
     let budget = if repeated { ", budget: self.budget" } else { "" }
     let self_arg = if repeated { "self" } else { "_self" }
     output.write_string(
-      "///|\nfn \{root_type}Reader::substream(\{self_arg} : \{root_type}Reader, bytes : BytesView) -> \{root_type}Reader {\n  { input: bytes.to_owned(), offset: 0\{budget} }\n}\n\n",
+      "///|\nfn \{root_type}Reader::substream(\{self_arg} : \{root_type}Reader, bytes : BytesView) -> \{root_type}Reader {\n  { input: bytes.to_owned(), offset: 0\{budget}\{bit_state(bits)} }\n}\n\n",
     )
   }
   if byte_options {
@@ -50,6 +51,14 @@ fn emit_stream_reader(
       #|  bytes[:end]
       #|}
       #|
+    let block = if bits {
+      block.replace_all(
+        old="  let bytes = if terminated",
+        new="  self.bits_left = 0\n  let bytes = if terminated",
+      )
+    } else {
+      block
+    }
     write_reader_block(output, block, root_type)
   }
   if strings {

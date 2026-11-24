@@ -24,7 +24,7 @@ fn record_reference(
 ) -> String {
   let prefix = if instance { "self." } else { "v_" }
   let field = record.fields.iter().find_first(fn(f) { f.name == name })
-  let suffix = if field is Some({ kind: Text(_, _), .. }) {
+  let suffix = if field is Some({ kind: Text(_, _) | BitInteger(1, _), .. }) {
     ""
   } else {
     ".to_int64()"
@@ -116,6 +116,7 @@ fn switch_read_code(
   selector_override~ : String? = None,
   evaluate~ : ((Expr) -> String)? = None,
   parent_context~ : String? = None,
+  bits~ : Bool = false,
 ) -> String {
   guard kind is Switch(name, selector, cases, fallback) else {
     abort("expected switch")
@@ -126,7 +127,7 @@ fn switch_read_code(
   let selector_code = selector_override.unwrap_or(
     match evaluate {
       Some(evaluate) => evaluate(selector)
-      None => expression_code(selector, reference, path)
+      None => expression_code(selector, reference, path, bit_stream=bits)
     },
   )
   result.write_string(
@@ -139,15 +140,15 @@ fn switch_read_code(
   for index, (tag, child) in cases {
     let tag = match evaluate {
       Some(resolve) => resolve(tag)
-      None => expression_code(tag, reference, path)
+      None => expression_code(tag, reference, path, bit_stream=bits)
     }
     result.write_string(
-      "if selector == \{tag} { \{type_name}::Case\{index}(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}) } else ",
+      "if selector == \{tag} { \{type_name}::Case\{index}(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~, bits~)}) } else ",
     )
   }
   if fallback is Some(child) {
     result.write_string(
-      "{ \{type_name}::Default(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}) }",
+      "{ \{type_name}::Default(\{read_code(child, id, path, in_instance=instance, reference~, evaluate~, parent_context~, bits~)}) }",
     )
   } else if bounded {
     result.write_string(
@@ -172,11 +173,12 @@ fn emit_field_read(
   evaluate~ : ((Expr) -> String)? = None,
   parent_context~ : String? = None,
   publish_items~ : (String, String)? = None,
+  bits~ : Bool = false,
 ) -> Unit {
   match field.count {
     None => {
       output.write_string(
-        "  let \{target} = \{read_code(field.kind, id, path, in_instance=instance, reference~, evaluate~, parent_context~)}\n",
+        "  let \{target} = \{read_code(field.kind, id, path, in_instance=instance, reference~, evaluate~, parent_context~, bits~)}\n",
       )
       if field.validation is Some(check) {
         output.write_string(
@@ -199,10 +201,16 @@ fn emit_field_read(
       match repeat {
         Times(_) =>
           output.write_string("  for index in 0..<count_\{target} {\n")
-        ToEnd =>
+        ToEnd => {
+          let buffered = if bits && field.kind is BitInteger(_, _) {
+            " || reader.bits_left > 0"
+          } else {
+            ""
+          }
           output.write_string(
-            "  while reader.offset < reader.input.length() {\n    let index = \{target}.length()\n",
+            "  while reader.offset < reader.input.length()\{buffered} {\n    let index = \{target}.length()\n",
           )
+        }
         Until(_) =>
           output.write_string(
             "  while true {\n    let index = \{target}.length()\n",
@@ -217,10 +225,16 @@ fn emit_field_read(
         )
       }
       if repeat is ToEnd {
-        output.write_string("    let before = reader.offset\n")
+        output.write_string(
+          if bits {
+            "    let before = reader.offset.to_int64() * 8L - reader.bits_left.to_int64()\n"
+          } else {
+            "    let before = reader.offset\n"
+          },
+        )
       }
       output.write_string(
-        "    let item = \{read_code(field.kind, id, "item_path", in_instance=instance, reference~, evaluate~, parent_context~)}\n    \{target}.push(item)\n",
+        "    let item = \{read_code(field.kind, id, "item_path", in_instance=instance, reference~, evaluate~, parent_context~, bits~)}\n    \{target}.push(item)\n",
       )
       if publish_items is Some((_, after)) {
         output.write_string(after)
@@ -233,7 +247,7 @@ fn emit_field_read(
               expression,
               fn(name) {
                 if name == "_" {
-                  if field.kind is Text(_, _) {
+                  if field.kind is Text(_, _) || field.kind is BitInteger(1, _) {
                     "item"
                   } else {
                     "item.to_int64()"
@@ -247,13 +261,19 @@ fn emit_field_read(
                 }
               },
               "item_path",
+              bit_stream=bits,
             )
         }
         output.write_string("    if \{predicate} { break }\n")
       }
       if repeat is ToEnd {
+        let position = if bits {
+          "(reader.offset.to_int64() * 8L - reader.bits_left.to_int64())"
+        } else {
+          "reader.offset"
+        }
         output.write_string(
-          "    guard reader.offset > before else { raise \{pascal_case(id)}NoProgress(field=item_path, offset=reader.offset) }\n",
+          "    guard \{position} > before else { raise \{pascal_case(id)}NoProgress(field=item_path, offset=reader.offset) }\n",
         )
       }
       output.write_string("  }\n")

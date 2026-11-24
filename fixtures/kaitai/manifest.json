@@ -467,6 +467,50 @@
       "sample_sha256": "3ef1383eaaf56aa8d9170cb1d4c71e107ac7399fa4c2222ae2d492ce1f59670d",
       "spec": "kaitai/spec/test_params_call_extra_parens.py",
       "spec_sha256": "98a727f732bf5a3021c78b12cdd2cffe7f7502e4a8930150e275262b173cf592"
+    },
+    {
+      "schema": "bits_byte_aligned",
+      "package": "bits_byte_aligned",
+      "group": "bits",
+      "source": "kaitai/bits_byte_aligned.ksy",
+      "sha256": "1dc64d85d6e2629ca670d6b07f9d45ed18e90ca54cc0f95aa656415abbeeb41a",
+      "sample": "kaitai/samples/fixed_struct.bin",
+      "sample_sha256": "383757790fcb7ec12e699c143257cf3fb79535ace0e24e521f4bbbdbf53581a0",
+      "spec": "kaitai/spec/test_bits_byte_aligned.py",
+      "spec_sha256": "15498c120cba73a475de0277fa94f2eba1ffc33b4632182f078e71a0f32c0ae3"
+    },
+    {
+      "schema": "bits_byte_aligned_eof_be",
+      "package": "bits_byte_aligned_eof_be",
+      "group": "bits",
+      "source": "kaitai/bits_byte_aligned_eof_be.ksy",
+      "sha256": "b347472c562ba9a42b263b235fd6a66b803e74590b7e1260bec0c08cbb37bf1c",
+      "sample": "kaitai/samples/bcd_user_type_be.bin",
+      "sample_sha256": "007faabc227979a8660505fb4be75186fcebf7bdca52b399db38cc8c34a0c637",
+      "spec": "kaitai/spec/test_bits_byte_aligned_eof_be.py",
+      "spec_sha256": "d95c2ce7662211559af3cac777c16b7fe4b9ba5bffb2e4ec4526cb8c4a868bb4"
+    },
+    {
+      "schema": "bits_byte_aligned_eof_le",
+      "package": "bits_byte_aligned_eof_le",
+      "group": "bits",
+      "source": "kaitai/bits_byte_aligned_eof_le.ksy",
+      "sha256": "ab1fa5fbe2066dd7c781e52bf9c803a0c2a7309613673341e660a5a8b7ded553",
+      "sample": "kaitai/samples/bcd_user_type_be.bin",
+      "sample_sha256": "007faabc227979a8660505fb4be75186fcebf7bdca52b399db38cc8c34a0c637",
+      "spec": "kaitai/spec/test_bits_byte_aligned_eof_le.py",
+      "spec_sha256": "5b536bed5ada844d6209cdeff3327905d19d9a93e456e578af7566e1579b6e65"
+    },
+    {
+      "schema": "bits_seq_endian_combo",
+      "package": "bits_seq_endian_combo",
+      "group": "bits",
+      "source": "kaitai/bits_seq_endian_combo.ksy",
+      "sha256": "414f5de87ad402da46058b8f402fea5358b26e158af42b3224c2daaab2e85f8d",
+      "sample": "kaitai/samples/process_xor_4.bin",
+      "sample_sha256": "29c486617e08ad727c4eae75a46b6b1caadad51301388c36dae03f8d8dec711c",
+      "spec": "kaitai/spec/test_bits_seq_endian_combo.py",
+      "spec_sha256": "b853ea1f72af80cc5ce3d1d0850905fe046b4e903a6f3307de9c6ed2e65e4350"
     }
   ]
 }

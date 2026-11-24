@@ -66,4 +66,8 @@ import {
   "example/ksymoon-consumer/params_call",
   "example/ksymoon-consumer/params_def",
   "example/ksymoon-consumer/params_call_extra_parens",
+  "example/ksymoon-consumer/bits_byte_aligned",
+  "example/ksymoon-consumer/bits_byte_aligned_eof_be",
+  "example/ksymoon-consumer/bits_byte_aligned_eof_le",
+  "example/ksymoon-consumer/bits_seq_endian_combo",
 } for "wbtest"

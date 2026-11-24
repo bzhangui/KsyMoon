@@ -58,6 +58,16 @@ fn context_value_code(
       )
       "(match \{source}.object_id() { Some(object) => { guard arena.frame(object, \{path}).tag == \{tag} else { \{error} }; \{root}Value::ObjectId(object) }; None => { \{error} } })"
     }
+    Decode(base, encoding) => {
+      let value = context_value_code(scope, base, root, path, owner_reader)
+      let error = context_error(
+        root,
+        path,
+        reader=owner_reader,
+        message="expected bytes for decoding",
+      )
+      "\{root}Value::StringValue(\{owner_reader}.decode_text((match \{value} { \{root}Value::Binary(bytes) => bytes; _ => { \{error} } }), \{encoding.escape()}, \{path}, \{owner_reader}.offset))"
+    }
     EnumLiteral(name, label) => {
       let (_, value) = context_enum_label(scope, name, label)
       "\{root}Value::Number(\{value}L)"
@@ -71,7 +81,7 @@ fn context_value_code(
     Member(base, name) =>
       "\{context_value_code(scope, base, root, path, owner_reader)}.attribute(arena, \{name.escape()}, \{path})"
     Index(base, index) =>
-      "\{context_value_code(scope, base, root, path, owner_reader)}.element(\{context_expression_code(scope, index, root, path, owner_reader~)}, \{path}, \{owner_reader}.offset)"
+      "\{context_value_code(scope, base, root, path, owner_reader)}.element(arena, \{context_expression_code(scope, index, root, path, owner_reader~)}, \{path}, \{owner_reader}.offset)"
     Choose(condition, yes, no) =>
       "(if \{context_expression_code(scope, condition, root, path, owner_reader~)} { \{context_value_code(scope, yes, root, path, owner_reader)} } else { \{context_value_code(scope, no, root, path, owner_reader)} })"
     _ => {
@@ -107,6 +117,7 @@ fn context_expression_code(
     | Member(_, _)
     | Index(_, _)
     | Cast(_, _)
+    | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _) =>
       context_unpack_expression(
@@ -132,6 +143,7 @@ fn context_expression_code(
           navigation.iter().find_first(fn(pair) { pair.0 == value }).unwrap().1
         }),
         stream_reader=owner_reader,
+        bit_stream=scope.graph.bits,
       )
     }
   }
@@ -145,7 +157,9 @@ fn context_pack_kind(
   bounded~ : Bool = false,
 ) -> String {
   match kind {
-    Unsigned(_, _) | Signed(_, _) => "\{root}Value::Number(\{value}.to_int64())"
+    BitInteger(1, _) => "\{root}Value::Flag(\{value})"
+    Unsigned(_, _) | Signed(_, _) | BitInteger(_, _) =>
+      "\{root}Value::Number(\{value}.to_int64())"
     Enumerated(_, _) => "\{root}Value::Number(\{value}.to_i())"
     Unsigned64(_) => "\{root}Value::Wide(\{value})"
     Float32(_) => "\{root}Value::FloatValue(\{value})"
@@ -213,7 +227,9 @@ fn context_unpack_kind(
     "(match \{value} { \{root}Value::\{variant}(value) => \{result}; _ => { \{error} } })"
   }
   match kind {
-    Unsigned(_, _) => scalar("Number", "value.to_int().reinterpret_as_uint()")
+    BitInteger(1, _) => scalar("Flag", "value")
+    Unsigned(_, _) | BitInteger(_, _) =>
+      scalar("Number", "value.to_int().reinterpret_as_uint()")
     Signed(_, _) => scalar("Number", "value.to_int()")
     Enumerated(_, name) =>
       scalar("Number", generated_enum_type(root, name) + "::from_code(value)")
@@ -368,6 +384,7 @@ fn context_has_reference(expression : Expr) -> Bool {
     | Member(_, _)
     | Index(_, _)
     | Cast(_, _)
+    | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _) => true
     Unary(_, child) => context_has_reference(child)
@@ -389,23 +406,30 @@ fn context_read_effects(schema : Schema) -> Map[String, Bool] {
   }
   for _ in 0..<graph.records.length() {
     for owner, record in graph.records {
-      effects[owner] = record.parameters
-        .iter()
-        .any(fn(p) { p.range is Some(_) }) ||
-        record.fields
-        .iter()
-        .any(fn(field) {
-          field.count is Some(_) ||
-          field.validation is Some(_) ||
-          (
-            field.condition is Some(value) &&
-            (context_has_reference(value) || expression_arithmetic(value))
-          ) ||
-          context_kind_raises(field.kind, effects)
-        })
+      effects[owner] = schema.recursive ||
+        context_record_raises(record, effects)
     }
   }
   effects
+}
+
+///|
+fn context_record_raises(
+  record : RecordDef,
+  effects : Map[String, Bool],
+) -> Bool {
+  record.parameters.iter().any(fn(p) { p.range is Some(_) }) ||
+  record.fields
+  .iter()
+  .any(fn(field) {
+    field.count is Some(_) ||
+    field.validation is Some(_) ||
+    (
+      field.condition is Some(value) &&
+      (context_has_reference(value) || expression_arithmetic(value))
+    ) ||
+    context_kind_raises(field.kind, effects)
+  })
 }
 
 ///|
@@ -450,6 +474,7 @@ fn context_expression_parts(
     Member(_, _)
     | Index(_, _)
     | Cast(_, _)
+    | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _) =>
       navigation.push(

@@ -105,6 +105,7 @@ fn expression_needs_context(expression : Expr) -> Bool {
     Member(_, _)
     | Index(_, _)
     | Cast(_, _)
+    | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _) => true
     Reference("_root" | "_parent" | "_io") => true
@@ -141,6 +142,8 @@ priv struct ContextGraph {
   type_scopes : Map[String, Map[String, String]]
   enum_scopes : Map[String, Map[String, String]]
   enums : Map[String, EnumDef]
+  bits : Bool
+  imported_types : Array[String]
 }
 
 ///|
@@ -189,6 +192,8 @@ fn context_graph(schema : Schema) -> ContextGraph {
     type_scopes: schema.type_scopes,
     enum_scopes: schema.enum_scopes,
     enums: schema.enums,
+    bits: schema_has_bits(schema),
+    imported_types: schema.imported_types,
   }
 }
 
@@ -239,7 +244,8 @@ fn context_kind_type(
   path : String,
 ) -> ExprType raise SchemaError {
   match kind {
-    Unsigned(_, _) | Signed(_, _) => Integer
+    BitInteger(1, _) => Boolean
+    Unsigned(_, _) | Signed(_, _) | BitInteger(_, _) => Integer
     Unsigned64(_) => WideInteger
     Float32(_) => Real
     Contents(_) | ByteField(_) => Bytes
@@ -334,6 +340,16 @@ fn context_member_type(
         _ => invalid(scope.path, "unknown stream attribute '" + name + "'")
       }
     Object(owners) => {
+      if name == "_root" || name == "_parent" {
+        guard !owners
+          .iter()
+          .any(fn(owner) { scope.graph.imported_types.contains(owner) }) else {
+          invalid(
+            scope.path,
+            "root and parent navigation on imported records awaits implementation",
+          )
+        }
+      }
       if name == "_io" {
         return Stream
       }
@@ -408,6 +424,15 @@ fn context_expression_type(
   expression : Expr,
 ) -> ExprType raise SchemaError {
   match expression {
+    Decode(bytes, encoding) => {
+      context_require(scope, bytes, Bytes)
+      guard ["UTF-8", "UTF8", "ASCII", "UTF-16LE", "UTF-16BE"].contains(
+        encoding,
+      ) else {
+        invalid(scope.path, "encoding is awaiting implementation: " + encoding)
+      }
+      Text
+    }
     EnumLiteral(name, label) => Enum(context_enum_label(scope, name, label).0)
     ToEnum(value, name) => {
       ignore(context_enum(scope, name))
@@ -429,12 +454,14 @@ fn context_expression_type(
       context_member_type(scope, context_expression_type(scope, base), name)
     Index(base, index) => {
       context_require(scope, index, Integer)
-      guard context_expression_type(scope, base) is Sequence(element) else {
-        invalid(scope.path, "index requires an array")
+      match context_expression_type(scope, base) {
+        Sequence(element) => element
+        Bytes => Integer
+        _ => invalid(scope.path, "index requires an array or bytes")
       }
-      element
     }
-    Reference("_root") => Object(["@root"])
+    Reference("_root") =>
+      context_member_type(scope, Object([scope.owner]), "_root")
     Reference("_parent") =>
       context_member_type(scope, Object([scope.owner]), "_parent")
     Reference("_io") => Stream

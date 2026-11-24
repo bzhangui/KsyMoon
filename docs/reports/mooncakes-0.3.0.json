@@ -1,0 +1,24 @@
+{
+  "source_commit": "0499f26b886b23e4e7e8011d446ec74c174d9c9b",
+  "tag": "v0.3.0",
+  "module": "bzhangui/ksymoon",
+  "version": "0.3.0",
+  "published": true,
+  "yanked": false,
+  "registry_checksum": "18aa03850515b91fb25a3dc60682a6375ff0cc49fcd6e5bedce7ecddb5a153cc",
+  "published_at": "2026-11-24T04:57:28.364752+00:00",
+  "release_ci": "https://github.com/bzhangui/KsyMoon/actions/runs/45329509459",
+  "archive_files": 315,
+  "release_archive_contents_verified": true,
+  "registry_install_verified": true,
+  "fresh_consumer_targets": [
+    "js",
+    "wasm",
+    "wasm-gc",
+    "native"
+  ],
+  "examples": [
+    "UDP valid payload and truncated payload",
+    "cross-stream names and missing terminator"
+  ]
+}
