@@ -10,7 +10,7 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 - 语义基线采用官方编译器 0.11 和 Python `kaitaistruct==0.11`。与 MoonBit 的 JS、Wasm、Wasm-GC、Native 四个目标逐字段比较正常结果、条件缺省值和惰性行为。
 - 官方测试库固定在 `4108136c807f8df88df843de6571f1a7bf29c74e`，其 `formats/` 下共有 339 份描述。每次 CI 盘点全部文件，包括依赖其他文件、需要更多语义、故意验证失败等用例。 [测试库快照](https://github.com/kaitai-io/kaitai_struct_tests/tree/4108136c807f8df88df843de6571f1a7bf29c74e)
-- 测试归档 SHA-256 固定为 `3a78e2ffb3938c18b5c1d2f06f3bc8567bc72e054a8e68f0ddacbfa1406937fe`。47 份直接复用的测试描述及其中 43 组二进制样本及 Python 测试说明另有逐文件哈希和原 MIT 许可证。 [输入清单](../fixtures/kaitai/manifest.json) · [许可证](../fixtures/kaitai/LICENSE)
+- 测试归档 SHA-256 固定为 `3a78e2ffb3938c18b5c1d2f06f3bc8567bc72e054a8e68f0ddacbfa1406937fe`。51 份直接复用的测试描述及其中 47 组二进制样本及 Python 测试说明另有逐文件哈希和原 MIT 许可证。 [输入清单](../fixtures/kaitai/manifest.json) · [许可证](../fixtures/kaitai/LICENSE)
 - 已生成的解析器必须在独立模块通过四后端的检查和构建。二进制运行与参考对照另行统计，所有未完成项保留诊断。
 
 ## 已完成 P1
@@ -81,7 +81,7 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 `v0.3.0` 的 Git 标签和 Mooncakes ZIP 对应同一源码。发布后从 Mooncakes 在全新生成模块安装，再建立独立项目，通过四后端的 UDP 和跨流实例正常与截断检查。 [发布记录](reports/mooncakes-0.3.0.json)
 
-开发版取得 WAV/RIFF 的端到端对照。原样 WAV 通过 `/common/riff` 导入原样 RIFF。测试覆盖 PCM、扩展 WAV 声道位图、未知块的奇数长度填充、RIFF 嵌套 LIST、字节索引、编码转换和条件字符串。4 个完整输入和 246 个真前缀与官方 0.11 的结果一致。 [复现脚本](../scripts/wav-reference.py)
+开发版取得 WAV/RIFF 的端到端对照。原样 WAV 通过 `/common/riff` 导入原样 RIFF。测试覆盖 PCM、扩展 WAV 声道位图、未知块的奇数长度填充、RIFF 嵌套 LIST、字节索引、编码转换和条件字符串。4 个完整输入和 246 个真前缀与官方 0.11 的结果一致。 [复现脚本](../scripts/wav-reference.py) · [实现 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45331862218) · [WAV/RIFF 报告](reports/wav-riff-2026-11-24.json)
 
 现有导入由调用方显式提供描述；单个图最多 16 个导入。涉及跨模块根/父对象的描述等待后续支持。位整数支持 1 到 32 位，大小位序只在字节边界切换。允许通过惰性实例出现的类型环，顺序读取中的类型环给出诊断，运行中对象深度最多 64 层。跨文件导入、位字段更宽类型、表达式和处理器继续按矩阵推进。
 
@@ -100,11 +100,14 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 python -m pip install kaitaistruct==0.11
 node scripts/verify.mjs --kaitai-reference
 python scripts/compatibility-report.py --runtime-report
+python scripts/wav-reference.py
 ```
 
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。第二条脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
 
-`generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。当前盘点为 **143 份生成、196 份待支持**，全部 339 份都保留结果。47 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P3—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
+`generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。当前盘点为 **160 份生成、179 份保留诊断**，全部 339 份都保留结果。51 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P3—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
+
+[最新固定语料报告](reports/kaitai-0.11-p4-2026-11-24.json)保留全部 339 行。WAV 与 RIFF 是额外的格式库用例，单独计入 [WAV/RIFF 报告](reports/wav-riff-2026-11-24.json)。
 
 ## 发布内容核验
 

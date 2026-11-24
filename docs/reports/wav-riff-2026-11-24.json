@@ -1,0 +1,20 @@
+{
+  "source_commit": "3bfc19cf4e59fb03dcfa841aae7e4f3b2aec7030",
+  "official_compiler_version": "0.11",
+  "upstream_revision": "30e7ad51e8c870d3a098cd618c0f4b2797efc538",
+  "upstream_hashes": {
+    "media/wav.ksy": "c425bf2bd43f624d1840b56c0e8791c1220e19d2aba13f14d6bcb79be6485dd8",
+    "common/riff.ksy": "8e43fd273dad55ef3d654a47645477b80048b81b78648eedb8044ba7ff1cad72"
+  },
+  "targets": [
+    "js",
+    "wasm",
+    "wasm-gc",
+    "native"
+  ],
+  "comparisons": 8,
+  "resource_limit_tests": 1,
+  "prefixes": 246,
+  "rejected_prefixes": 246,
+  "check_build_test": true
+}

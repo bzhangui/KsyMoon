@@ -63,9 +63,9 @@ moon run --target js cmd/ksymoon -- generate wav.ksy --out wav.mbt --import /com
 node scripts/verify.mjs
 ```
 
-脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局、流控制布局与 47 份原样上游兼容描述均重新生成，并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
+脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局、流控制布局与 51 份原样上游兼容描述均重新生成，并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
 
-安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 43 个原样上游 Python 测试及 112 项比较测试。对 43 组上游样本检查了 1,429 个真前缀，部分用例同时触发惰性实例读取。四后端每个目标通过 24 项生成器测试和 177 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
+安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 47 个原样上游 Python 测试及 120 项比较测试。对 47 组上游样本检查了 1,612 个真前缀，部分用例同时触发惰性实例读取。四后端每个目标通过 26 项生成器测试和 185 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
 ```powershell
 python -m pip install kaitaistruct==0.11
@@ -115,11 +115,11 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 
 KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy) · [IVF 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/vp8_duck_ivf.ksy)
 
-47 份兼容描述与其中 43 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
+51 份兼容描述与其中 47 组二进制和 Python 测试说明来自 Kaitai 官方测试库，按固定修订原样保存，采用上游 MIT 许可证。MoonBit 中的期望值及前缀结果由官方解析器生成，其他布局、生成器、读取模板及边界断言由项目实现。官方编译器与 Python 运行时仅用于测试对照。 [测试来源与哈希](fixtures/kaitai/manifest.json) · [上游许可证](fixtures/kaitai/LICENSE)
 
 WAV 与 RIFF 描述从相同固定修订按需下载，分别保留上游文件声明的 BSD-3-Clause-Attribution 与 CC0-1.0。WAV 描述由 John Byrd（Gigantic Software）编写。两份描述和相应生成文件保存在本地构建目录。 [原样 WAV](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/wav.ksy) · [原样 RIFF](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/common/riff.ksy) · [WAV 许可](https://spdx.org/licenses/BSD-3-Clause-Attribution.html)
 
-本轮 P3 实现由 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45191577558) 验证。固定语料的 339 份描述中，143 份可生成并在四后端构建，196 份保留待支持诊断，47 份有运行对照。 [公开完整报告](docs/reports/kaitai-0.11-p3-2026-11-23.json)
+当前开发版通过 [MoonBit v0.10.19 CI](https://github.com/bzhangui/KsyMoon/actions/runs/45331862218)。固定语料的 339 份描述中，160 份可生成并在四后端构建，179 份保留诊断，51 份有运行对照。WAV 与 RIFF 的官方对照和递归限制共 9 项测试在四后端通过。 [固定语料报告](docs/reports/kaitai-0.11-p4-2026-11-24.json) · [WAV/RIFF 报告](docs/reports/wav-riff-2026-11-24.json)
 
 定位实例失败后的游标策略有一处已知差异。KsyMoon 恢复游标和本次重复项预算，便于失败后重试。官方 Python 0.11 会保留失败位置。正常结果、成功定位恢复和失败接受判定已对照，失败后的游标策略另有专门回归。更多编码、集合表达式和模块导入仍按后续矩阵推进。
 
