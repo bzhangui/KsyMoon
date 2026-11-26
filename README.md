@@ -6,7 +6,9 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 `v0.9.0` 支持独立 Native CLI、动态字节序、复合参数、跨模块枚举和固定尺寸表达式。发布后从 Mooncakes 在空缓存安装，重新生成并验证九个场景。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.9.0) · [发布记录](docs/reports/mooncakes-0.9.0.json)
 
-`v0.12.0` 支持计算长度和计数、空布局、匿名字段、显式父对象以及顶层递归。在固定 339 份 Kaitai 描述中，299 份生成并通过四后端检查和构建。 [兼容说明](docs/COMPATIBILITY.zh-CN.md)
+`v0.13.0` 增加整数值转换、字符串操作、字节数组转换、插值与转义，以及 Shift-JIS 和 IBM437 解码。原样 EDID 可生成 MoonBit 解析器，并在四后端与 Kaitai 0.11 对照。 [兼容说明](docs/COMPATIBILITY.zh-CN.md)
+
+`v0.12.0` 引入计算长度和计数、空布局、匿名字段、显式父对象及顶层递归。上述能力持续纳入回归。
 
 `v0.11.0` 引入字符串拼接、`UInt64` 比较、带边界检查的动态长度和惰性实例计数，以及原样 ZIP、MIDI/VLQ 和 JPEG/Exif。上述场景继续纳入回归。
 
@@ -126,6 +128,8 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 
 `python scripts/reader-context-reference.py` 对照 5 份原样读取上下文用例。`python scripts/layout-navigation-reference.py` 对照 16 份空布局、匿名字段、父根导航与递归用例，包含完整输入、截断和深度边界。 [读取对照](scripts/reader-context-reference.py) · [布局与导航对照](scripts/layout-navigation-reference.py)
 
+`python scripts/value-encoding-reference.py` 运行 12 份原样值转换与编码用例及 2 份预期编码错误用例。`python scripts/edid-reference.py` 对照原样 EDID 的制造商、产品号、色度、时序、伽马和截断结果。 [表达式与编码对照](scripts/value-encoding-reference.py) · [EDID 对照](scripts/edid-reference.py)
+
 | 样本 | 验收结果 |
 | --- | --- |
 | 正常 UDP | 端口 `1234 → 5678`，声明长度 11，负载 `ABC` |
@@ -164,6 +168,8 @@ GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node
 - 当前兼容盘点和剩余能力按 Kaitai Struct 0.11 语义矩阵记录。运行时错误包含字段路径和字节偏移，重复项共享 1,000,000 项预算。 [兼容目标与范围](docs/COMPATIBILITY.zh-CN.md)
 
 ## 来源与许可
+
+Shift-JIS 与 IBM437 的码位表从 CPython 3.14.5 的编解码器生成。解码逻辑由 MoonBit 实现，使用对应表的生成源码附带来源和许可。 [码表生成脚本](scripts/build-encoding-tables.py) · [CPython 许可](LICENSE-CPYTHON)
 
 KsyMoon 源码及 STM32 描述采用 MIT 许可证。UDP、STL 和 IVF 描述按 Kaitai Struct 上游提交 `30e7ad51e8c870d3a098cd618c0f4b2797efc538` 原样保存，采用各自文件内的 CC0-1.0 许可。 [UDP 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/network/udp_datagram.ksy) · [STL 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/stl.ksy) · [IVF 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/vp8_duck_ivf.ksy)
 

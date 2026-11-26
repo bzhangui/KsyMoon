@@ -503,6 +503,7 @@ fn parse_field(
     type_names,
     path,
     navigation~,
+    defer_encoding_error=sequence_index is None,
   )
   let count = match
     (field.get("repeat"), field.get("repeat-expr"), field.get("repeat-until")) {

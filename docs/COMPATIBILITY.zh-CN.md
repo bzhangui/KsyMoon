@@ -141,6 +141,14 @@ MIDI 从原样 Standard MIDI 和 VLQ 描述生成，验证轨道、事件、变�
 
 原样布局与导航套件比较 16 份 Kaitai 0.11 描述、1,538 个完整或前缀输入及 3 个匿名字段损坏样本。额外单测覆盖 MoonBit 的 64 层递归边界。调试元数据和目标扩展继续按各自语义核验。 [布局与导航复现](../scripts/layout-navigation-reference.py) · [重复与流语义](https://doc.kaitai.io/user_guide.html#_streams_and_substreams)
 
+## v0.13.0 的值转换、文本解码与 EDID
+
+整数转换覆盖浮点朝零截断、布尔转 `0/1` 和文本按指定进制读取。文本数字检查完整输入及 `Int64` 范围，浮点转整数检查有限值和范围。字符串增加按字符翻转、插值与转义，整数数组可在检查字节范围后转换为 `bytes`。
+
+字段与字节值的 `to_s(encoding)` 可使用 Shift-JIS 和 IBM437。转换在 MoonBit 中执行，四后端使用相同码位数据和非法序列检查。两个原样未知编码用例在访问惰性值时报告编码错误，并保留编码名拼写。码表由固定 CPython 3.14.5 编解码器生成。 [值与编码复现](../scripts/value-encoding-reference.py) · [码表生成脚本](../scripts/build-encoding-tables.py) · [CPython 来源与许可](../LICENSE-CPYTHON)
+
+EDID 按固定格式库修订获取原样描述并核对 SHA-256，验证显示器制造商、产品号、制造年份、色度和时序字段。对照范围遵循上游描述实际读取的字段，包含原始前缀及错误签名。 [原样 EDID 描述](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/hardware/edid.ksy) · [EDID 复现](../scripts/edid-reference.py)
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -159,6 +167,7 @@ python scripts/native-cli-check.py
 python scripts/module-process-reference.py
 python scripts/numeric-endian-reference.py
 python scripts/expression-validation-reference.py
+python scripts/value-encoding-reference.py
 python scripts/type-parameter-reference.py
 python scripts/corpus-runtime-reference.py
 python scripts/reader-context-reference.py
@@ -168,6 +177,7 @@ python scripts/wav-reference.py --all-scenarios
 python scripts/image-reference.py
 python scripts/zip-reference.py
 python scripts/midi-jpeg-reference.py
+python scripts/edid-reference.py
 ```
 
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。兼容盘点脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。

@@ -8,6 +8,7 @@ fn emit_stream_reader(
   repeated : Bool,
   bits : Bool,
   single_byte_encoding : Bool,
+  extended_encodings : Array[String],
 ) -> Unit {
   if bounded {
     let budget = if repeated { ", budget: self.budget" } else { "" }
@@ -112,6 +113,86 @@ fn emit_stream_reader(
     } else {
       block
     }
+    let block = if extended_encodings.is_empty() {
+      block
+    } else {
+      extend_text_reader(output, root_type, block, extended_encodings)
+    }
     write_reader_block(output, block, root_type)
+  }
+}
+
+///|
+fn extend_text_reader(
+  output : StringBuilder,
+  root_type : String,
+  block : String,
+  encodings : Array[String],
+) -> String {
+  let branches = []
+  if encodings.contains("SHIFT-JIS") || encodings.contains("IBM437") {
+    output.write_string(cpython_codec_notice())
+    output.write_string("\n\n")
+  }
+  if encodings.contains("SHIFT-JIS") {
+    output.write_string(
+      "///|\nlet ksy_shift_jis_\{root_type} : Array[Char] = \{shift_jis_mapping().escape()}.to_array()\n\n",
+    )
+    let branch =
+      #|if encoding == "SHIFT-JIS" {
+      #|      if first >= 0xA1 && first <= 0xDF {
+      #|        code = 0xFF61 + first - 0xA1
+      #|      } else if first >= 0x80 {
+      #|        let error_offset = start + i
+      #|        let valid_lead = (first >= 0x81 && first <= 0x9F) || (first >= 0xE0 && first <= 0xEF)
+      #|        guard valid_lead && i + 1 < bytes.length() else {
+      #|          raise __ROOT__InvalidEncoding(field~, offset=error_offset, encoding~)
+      #|        }
+      #|        let trail = bytes[i + 1].to_int()
+      #|        guard trail >= 0x40 && trail <= 0xFC && trail != 0x7F else {
+      #|          raise __ROOT__InvalidEncoding(field~, offset=error_offset, encoding~)
+      #|        }
+      #|        let row = if first <= 0x9F { first - 0x81 } else { first - 0xE0 + 31 }
+      #|        let column = if trail <= 0x7E { trail - 0x40 } else { trail - 0x41 }
+      #|        let character = ksy_shift_jis___ROOT__[row * 188 + column]
+      #|        guard character != '\u{FFFD}' else {
+      #|          raise __ROOT__InvalidEncoding(field~, offset=error_offset, encoding~)
+      #|        }
+      #|        code = character.to_int()
+      #|        width = 2
+      #|      }
+      #|    }
+    branches.push(branch)
+  }
+  if encodings.contains("IBM437") {
+    output.write_string(
+      "///|\nlet ksy_ibm437_\{root_type} : Array[Char] = \{ibm437_mapping().escape()}.to_array()\n\n",
+    )
+    let branch =
+      #|if encoding == "IBM437" {
+      #|      if first >= 0x80 {
+      #|        code = ksy_ibm437___ROOT__[first - 0x80].to_int()
+      #|      }
+      #|    }
+    branches.push(branch)
+  }
+  let block = if branches.is_empty() {
+    block
+  } else {
+    let original = "    if encoding == \"UTF-16LE\" || encoding == \"UTF-16BE\" {"
+    block.replace_all(
+      old=original,
+      new="    \{branches.join(" else ")} else \{original[4:].to_owned()}"[:],
+    )
+  }
+  if encodings.contains("unknown") {
+    let validation =
+      #|  guard encoding is ("UTF-8" | "UTF8" | "ASCII" | "UTF-16LE" | "UTF-16BE" | "WINDOWS-1252" | "ISO-8859-1" | "SHIFT-JIS" | "IBM437") else {
+      #|    raise __ROOT__InvalidEncoding(field~, offset=start, encoding~)
+      #|  }
+      #|  let output = StringBuilder()
+    block.replace_all(old="  let output = StringBuilder()", new=validation[:])
+  } else {
+    block
   }
 }

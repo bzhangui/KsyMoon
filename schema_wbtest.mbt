@@ -229,8 +229,8 @@ test "sized streams reject contradictory size and eos bounds" {
 ///|
 test "encoding and padding options have explicit validation" {
   expect_schema_error(
-    "meta: {id: example}\nseq:\n  - {id: text, type: str, size: 4, encoding: SJIS}\n",
-    "seq[0].encoding: encoding is awaiting implementation: SJIS",
+    "meta: {id: example}\nseq:\n  - {id: text, type: str, size: 4, encoding: CP932}\n",
+    "seq[0].encoding: encoding is awaiting implementation: CP932",
   )
   expect_schema_error(
     "meta: {id: example}\nseq:\n  - {id: text, terminator: 0, pad-right: 32}\n",

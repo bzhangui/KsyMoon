@@ -71,6 +71,20 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
   if expressions
     .iter()
     .any(fn(expr) {
+      expression_any(expr, fn(value) { value is Cast(_, "bytes") })
+    }) {
+    add("binary")
+  }
+  if expressions
+    .iter()
+    .any(fn(expr) {
+      expression_any(expr, fn(value) { value is Member(_, "@interpolate") })
+    }) {
+    add("text")
+  }
+  if expressions
+    .iter()
+    .any(fn(expr) {
       expression_any(expr, fn(value) { value is ArrayLiteral(_) })
     }) {
     add("items")
@@ -482,7 +496,8 @@ fn context_contains_index(expression : Expr) -> Bool {
     | Decode(base, _)
     | ToEnum(base, _)
     | Unary(_, base) => context_contains_index(base)
-    Binary(_, a, b) => context_contains_index(a) || context_contains_index(b)
+    Binary(_, a, b) | ToInteger(a, b) =>
+      context_contains_index(a) || context_contains_index(b)
     Choose(a, b, c) | Substring(a, b, c) =>
       context_contains_index(a) ||
       context_contains_index(b) ||
@@ -542,20 +557,12 @@ fn context_record_expressions(record : RecordDef) -> Array[Expr] {
 
 ///|
 fn context_contains_cast(expression : Expr) -> Bool {
-  match expression {
-    Cast(base, target) =>
-      (integer_cast(target) is None && integer_array_cast(target) is None) ||
-      context_contains_cast(base)
-    Member(base, _) | Decode(base, _) | ToEnum(base, _) | Unary(_, base) =>
-      context_contains_cast(base)
-    Index(base, index) | Binary(_, base, index) =>
-      context_contains_cast(base) || context_contains_cast(index)
-    Choose(a, b, c) | Substring(a, b, c) =>
-      context_contains_cast(a) ||
-      context_contains_cast(b) ||
-      context_contains_cast(c)
-    _ => false
-  }
+  expression_any(expression, fn(value) {
+    value is Cast(_, target) &&
+    target != "bytes" &&
+    integer_cast(target) is None &&
+    integer_array_cast(target) is None
+  })
 }
 
 ///|
@@ -597,16 +604,5 @@ fn context_emit_stream_value(
 
 ///|
 fn context_contains_decode(expression : Expr) -> Bool {
-  match expression {
-    Decode(_, _) => true
-    Member(base, _) | Cast(base, _) | ToEnum(base, _) | Unary(_, base) =>
-      context_contains_decode(base)
-    Binary(_, a, b) | Index(a, b) =>
-      context_contains_decode(a) || context_contains_decode(b)
-    Choose(a, b, c) | Substring(a, b, c) =>
-      context_contains_decode(a) ||
-      context_contains_decode(b) ||
-      context_contains_decode(c)
-    _ => false
-  }
+  expression_any(expression, fn(part) { part is Decode(_, _) })
 }

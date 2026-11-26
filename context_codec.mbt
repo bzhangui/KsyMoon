@@ -145,6 +145,8 @@ fn context_raw_value_code(
       "\{context_pack_kind(scope.item.unwrap(), "item", root)}.attribute(arena, \{name[2:].escape()}, \{path})"
     Reference(name) =>
       "\{root}Value::ObjectId(context).attribute(arena, \{name.escape()}, \{path})"
+    Cast(base, "bytes") =>
+      context_byte_cast_value(scope, base, root, path, owner_reader)
     Cast(base, target) if integer_array_cast(target) is Some(_) =>
       context_value_code(scope, base, root, path, owner_reader)
     Cast(base, target) if integer_cast(target) is Some((bits, signed)) => {
@@ -203,6 +205,22 @@ fn context_raw_value_code(
       "\{context_value_code(scope, base, root, path, owner_reader)}.attribute(arena, \"length\", \{path})"
     Member(base, "to_i") if context_expression_type(scope, base) is Enum(_) =>
       context_value_code(scope, base, root, path, owner_reader)
+    Member(base, "to_i") if context_expression_type(scope, base)
+      is (Boolean | Real | Text) =>
+      "\{root}Value::Number(\{context_to_integer(scope, base, None, root, path, owner_reader)})"
+    ToInteger(base, radix) =>
+      "\{root}Value::Number(\{context_to_integer(scope, base, Some(radix), root, path, owner_reader)})"
+    Member(base, "reverse") if context_expression_type(scope, base) == Text =>
+      "\{root}Value::StringValue((\{context_expression_code(scope, base, root, path, owner_reader~)})[:].rev())"
+    Member(base, "@interpolate") => {
+      let code = context_expression_code(scope, base, root, path, owner_reader~)
+      let text = if context_expression_type(scope, base) == Text {
+        code
+      } else {
+        "(\{code}).to_string()"
+      }
+      "\{root}Value::StringValue(\{text})"
+    }
     Member(base, "length") if context_expression_type(scope, base) == Text =>
       "\{root}Value::Number(\{context_expression_code(scope, base, root, path, owner_reader~)}.to_array().length().to_int64())"
     Substring(_, _, _) =>
@@ -293,6 +311,7 @@ fn context_expression_code(
     | Index(_, _)
     | Cast(_, _)
     | Decode(_, _)
+    | ToInteger(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
     | ArrayLiteral(_) =>
@@ -611,6 +630,7 @@ fn context_has_reference(expression : Expr) -> Bool {
     | Index(_, _)
     | Cast(_, _)
     | Decode(_, _)
+    | ToInteger(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
     | ArrayLiteral(_)
@@ -756,6 +776,7 @@ fn context_expression_parts(
     | Index(_, _)
     | Cast(_, _)
     | Decode(_, _)
+    | ToInteger(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
     | TypeSize(_, _)

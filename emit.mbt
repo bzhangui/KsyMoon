@@ -52,6 +52,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
   let mut has_byte_options = false
   let mut has_strings = false
   let mut single_byte_encoding = false
+  let extended_encodings = []
   let mut has_open_repeats = false
   let processors = []
   for record in records {
@@ -117,6 +118,9 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
         has_strings = has_strings || kind is Text(_, _)
         single_byte_encoding = single_byte_encoding ||
           kind is Text(_, "WINDOWS-1252" | "ISO-8859-1")
+        if kind is Text(_, encoding) {
+          note_extended_encoding(extended_encodings, encoding)
+        }
         match kind {
           ByteField(options) | Text(options, _) | Bounded(_, options) =>
             has_byte_options = has_byte_options ||
@@ -153,6 +157,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
     has_byte_options~,
     has_strings~,
     single_byte_encoding~,
+    extended_encodings~,
     has_open_repeats~,
     has_numeric_fields~,
     has_uint64~,

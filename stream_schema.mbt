@@ -2,7 +2,31 @@
 fn supported_encoding(encoding : String) -> Bool {
   [
     "UTF-8", "UTF8", "ASCII", "UTF-16LE", "UTF-16BE", "WINDOWS-1252", "ISO-8859-1",
+    "SHIFT-JIS", "IBM437",
   ].contains(encoding)
+}
+
+///|
+fn normalize_encoding(label : String) -> String {
+  let upper = label.to_upper()
+  match upper {
+    "SHIFT_JIS" | "SHIFTJIS" | "SJIS" | "S_JIS" | "CSSHIFTJIS" => "SHIFT-JIS"
+    "IBM-437" | "CP437" | "437" | "CSPC8CODEPAGE437" => "IBM437"
+    _ if supported_encoding(upper) => upper
+    _ => label
+  }
+}
+
+///|
+fn note_extended_encoding(encodings : Array[String], encoding : String) -> Unit {
+  let feature = match encoding {
+    "SHIFT-JIS" | "IBM437" => encoding
+    _ if !supported_encoding(encoding) => "unknown"
+    _ => return
+  }
+  if !encodings.contains(feature) {
+    encodings.push(feature)
+  }
 }
 
 ///|
@@ -102,6 +126,7 @@ fn parse_field_kind(
   type_names : Array[String],
   path : String,
   navigation~ : Bool = false,
+  defer_encoding_error~ : Bool = false,
 ) -> FieldKind raise SchemaError {
   if field.get("contents") is Some(value) {
     for
@@ -121,11 +146,10 @@ fn parse_field_kind(
         parse_byte_options(field, earlier, path, false, navigation~),
       )
     Some(@yaml.String("str")) | Some(@yaml.String("strz")) => {
-      let encoding = as_string(
-        get_required(field, "encoding", path),
-        path + ".encoding",
-      ).to_upper()
-      guard supported_encoding(encoding) else {
+      let encoding = normalize_encoding(
+        as_string(get_required(field, "encoding", path), path + ".encoding"),
+      )
+      guard defer_encoding_error || supported_encoding(encoding) else {
         invalid(
           path + ".encoding",
           "encoding is awaiting implementation: " + encoding,
@@ -182,6 +206,7 @@ fn parse_field_kind(
               type_names,
               case_path,
               navigation~,
+              defer_encoding_error~,
             )
           }
           _ =>

@@ -71,7 +71,7 @@ fn context_uses_integer_arithmetic(
     Unary(op, child) =>
       (op == "-" && context_expression_type(scope, child) != Real) ||
       context_uses_integer_arithmetic(scope, child)
-    Index(base, index) =>
+    Index(base, index) | ToInteger(base, index) =>
       context_uses_integer_arithmetic(scope, base) ||
       context_uses_integer_arithmetic(scope, index)
     Member(child, _) | Cast(child, _) | Decode(child, _) | ToEnum(child, _) =>

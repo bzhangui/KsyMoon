@@ -6,6 +6,7 @@ fn emit_reader(
   has_byte_options~ : Bool,
   has_strings~ : Bool,
   single_byte_encoding~ : Bool = false,
+  extended_encodings~ : Array[String] = [],
   has_open_repeats~ : Bool,
   has_numeric_fields~ : Bool,
   has_uint64~ : Bool,
@@ -200,7 +201,7 @@ fn emit_reader(
   }
   emit_stream_reader(
     output, root_type, has_bounded, has_byte_options, has_strings, has_repeated_fields,
-    has_bits, single_byte_encoding,
+    has_bits, single_byte_encoding, extended_encodings,
   )
   if has_positions {
     let seek =

@@ -56,12 +56,15 @@ def main():
             "scripts/midi-jpeg-reference.py",
             "scripts/reader-context-reference.py",
             "scripts/layout-navigation-reference.py",
+            "scripts/value-encoding-reference.py", "scripts/edid-reference.py",
+            "scripts/build-encoding-tables.py", "LICENSE-CPYTHON",
         })
         assert required.issubset(files), f"Missing source, fixture or license: {required.difference(files)}"
         assert all(not path.endswith(("/wav.ksy", "/riff.ksy")) for path in files), "WAV/RIFF descriptions should be fetched on demand"
         assert all(not path.endswith(("/zip.ksy", "/dos_datetime.ksy")) for path in files), "ZIP descriptions should be fetched on demand"
         assert all(not path.endswith(("/standard_midi_file.ksy", "/vlq_base128_be.ksy", "/jpeg.ksy", "/exif.ksy"))
                    for path in files), "MIDI and JPEG descriptions should be fetched on demand"
+        assert all(not path.endswith("/edid.ksy") for path in files), "EDID description should be fetched on demand"
         assert before == hashlib.sha256(PROPOSAL.read_bytes()).hexdigest(), "Proposal was modified"
         report = {
             "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),

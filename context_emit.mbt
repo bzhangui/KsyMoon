@@ -12,6 +12,9 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
   if decode && !flags.contains("text") {
     flags.push("text")
   }
+  if decode && !flags.contains("binary") {
+    flags.push("binary")
+  }
   let object_values = []
   let mut stream_values = false
   for owner, record in graph.records {
@@ -58,6 +61,17 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
         part is Decode(_, "WINDOWS-1252" | "ISO-8859-1")
       })
     })
+  let extended_encodings = []
+  for expression in expressions {
+    ignore(
+      expression_any(expression, fn(part) {
+        if part is Decode(_, encoding) {
+          note_extended_encoding(extended_encodings, encoding)
+        }
+        false
+      }),
+    )
+  }
   let mut open_repeats = false
   for record in records {
     let fields = record.fields.copy()
@@ -91,6 +105,9 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
         strings = strings || kind is Text(_, _)
         single_byte_encoding = single_byte_encoding ||
           kind is Text(_, "WINDOWS-1252" | "ISO-8859-1")
+        if kind is Text(_, encoding) {
+          note_extended_encoding(extended_encodings, encoding)
+        }
         match kind {
           ByteField(bytes) | Text(bytes, _) | Bounded(_, bytes) =>
             options = options ||
@@ -146,6 +163,7 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     has_byte_options=options,
     has_strings=strings || decode,
     single_byte_encoding~,
+    extended_encodings~,
     has_open_repeats=open_repeats,
     has_numeric_fields=numeric,
     has_uint64=wide,
@@ -265,6 +283,9 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
       repeated,
       accounting,
     )
+  }
+  if graph.needs_text_integer {
+    emit_text_integer(output, root)
   }
   output.to_string()
 }

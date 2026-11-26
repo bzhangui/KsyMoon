@@ -12,6 +12,7 @@ priv enum Expr {
   Index(Expr, Expr)
   Cast(Expr, String)
   Decode(Expr, String)
+  ToInteger(Expr, Expr)
   Substring(Expr, Expr, Expr)
   EnumLiteral(String, String)
   ToEnum(Expr, String)
@@ -63,26 +64,10 @@ fn expression_tokens(
       i += 1
       continue
     }
-    if ch == '\'' || ch == '"' {
-      let quote = ch
-      let token = StringBuilder()
-      token.write_char(quote)
-      i += 1
-      let mut closed = false
-      while i < chars.length() {
-        let current = chars[i]
-        token.write_char(current)
-        i += 1
-        if current == '\\' && i < chars.length() {
-          token.write_char(chars[i])
-          i += 1
-        } else if current == quote {
-          closed = true
-          break
-        }
-      }
-      guard closed else { invalid(path, "unterminated string literal") }
-      tokens.push(token.to_string())
+    if ch == '\'' || ch == '"' || formatted_quote(chars, i) {
+      let end = quoted_end(chars, i, path, 0)
+      tokens.push(String::from_array(chars[i:end]))
+      i = end
       continue
     }
     let token = StringBuilder()
@@ -248,6 +233,8 @@ fn ExprParser::parse(
     "_root" | "_parent" | "_sizeof" | "_bitsizeof" => Reference(token)
     number if number[0] >= '0' && number[0] <= '9' =>
       parse_number_literal(number, self.path)
+    formatted if formatted.has_prefix("f\"") =>
+      parse_formatted_string(formatted, self.path, self.depth)
     quoted if quoted[0] == '\'' || quoted[0] == '"' =>
       Text(parse_quoted(quoted, self.path))
     "_" | "_index" => Reference(token)
@@ -289,6 +276,14 @@ fn ExprParser::parse(
         }
         self.index += 1
         left = Substring(left, start, end)
+      } else if attribute == "to_i" && self.peek() == "(" {
+        self.index += 1
+        let radix = self.parse(1)
+        guard self.peek() == ")" else {
+          invalid(self.path, "expected ')' after integer base")
+        }
+        self.index += 1
+        left = ToInteger(left, radix)
       } else if attribute == "to_s" && self.peek() == "(" {
         self.index += 1
         let encoding = self.peek()
@@ -300,7 +295,10 @@ fn ExprParser::parse(
           invalid(self.path, "expected ')' after encoding")
         }
         self.index += 1
-        left = Decode(left, parse_quoted(encoding, self.path).to_upper())
+        left = Decode(
+          left,
+          normalize_encoding(parse_quoted(encoding, self.path)),
+        )
       } else if attribute == "as" && self.peek() == "<" {
         self.index += 1
         let parts = []
@@ -336,7 +334,8 @@ fn ExprParser::parse(
           attribute != "_bitsizeof" {
           check_identifier(attribute, self.path)
         }
-        left = if left is Reference("_") && attribute != "length" {
+        left = if left is Reference("_") &&
+          !(attribute is ("length" | "reverse" | "to_i")) {
           Reference("_." + attribute)
         } else {
           Member(left, attribute)
@@ -425,22 +424,29 @@ fn parse_expression(
     }
     @yaml.Array(_) => ByteLiteral(parse_contents(value, path))
     @yaml.Boolean(value) => Boolean(value)
-    @yaml.String(source) => {
-      let parser : ExprParser = {
-        tokens: expression_tokens(source, path),
-        path,
-        index: 0,
-        depth: 0,
-      }
-      let expression = parser.parse(1)
-      guard parser.index == parser.tokens.length() else {
-        invalid(path, "unexpected expression token '\{parser.peek()}'")
-      }
-      check_expression_depth(expression, 0, path)
-      expression
-    }
+    @yaml.String(source) => parse_expression_source(source, path)
     _ => invalid(path, "expected an integer, boolean or expression string")
   }
+}
+
+///|
+fn parse_expression_source(
+  source : String,
+  path : String,
+  depth~ : Int32 = 0,
+) -> Expr raise SchemaError {
+  let parser : ExprParser = {
+    tokens: expression_tokens(source, path),
+    path,
+    index: 0,
+    depth,
+  }
+  let expression = parser.parse(1)
+  guard parser.index == parser.tokens.length() else {
+    invalid(path, "unexpected expression token '\{parser.peek()}'")
+  }
+  check_expression_depth(expression, depth, path)
+  expression
 }
 
 ///|
@@ -453,7 +459,7 @@ fn check_expression_depth(
   match expression {
     Member(value, _) | Cast(value, _) | Decode(value, _) | ToEnum(value, _) =>
       check_expression_depth(value, depth + 1, path)
-    Index(value, index) => {
+    Index(value, index) | ToInteger(value, index) => {
       check_expression_depth(value, depth + 1, path)
       check_expression_depth(index, depth + 1, path)
     }
@@ -490,6 +496,7 @@ fn expression_type(
     | Index(_, _)
     | Cast(_, _)
     | Decode(_, _)
+    | ToInteger(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
     | TypeSize(_, _)
@@ -613,6 +620,7 @@ fn expression_code(
     | Index(_, _)
     | Cast(_, _)
     | Decode(_, _)
+    | ToInteger(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
     | TypeSize(_, _)
@@ -652,7 +660,7 @@ fn expression_arithmetic(expression : Expr) -> Bool {
   match expression {
     Member(value, _) | Cast(value, _) | Decode(value, _) | ToEnum(value, _) =>
       expression_arithmetic(value)
-    Index(value, index) =>
+    Index(value, index) | ToInteger(value, index) =>
       expression_arithmetic(value) || expression_arithmetic(index)
     Unary(op, value) => op == "-" || expression_arithmetic(value)
     Binary(op, a, b) =>
@@ -674,7 +682,7 @@ fn expression_stream_size(expression : Expr) -> Bool {
     Cast(value, _) | ToEnum(value, _) => expression_stream_size(value)
     Member(value, attribute) =>
       attribute == "size" || expression_stream_size(value)
-    Index(value, index) =>
+    Index(value, index) | ToInteger(value, index) =>
       expression_stream_size(value) || expression_stream_size(index)
     Unary(_, value) => expression_stream_size(value)
     Binary(_, a, b) => expression_stream_size(a) || expression_stream_size(b)
@@ -689,29 +697,12 @@ fn expression_stream_size(expression : Expr) -> Bool {
 ///|
 fn parse_quoted(source : String, path : String) -> String raise SchemaError {
   let chars = source.to_array()
-  let output = StringBuilder()
-  let mut i = 1
-  while i < chars.length() - 1 {
-    let ch = chars[i]
-    if ch == '\\' {
-      i += 1
-      output.write_char(
-        match chars[i] {
-          'n' => '\n'
-          'r' => '\r'
-          't' => '\t'
-          '\\' => '\\'
-          '\'' => '\''
-          '"' => '"'
-          _ => invalid(path, "unsupported string escape")
-        },
-      )
-    } else {
-      output.write_char(ch)
-    }
-    i += 1
+  let body = chars[1:chars.length() - 1]
+  if chars[0] == '\'' {
+    String::from_array(body)
+  } else {
+    decode_string_chars(body, path)
   }
-  output.to_string()
 }
 
 ///|
@@ -742,7 +733,7 @@ fn expression_any(expr : Expr, predicate : (Expr) -> Bool) -> Bool {
     | Decode(base, _)
     | ToEnum(base, _)
     | Unary(_, base) => expression_any(base, predicate)
-    Index(a, b) | Binary(_, a, b) =>
+    Index(a, b) | Binary(_, a, b) | ToInteger(a, b) =>
       expression_any(a, predicate) || expression_any(b, predicate)
     Choose(a, b, c) | Substring(a, b, c) =>
       expression_any(a, predicate) ||

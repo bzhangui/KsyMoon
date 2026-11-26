@@ -47,6 +47,7 @@ jobs:
           python scripts/module-process-reference.py
           python scripts/numeric-endian-reference.py
           python scripts/expression-validation-reference.py
+          python scripts/value-encoding-reference.py
           python scripts/type-parameter-reference.py
           python scripts/corpus-runtime-reference.py
           python scripts/reader-context-reference.py
@@ -57,6 +58,7 @@ jobs:
           python scripts/image-reference.py
           python scripts/zip-reference.py
           python scripts/midi-jpeg-reference.py
+          python scripts/edid-reference.py
           python scripts/package-check.py
       - name: Upload complete compatibility inventory
         uses: actions/upload-artifact@v4
@@ -69,6 +71,7 @@ jobs:
             _build/module-process-report.json
             _build/numeric-endian-report.json
             _build/expression-validation-report.json
+            _build/value-encoding-reference-report.json
             _build/type-parameter-report.json
             _build/native-cli-report.json
             _build/image-reference-report.json
@@ -77,4 +80,5 @@ jobs:
             _build/layout-navigation-reference-report.json
             _build/zip-reference-report.json
             _build/midi-jpeg-reference-report.json
+            _build/edid-reference-report.json
           if-no-files-found: error

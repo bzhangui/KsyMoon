@@ -190,6 +190,7 @@ fn expression_needs_context(
       | Index(_, _)
       | Cast(_, _)
       | Decode(_, _)
+      | ToInteger(_, _)
       | EnumLiteral(_, _)
       | ToEnum(_, _)
       | TypeSize(_, _)
@@ -230,6 +231,7 @@ priv struct ContextGraph {
   bits : Bool
   module_roots : Map[String, String]
   root_referenced : Bool
+  mut needs_text_integer : Bool
   has_overridden_parent : Bool
   has_parent_expression : Bool
   mut object_refs : Bool
@@ -297,6 +299,7 @@ fn context_graph(schema : Schema) -> ContextGraph {
     bits: schema_has_bits(schema),
     module_roots: schema.module_roots,
     root_referenced,
+    needs_text_integer: false,
     has_overridden_parent,
     has_parent_expression: !explicit_parents.is_empty(),
     object_refs: records
@@ -548,9 +551,11 @@ fn context_member_type(
     Sequence(element) if ["first", "last", "min", "max"].contains(name) =>
       element
     Bytes if ["first", "last", "min", "max"].contains(name) => Integer
-    Enum(_) if name == "to_i" => Integer
+    Enum(_) | Real | Boolean | Text if name == "to_i" => Integer
     Enum(_) if name == "_in_enum" => Boolean
     Text if name == "length" => Integer
+    Text if name == "reverse" => Text
+    Text | Integer | WideInteger if name == "@interpolate" => Text
     Integer if name == "to_s" => Text
     _ =>
       invalid(
@@ -595,12 +600,14 @@ fn context_expression_type(
       }
       Sequence(element)
     }
-    Decode(bytes, encoding) => {
+    Decode(bytes, _) => {
       context_require(scope, bytes, Bytes)
-      guard supported_encoding(encoding) else {
-        invalid(scope.path, "encoding is awaiting implementation: " + encoding)
-      }
       Text
+    }
+    ToInteger(value, radix) => {
+      context_require(scope, value, Text)
+      context_require(scope, radix, Integer)
+      Integer
     }
     Substring(value, start, end) => {
       context_require(scope, value, Text)
@@ -613,6 +620,13 @@ fn context_expression_type(
       ignore(context_enum(scope, name))
       context_require(scope, value, Integer)
       Enum(name)
+    }
+    Cast(base, "bytes") => {
+      guard context_expression_type(scope, base)
+        is (Bytes | Sequence(Integer | WideInteger)) else {
+        invalid(scope.path, "byte cast needs an integer array or bytes")
+      }
+      Bytes
     }
     Cast(base, target) if integer_array_cast(target) is Some(kind) => {
       guard context_expression_type(scope, base) == Sequence(kind) else {
