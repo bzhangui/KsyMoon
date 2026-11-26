@@ -6,7 +6,9 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 `v0.9.0` 支持独立 Native CLI、动态字节序、复合参数、跨模块枚举和固定尺寸表达式。发布后从 Mooncakes 在空缓存安装，重新生成并验证九个场景。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.9.0) · [发布记录](docs/reports/mooncakes-0.9.0.json)
 
-`v0.11.0` 源码支持字符串拼接、`UInt64` 比较、带边界检查的动态长度和惰性实例计数。ZIP、MIDI/VLQ 和 JPEG/Exif 均从原样上游描述生成，另有 35 份原样语料新增运行对照。 [兼容说明](docs/COMPATIBILITY.zh-CN.md)
+`v0.12.0` 支持计算长度和计数、空布局、匿名字段、显式父对象以及顶层递归。在固定 339 份 Kaitai 描述中，299 份生成并通过四后端检查和构建。 [兼容说明](docs/COMPATIBILITY.zh-CN.md)
+
+`v0.11.0` 引入字符串拼接、`UInt64` 比较、带边界检查的动态长度和惰性实例计数，以及原样 ZIP、MIDI/VLQ 和 JPEG/Exif。上述场景继续纳入回归。
 
 ## 快速开始
 
@@ -75,6 +77,8 @@ options("allow-experimental-packages": ["moonbitlang/core/compress/zlib"])
 
 库、生成代码和消费断言使用 MoonBit。CLI 的 Node 适配负责文件访问和退出状态。官方对照运行原样描述、二进制样本和 Python 测试，涵盖相对及绝对导入、条件递归、跨模块定位和处理后的子流。
 
+从 Git 标签 `v0.9.0` 复现已发布的 Mooncakes 依赖。
+
 ```powershell
 python -m pip install kaitaistruct==0.11
 python scripts/module-process-reference.py --registry
@@ -82,7 +86,7 @@ python scripts/module-process-reference.py --registry
 
 ## WAV 与 RIFF
 
-安装 Java 21、Python、Node.js 24 与 MoonBit v0.10.19，在本仓库运行：
+安装 Java 21、Python、Node.js 24 与 MoonBit v0.10.19，从 Git 标签 `v0.9.0` 运行已发布版本的对照：
 
 ```powershell
 python -m pip install kaitaistruct==0.11
@@ -108,7 +112,7 @@ node scripts/verify.mjs
 
 脚本更新 Mooncakes 索引，验证 CLI 的退出状态、诊断和输出文件保护，核对上游描述的 SHA-256，再在 `_build` 下新建独立消费模块。四个原有场景、基础特性、条件布局、流控制布局与 51 份原样上游兼容描述均重新生成，并与仓库源码逐字节比对。脚本在 JS、Wasm、Wasm-GC、Native 四个目标检查、构建和测试，演示命令继续运行 UDP、STL、STM32。
 
-安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 47 个原样上游 Python 测试及 120 项比较测试。对 47 组上游样本检查了 1,612 个真前缀，部分用例同时触发惰性实例读取。四后端每个目标通过 26 项生成器测试和 185 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
+安装 Java 21 和 Python 后，可用 Kaitai 官方 0.11 编译器的 Python 目标生成对照解析器。脚本核对编译器 ZIP 的 SHA-256，执行 47 个原样上游 Python 测试及 120 项比较测试。对 47 组上游样本检查了 1,612 个真前缀，部分用例同时触发惰性实例读取。四后端每个目标通过 29 项生成器测试和 185 项消费测试。 [Kaitai 0.11 发布](https://github.com/kaitai-io/kaitai_struct_compiler/releases/tag/0.11)
 
 ```powershell
 python -m pip install kaitaistruct==0.11
@@ -119,6 +123,8 @@ python scripts/compatibility-report.py --runtime-report
 GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node.js 24，运行对照验证，并检查固定上游测试库的全部 339 份描述。已生成的源码另建独立模块检查和构建，完整结果以 CI 附件导出。描述接受和编译结果、运行语义对照分别记录。 [工作流](.github/workflows/verify.yml)
 
 `python scripts/corpus-runtime-reference.py` 执行 80 份原样上游测试，并在四后端复跑官方解析器的 352 项字段断言。`python scripts/zip-reference.py` 对照原样 ZIP 和 DOS 时间描述。`python scripts/midi-jpeg-reference.py` 对照 MIDI 多轨与变长长度、JPEG 段及双字节序 Exif 元数据。各命令均需 Node.js、Java 与 `kaitaistruct==0.11`。 [语料脚本](scripts/corpus-runtime-reference.py) · [ZIP 脚本](scripts/zip-reference.py) · [MIDI 与 JPEG 脚本](scripts/midi-jpeg-reference.py)
+
+`python scripts/reader-context-reference.py` 对照 5 份原样读取上下文用例。`python scripts/layout-navigation-reference.py` 对照 16 份空布局、匿名字段、父根导航与递归用例，包含完整输入、截断和深度边界。 [读取对照](scripts/reader-context-reference.py) · [布局与导航对照](scripts/layout-navigation-reference.py)
 
 | 样本 | 验收结果 |
 | --- | --- |

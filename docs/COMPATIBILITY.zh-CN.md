@@ -131,9 +131,9 @@ MIDI 从原样 Standard MIDI 和 VLQ 描述生成，验证轨道、事件、变�
 
 新增 35 份原样上游语料运行对照及 182 条字段断言，独立语料套件在每个后端执行 80 份官方用例和 352 条字段断言。CI 上传语料和格式报告，并继续验证全部 339 份固定语料的生成与构建状态。 [语料复现](../scripts/corpus-runtime-reference.py) · [MIDI 与 JPEG 复现](../scripts/midi-jpeg-reference.py)
 
-## v0.12.0 开发方向
+## v0.12.0 的读取上下文与结构描述
 
-以 `v0.11.0` 的 278 份四后端构建和 202 份具名运行对照为基线，优先修复读取上下文与结构描述。61 份首个诊断中，14 份涉及读取时机或对象上下文，9 份涉及空布局或匿名字段。其余诊断按表达式与编码、调试、外部扩展、枚举与分支以及缺失依赖分别保留。 [固定语料](https://github.com/kaitai-io/kaitai_struct_tests/tree/4108136c807f8df88df843de6571f1a7bf29c74e)
+以 `v0.11.0` 的 278 份四后端构建和 202 份具名运行对照为基线，新增 21 份描述的生成、四后端构建和原样运行对照。固定语料的 339 份描述中共有 299 份通过生成与构建，40 份保留首个诊断。 [固定语料](https://github.com/kaitai-io/kaitai_struct_tests/tree/4108136c807f8df88df843de6571f1a7bf29c74e)
 
 首批处理流位置参与长度计算、算术重复计数，以及序列条件和终止条件触发的惰性实例。使用 `expr_io_pos`、`repeat_n_strz_double`、`instance_in_repeat_until`、`instance_in_sized` 和 `valid_fail_inst` 验证有界读流、首次求值时机、游标恢复和预期失败。 [复现脚本](../scripts/reader-context-reference.py)
 
