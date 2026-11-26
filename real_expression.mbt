@@ -64,7 +64,7 @@ fn context_uses_integer_arithmetic(
     }
     Binary(op, left, right) => {
       let arithmetic = ["+", "-", "*", "/", "%", "<<", ">>"].contains(op)
-      (arithmetic && !context_real_binary(scope, left, right)) ||
+      (arithmetic && context_expression_type(scope, expr) == Integer) ||
       context_uses_integer_arithmetic(scope, left) ||
       context_uses_integer_arithmetic(scope, right)
     }

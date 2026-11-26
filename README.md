@@ -4,7 +4,9 @@ KsyMoon 把 Kaitai Struct 的 `.ksy` 描述生成为带类型的 MoonBit 二进�
 
 项目以 **Kaitai Struct 0.11 的完整语言与二进制读取语义兼容**为最终目标，按标准能力矩阵和固定上游测试逐阶段验收。仓库已实现条件、惰性实例、有界子流、跨流实例、EOS/Until 重复、类型分支、字符串、对象导航、整数枚举及标量参数。完整目标、当前实现和后续阶段见[兼容计划](docs/COMPATIBILITY.zh-CN.md)。
 
-`v0.9.0` 支持独立 Native CLI、动态字节序、复合参数、跨模块枚举和固定尺寸表达式。原样 GIF、BMP、PNG 及此前六个场景均纳入四后端验证。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.9.0) · [兼容说明](docs/COMPATIBILITY.zh-CN.md)
+`v0.9.0` 支持独立 Native CLI、动态字节序、复合参数、跨模块枚举和固定尺寸表达式。发布后从 Mooncakes 在空缓存安装，重新生成并验证九个场景。 [Mooncakes](https://mooncakes.io/docs/bzhangui/ksymoon@0.9.0) · [发布记录](docs/reports/mooncakes-0.9.0.json)
+
+`v0.10.0-dev.1` 可直接生成 Kaitai 格式库原样 ZIP 解析器，读取目录、压缩方法、文件数据以及 DOS 时间，并从目录项按需定位本地文件头。开发版另纳入 45 份原样上游运行对照。 [兼容说明](docs/COMPATIBILITY.zh-CN.md)
 
 ## 快速开始
 
@@ -115,6 +117,8 @@ python scripts/compatibility-report.py --runtime-report
 ```
 
 GitHub Actions 在 Ubuntu 上安装固定的 MoonBit v0.10.19+97801ee1b 和 Node.js 24，运行对照验证，并检查固定上游测试库的全部 339 份描述。已生成的源码另建独立模块检查和构建，完整结果以 CI 附件导出。描述接受和编译结果、运行语义对照分别记录。 [工作流](.github/workflows/verify.yml)
+
+`python scripts/corpus-runtime-reference.py` 执行 45 份原样上游测试，并在四后端复跑官方解析器的 170 项字段断言。`python scripts/zip-reference.py` 对照原样 ZIP 和 DOS 时间描述，覆盖 Stored、Deflate 和空归档、UTF-8 文件名、中央目录、惰性定位及截断。两条命令均需 Node.js、Java 与 `kaitaistruct==0.11`。 [语料脚本](scripts/corpus-runtime-reference.py) · [ZIP 脚本](scripts/zip-reference.py)
 
 | 样本 | 验收结果 |
 | --- | --- |

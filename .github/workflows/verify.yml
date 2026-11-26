@@ -48,10 +48,12 @@ jobs:
           python scripts/numeric-endian-reference.py
           python scripts/expression-validation-reference.py
           python scripts/type-parameter-reference.py
+          python scripts/corpus-runtime-reference.py
           python scripts/compatibility-report.py --runtime-report
           node examples/quickstart/run.mjs --source --all-targets
           python scripts/wav-reference.py --all-scenarios
           python scripts/image-reference.py
+          python scripts/zip-reference.py
           python scripts/package-check.py
       - name: Upload complete compatibility inventory
         uses: actions/upload-artifact@v4
@@ -67,4 +69,6 @@ jobs:
             _build/type-parameter-report.json
             _build/native-cli-report.json
             _build/image-reference-report.json
+            _build/extended-runtime-report.json
+            _build/zip-reference-report.json
           if-no-files-found: error

@@ -639,6 +639,7 @@ fn context_expression_type(
             }
             Boolean
           }
+          "+" if a == Text => Text
           _ => {
             guard a == Integer else {
               invalid(scope.path, "operator requires integer operands")

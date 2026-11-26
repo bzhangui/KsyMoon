@@ -309,6 +309,11 @@ fn context_expression_code(
       context_lexical_code(scope, op, left, right, root, path, owner_reader)
     Binary(op, left, right) if context_real_binary(scope, left, right) =>
       context_real_code(scope, op, left, right, root, path, owner_reader)
+    Binary("+", left, right) if kind == Text => {
+      let a = context_expression_code(scope, left, root, path, owner_reader~)
+      let b = context_expression_code(scope, right, root, path, owner_reader~)
+      "(\{a} + \{b})"
+    }
     Choose(condition, yes, no) => {
       let branch = fn(value) raise SchemaError {
         let code = context_expression_code(
@@ -694,6 +699,19 @@ fn context_expression_parts(
         (
           expression,
           context_real_code(scope, op, left, right, root, path, reader),
+        ),
+      )
+    Binary("+", _, _) if context_expression_type(scope, expression) == Text =>
+      navigation.push(
+        (
+          expression,
+          context_expression_code(
+            scope,
+            expression,
+            root,
+            path,
+            owner_reader=reader,
+          ),
         ),
       )
     Unary("+" | "-", child) if context_expression_type(scope, child) == Real =>

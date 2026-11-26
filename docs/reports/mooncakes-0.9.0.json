@@ -1,0 +1,61 @@
+{
+  "version": "0.9.0",
+  "tag": "v0.9.0",
+  "source_commit": "fcbae226792a7f94b49ad1777c580d6c03e94880",
+  "registry_url": "https://mooncakes.io/docs/bzhangui/ksymoon@0.9.0",
+  "registry_checksum": "d67657acf0b625de3e23347ba312e126f3728b454f9caaece12d326f912850db",
+  "published_at": "2026-11-24T11:46:55.784431+00:00",
+  "ci": "https://github.com/bzhangui/KsyMoon/actions/runs/45386643265",
+  "archive_files": 358,
+  "clean_registry_install": true,
+  "fresh_generator_modules": 4,
+  "targets": [
+    "js",
+    "wasm",
+    "wasm-gc",
+    "native"
+  ],
+  "scenarios": [
+    "wav",
+    "riff",
+    "udp",
+    "stl",
+    "stm32",
+    "ivf",
+    "gif",
+    "bmp",
+    "png"
+  ],
+  "original_six_scenarios_tests_per_target": 25,
+  "image_tests_per_target": 8,
+  "module_processor_tests_per_target": 34,
+  "quickstart_tests_per_target": 2,
+  "image_input_results": {
+    "gif": {
+      "inputs": 43,
+      "accepted": 3,
+      "rejected": 40,
+      "fixture_test_sha256": "363160abfe3580d9516e531bca3415c74a0de722cad4fdc58800711127719446"
+    },
+    "bmp": {
+      "inputs": 120,
+      "accepted": 11,
+      "rejected": 109,
+      "fixture_test_sha256": "2c8db597162b65032ec744db5230b6770d6f148fda0644a04fbc9a1173067ed1"
+    },
+    "png": {
+      "inputs": 306,
+      "accepted": 5,
+      "rejected": 301,
+      "fixture_test_sha256": "45cb5764c8791158e06d9c8e3a3ab753d99810886ac1b72a8c2132adf933528c"
+    }
+  },
+  "original_six_parser_sha256": {
+    "wav": "e4cb325b08ab71b03ee2922672027db40885d4677b26f8f29e6f7806fa295ca2",
+    "riff": "24e03740d96a6d71d50533b04fdf8792b52064ab7373c5a64d01d86be04ea01d",
+    "udp": "203655bc9a6ae24d6a3fe2f92e96bdb1ebd25deb75859d1fe25dd14ce321a44a",
+    "stl": "c4e7c404389cdea742e92f0efeeff7152baf2e515d6273b896ccfa1351796ab3",
+    "stm32": "c4442b9a81c67d7b58b059443c51b7e26de5e0947de46a099fdf620d8d906bb6",
+    "ivf": "9207be8d62bd862f2f26c0e8ed47a8ad917efd232be7d8beb0e4cab13d69b0b5"
+  }
+}

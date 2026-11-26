@@ -50,11 +50,13 @@ def main():
                 "cmd/ksymoon_native/moon.pkg", "cmd/ksymoon_native/main.mbt",
                 "cmd/ksymoon_native/project.mbt", "scripts/native-cli-check.py",
             })
-        for verification in ("image-reference.py", "type-parameter-reference.py"):
-            if (ROOT / "scripts" / verification).exists():
-                required.add(f"scripts/{verification}")
+        required.update({
+            "scripts/image-reference.py", "scripts/type-parameter-reference.py",
+            "scripts/zip-reference.py", "scripts/corpus-runtime-reference.py",
+        })
         assert required.issubset(files), f"Missing source, fixture or license: {required.difference(files)}"
         assert all(not path.endswith(("/wav.ksy", "/riff.ksy")) for path in files), "WAV/RIFF descriptions should be fetched on demand"
+        assert all(not path.endswith(("/zip.ksy", "/dos_datetime.ksy")) for path in files), "ZIP descriptions should be fetched on demand"
         assert before == hashlib.sha256(PROPOSAL.read_bytes()).hexdigest(), "Proposal was modified"
         report = {
             "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),

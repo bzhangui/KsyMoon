@@ -115,6 +115,14 @@ KsyMoon 的目标是在 MoonBit 中实现 Kaitai Struct 0.11 的完整描述语�
 
 固定尺寸表达式计算字段、子流和嵌套记录的宽度。新增 4 份原样尺寸用例，补充根对象参数的上下文检查，以及 `valid: in-enum`、字符串切片和单字节解码的运行对照。PNG 与 ICC、Exif 的链接描述可包含最多 256 个类型定义，运行时递归深度与既有资源预算仍分别检查。`python scripts/image-reference.py` 验证原样 GIF、BMP、PNG 的正常字段、已知截断差异和惰性配置文件读取。
 
+## v0.10.0 开发版的 ZIP 与上游运行覆盖
+
+生成器支持 Kaitai 上下文表达式中的两个字符串相加。原样 ZIP 通过 `/common/dos_datetime` 导入 DOS 日期描述，用条件表达式及 `to_s` 生成带前导零的日期与时间。两个上游文件均为 CC0-1.0，测试按固定提交下载并核对 SHA-256。 [原样 ZIP](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/archive/zip.ksy) · [原样 DOS 日期](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/common/dos_datetime.ksy)
+
+ZIP 测试比较 Stored 和 Deflate 条目的原始数据、UTF-8 文件名、CRC 字段、目录偏移、按需查找本地文件头和 DOS 时间。空归档、全部真前缀、错误签名及越界的本地头偏移均与官方解析器对照。当前验证范围是 ZIP 结构解析及压缩数据读取。 [ZIP 对照](../scripts/zip-reference.py)
+
+固定语料新纳入 45 份原样 `.ksy`，执行原样二进制样本和 Python 测试，再由独立 MoonBit 消费模块逐字段复跑 170 项断言。覆盖位域、枚举、终止与填充、嵌套、定位和重复。CI 单独上传 `extended-runtime-report.json` 和 `zip-reference-report.json`，保留输入哈希与四后端结果。 [语料对照](../scripts/corpus-runtime-reference.py)
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -134,19 +142,21 @@ python scripts/module-process-reference.py
 python scripts/numeric-endian-reference.py
 python scripts/expression-validation-reference.py
 python scripts/type-parameter-reference.py
+python scripts/corpus-runtime-reference.py
 python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
 python scripts/image-reference.py
+python scripts/zip-reference.py
 ```
 
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。兼容盘点脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。
 
 `generated` 表示描述已接受、源码已输出并通过独立四后端检查和构建。报告中的 `runtime_oracle_schemas` 单列已执行官方语义对照的上游描述。v0.4.0 的固定盘点为 **160 份生成、179 份保留诊断**，全部 339 份都保留结果。51 份固定上游描述已有运行对照，其他生成条目的运行对照继续按 P3—P5 建立。`--runtime-report` 要求前一复现步骤已成功，报告中的运行记录必须与当前提交及工作区状态一致。
 
-开发版在同一固定语料中已有 **270 份生成并构建、69 份保留诊断**。相比 `v0.8.0` 候选基线有 39 份新增通过，原有 231 份保留。数值、校验、模块、参数和图像的运行对照分别输出报告，条目可能与基础对照重叠。Native CLI 的报告单独记录运行平台、依赖解析与批量生成后的四后端验证。
+`v0.9.0` 在同一固定语料中有 **270 份生成并构建、69 份保留诊断**，比 `v0.8.0` 候选基线多 39 份。CI 继续盘点开发版的全部 339 份描述。数值、校验、模块、参数和图像的运行对照分别输出报告，条目可能与基础对照重叠。Native CLI 的报告单独记录运行平台、依赖解析与批量生成后的四后端验证。
 
 [v0.4.0 固定语料报告](reports/kaitai-0.11-p4-2026-11-24.json)保留全部 339 行。WAV 与 RIFF 是额外的格式库用例，单独计入 [WAV/RIFF 报告](reports/wav-riff-2026-11-24.json)。
 
 ## 发布内容核验
 
-`python scripts/package-check.py` 检查实际 ZIP，并用本地申报书占位文件覆盖未跟踪文件场景，确认申报书、参考生成旁路文件与构建目录被排除，必需源码及许可证完整。CI 上传 `_build/package-content-report.json`。本地草稿保留在项目目录，排除规则不修改其内容。检出 `v0.4.0` 后，运行 `python scripts/wav-reference.py --registry` 从 Mooncakes 安装并在空白项目重跑六个场景。`node examples/quickstart/run.mjs --all-targets` 运行 UDP 和跨流实例的快速示例。
+`python scripts/package-check.py` 检查归档内容、本地文件排除规则、必需源码及许可证。CI 上传 `_build/package-content-report.json`。从标签 `v0.9.0` 运行 `python scripts/wav-reference.py --registry` 和 `python scripts/image-reference.py --registry`，从 Mooncakes 在空白模块安装，再用独立模块重跑九个场景。`node examples/quickstart/run.mjs --all-targets` 运行 UDP 和跨流实例的快速示例。 [v0.9.0 发布验收记录](reports/mooncakes-0.9.0.json)
