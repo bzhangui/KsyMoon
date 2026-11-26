@@ -13,7 +13,9 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
         context_all_expressions(schema)
         .iter()
         .any(fn(value) {
-          context_has_reference(value) || expression_arithmetic(value)
+          context_has_reference(value) ||
+          expression_arithmetic(value) ||
+          expression_any(value, fn(item) { item is Text(_) })
         }) ||
         [schema.root, ..schema.records]
         .iter()
@@ -325,15 +327,16 @@ fn emit_record_type(
 ///|
 fn length_code(
   expression : LengthExpr,
+  path : String,
   in_instance~ : Bool = false,
-  evaluate~ : ((Expr) -> String)? = None,
+  evaluate~ : ((Expr, String?) -> String)? = None,
 ) -> String {
   let prefix = if in_instance { "self." } else { "v_" }
   match expression {
     Constant(value) => "\{value}L"
     Remaining => "(reader.input.length() - reader.offset).to_int64()"
     Calculated(Integer(value)) => "\{value}L"
-    Calculated(value) => evaluate.unwrap()(value)
+    Calculated(value) => evaluate.unwrap()(value, Some(path))
     EarlierField(name, 0L) => "\{prefix}\{name}.to_int64()"
     EarlierField(name, subtract) => "\{prefix}\{name}.to_int64() - \{subtract}L"
   }
@@ -355,7 +358,7 @@ fn read_code(
   path : String,
   in_instance~ : Bool = false,
   reference~ : (String) -> String = fn(name) { "v_\{name}.to_int64()" },
-  evaluate~ : ((Expr) -> String)? = None,
+  evaluate~ : ((Expr, String?) -> String)? = None,
   parent_context~ : String? = None,
   bits~ : Bool = false,
 ) -> String {
@@ -428,7 +431,7 @@ fn read_code(
     }
     Application(name, arguments) => {
       let values = arguments
-        .map(fn(expression) { ", " + evaluate.unwrap()(expression) })
+        .map(fn(expression) { ", " + evaluate.unwrap()(expression, None) })
         .join("")
       "\{nested_reader(id, name)}(reader, \{path}, arena, \{parent_context.unwrap()}\{values})"
     }
@@ -487,7 +490,7 @@ fn read_code(
         Switch(_, selector, cases, _) if !cases.is_empty() =>
           "let ksy_selector = " +
           (match evaluate {
-            Some(evaluate) => evaluate(selector)
+            Some(evaluate) => evaluate(selector, None)
             None => expression_code(selector, reference, path)
           }) +
           "; "

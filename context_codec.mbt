@@ -309,6 +309,12 @@ fn context_expression_code(
       context_lexical_code(scope, op, left, right, root, path, owner_reader)
     Binary(op, left, right) if context_real_binary(scope, left, right) =>
       context_real_code(scope, op, left, right, root, path, owner_reader)
+    Binary(op, left, right) if context_mixed_integer_comparison(
+        scope, op, left, right,
+      ) =>
+      context_mixed_integer_code(
+        scope, op, left, right, root, path, owner_reader,
+      )
     Binary("+", left, right) if kind == Text => {
       let a = context_expression_code(scope, left, root, path, owner_reader~)
       let b = context_expression_code(scope, right, root, path, owner_reader~)
@@ -607,7 +613,8 @@ fn context_has_reference(expression : Expr) -> Bool {
     | Decode(_, _)
     | EnumLiteral(_, _)
     | ToEnum(_, _)
-    | ArrayLiteral(_) => true
+    | ArrayLiteral(_)
+    | WideLiteral(_) => true
     TypeSize(_, _) | Substring(_, _, _) => true
     Unary(_, child) => context_has_reference(child)
     Binary(_, a, b) => context_has_reference(a) || context_has_reference(b)
@@ -699,6 +706,15 @@ fn context_expression_parts(
         (
           expression,
           context_real_code(scope, op, left, right, root, path, reader),
+        ),
+      )
+    Binary(op, left, right) if context_mixed_integer_comparison(
+        scope, op, left, right,
+      ) =>
+      navigation.push(
+        (
+          expression,
+          context_mixed_integer_code(scope, op, left, right, root, path, reader),
         ),
       )
     Binary("+", _, _) if context_expression_type(scope, expression) == Text =>
@@ -817,7 +833,7 @@ fn context_field_evaluator(
   root : String,
   path : String,
   reader~ : String = "reader",
-) -> ((Expr) -> String) raise SchemaError {
+) -> ((Expr, String?) -> String) raise SchemaError {
   let expressions = context_kind_expressions(field.kind)
   if field.predicate is Some(value) {
     expressions.push(value)
@@ -839,9 +855,25 @@ fn context_field_evaluator(
     (
       value,
       context_expression_code(scope, value, root, path, owner_reader=reader),
+      context_expression_type(scope, value),
     )
   })
-  fn(value) { codes.iter().find_first(fn(pair) { pair.0 == value }).unwrap().1 }
+  fn(value, length_path) {
+    let (_, code, kind) = codes
+      .iter()
+      .find_first(fn(pair) { pair.0 == value })
+      .unwrap()
+    if kind == WideInteger && length_path is Some(field) {
+      let error = context_error(
+        root,
+        field,
+        message="unsigned length exceeds the Int64 range",
+      )
+      "({ let length = \{code}; guard length <= 9223372036854775807UL else { \{error} }; length.reinterpret_as_int64() })"
+    } else {
+      code
+    }
+  }
 }
 
 ///|

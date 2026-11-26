@@ -78,6 +78,18 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
   if expressions
     .iter()
     .any(fn(expr) {
+      expression_any(expr, fn(value) {
+        value is ArrayLiteral(items) &&
+        items
+        .iter()
+        .any(fn(item) { expression_any(item, fn(part) { part is Text(_) }) })
+      })
+    }) {
+    add("text")
+  }
+  if expressions
+    .iter()
+    .any(fn(expr) {
       expression_any(expr, fn(value) { value is Member(_, "min" | "max") })
     }) {
     add("sequence_extremes")
@@ -85,9 +97,8 @@ fn context_flags(schema : Schema) -> Array[String] raise SchemaError {
   if expressions.iter().any(context_contains_endpoint) {
     flags.push("sequence_endpoints")
   }
-  if context_all_expressions(schema).iter().any(context_contains_wide_cast) &&
-    !flags.contains("wide") {
-    flags.push("wide")
+  if expressions.iter().any(context_contains_wide_value) {
+    add("wide")
   }
   flags
 }

@@ -128,12 +128,12 @@ fn predicate_code(
   field : Field,
   expr : Expr,
   path : String,
-  evaluate : ((Expr) -> String)?,
+  evaluate : ((Expr, String?) -> String)?,
 ) -> String {
   if plain_predicate(field) {
     plain_predicate_code(field.kind, expr, path)
   } else {
-    evaluate.unwrap()(expr)
+    evaluate.unwrap()(expr, None)
   }
 }
 

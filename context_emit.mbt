@@ -495,7 +495,9 @@ fn context_emit_reader(
     )
     let evaluate = context_field_evaluator(scope, field, root, path)
     if field.condition is Some(expression) {
-      output.write_string("  let v_\{name} = if \{evaluate(expression)} {\n")
+      output.write_string(
+        "  let v_\{name} = if \{evaluate(expression, None)} {\n",
+      )
     }
     let publish = if field.count is Some(_) {
       Some(

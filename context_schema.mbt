@@ -8,31 +8,51 @@ fn raw_uses_context(
     Some(@yaml.Array(fields)) => fields.copy()
     _ => []
   }
-  if record.get("instances") is Some(@yaml.Map(instances)) {
-    for _, value in instances {
-      if value is @yaml.Map(properties) && properties.contains("io") {
-        return true
-      }
-      fields.push(value)
-    }
+  let instances = match record.get("instances") {
+    Some(@yaml.Map(instances)) => instances
+    _ => Map([])
   }
-  let objects = []
+  let declarations : Map[String, @yaml.Yaml] = Map([])
   for field in fields {
     if field is @yaml.Map(properties) &&
-      properties.get("id") is Some(@yaml.String(name)) &&
-      properties.get("type") is Some(@yaml.String(kind)) &&
-      types.contains(kind) {
-      objects.push(name)
+      properties.get("id") is Some(@yaml.String(name)) {
+      declarations[name] = field
     }
   }
-  if record.get("instances") is Some(@yaml.Map(instances)) {
-    for name, value in instances {
-      if value is @yaml.Map(properties) &&
-        properties.get("type") is Some(@yaml.String(kind)) &&
-        types.contains(kind) {
-        objects.push(name)
+  for name, value in instances {
+    if value is @yaml.Map(properties) && properties.contains("io") {
+      return true
+    }
+    declarations[name] = value
+    fields.push(value)
+  }
+  let objects = []
+  let text_types : Map[String, Bool] = Map([])
+  let wide_fields = []
+  let values : Map[String, Expr] = Map([])
+  for name, declaration in declarations {
+    if declaration is @yaml.Map(properties) {
+      if properties.get("type") is Some(@yaml.String(kind)) {
+        if types.contains(kind) {
+          objects.push(name)
+        }
+        if kind is ("str" | "strz") {
+          text_types[name] = true
+        }
+        if kind is ("u8" | "u8le" | "u8be") ||
+          (bit_width(kind) is Some(width) && width > 32) {
+          wide_fields.push(name)
+        }
+      }
+      if properties.get("value") is Some(value) {
+        values[name] = parse_expression(value, name) catch {
+          _ => Expr::Integer(0L)
+        }
       }
     }
+  }
+  let is_text = fn(expression) {
+    raw_text_expression(expression, values, text_types)
   }
   for field in fields {
     if field is @yaml.Map(properties) {
@@ -57,7 +77,10 @@ fn raw_uses_context(
           let expression = parse_expression(source, key) catch {
             _ => Expr::Integer(0L)
           }
-          if expression_needs_context(expression) ||
+          let length = key is ("size" | "repeat-expr")
+          if expression_needs_context(expression, is_text, fn(name) {
+              wide_fields.contains(name) || (length && instances.contains(name))
+            }) ||
             (key == "value" && expression_returns_record(expression, objects)) {
             return true
           }
@@ -69,6 +92,8 @@ fn raw_uses_context(
           parse_expression(source, "switch-on") catch {
             _ => Expr::Integer(0L)
           },
+          is_text,
+          fn(name) { wide_fields.contains(name) },
         ) {
         return true
       }
@@ -110,28 +135,56 @@ fn raw_uses_context(
 }
 
 ///|
-fn expression_needs_context(expression : Expr) -> Bool {
+fn raw_text_expression(
+  expression : Expr,
+  aliases : Map[String, Expr],
+  text_types : Map[String, Bool],
+) -> Bool {
   match expression {
-    Member(_, _)
-    | Index(_, _)
-    | Cast(_, _)
-    | Decode(_, _)
-    | EnumLiteral(_, _)
-    | ToEnum(_, _)
-    | TypeSize(_, _)
-    | Substring(_, _, _)
-    | ArrayLiteral(_)
-    | ByteLiteral(_) => true
-    Reference("_root" | "_parent" | "_io" | "_sizeof" | "_bitsizeof") => true
-    Unary(_, value) => expression_needs_context(value)
-    Binary(_, left, right) =>
-      expression_needs_context(left) || expression_needs_context(right)
-    Choose(condition, yes, no) =>
-      expression_needs_context(condition) ||
-      expression_needs_context(yes) ||
-      expression_needs_context(no)
+    Text(_) => true
+    Reference(name) => {
+      if text_types.get(name) is Some(known) {
+        return known
+      }
+      guard aliases.get(name) is Some(value) else { return false }
+      // Mark the alias before recursing. Type validation reports any cycle.
+      text_types[name] = false
+      let known = raw_text_expression(value, aliases, text_types)
+      text_types[name] = known
+      known
+    }
+    Binary("+", a, b) | Choose(_, a, b) =>
+      raw_text_expression(a, aliases, text_types) ||
+      raw_text_expression(b, aliases, text_types)
     _ => false
   }
+}
+
+///|
+fn expression_needs_context(
+  expression : Expr,
+  is_text : (Expr) -> Bool,
+  use_reference : (String) -> Bool,
+) -> Bool {
+  expression_any(expression, fn(value) {
+    match value {
+      Member(_, _)
+      | Index(_, _)
+      | Cast(_, _)
+      | Decode(_, _)
+      | EnumLiteral(_, _)
+      | ToEnum(_, _)
+      | TypeSize(_, _)
+      | Substring(_, _, _)
+      | ArrayLiteral(_)
+      | ByteLiteral(_)
+      | WideLiteral(_) => true
+      Reference("_root" | "_parent" | "_io" | "_sizeof" | "_bitsizeof") => true
+      Reference(name) => use_reference(name)
+      Binary("+" | "<" | "<=" | ">" | ">=", a, b) => is_text(a) || is_text(b)
+      _ => false
+    }
+  })
 }
 
 ///|
@@ -600,6 +653,8 @@ fn context_expression_type(
           "==" | "!=" | "<" | "<=" | ">" | ">=" => Boolean
           _ => invalid(scope.path, "operator is unsupported for real operands")
         }
+      } else if mixed_integer_comparison(op, a, b) {
+        Boolean
       } else {
         guard a == b else {
           if a is Enum(name) {
@@ -759,7 +814,9 @@ fn check_context_length(
   length : LengthExpr?,
 ) -> Unit raise SchemaError {
   if length is Some(Calculated(expression)) {
-    context_require(scope, expression, Integer)
+    guard context_expression_type(scope, expression) is (Integer | WideInteger) else {
+      invalid(scope.path, "expected an integer expression")
+    }
   }
 }
 
@@ -771,8 +828,8 @@ fn check_context_field(
   if field.condition is Some(expression) {
     context_require(scope, expression, Boolean)
   }
-  if field.count is Some(Times(Calculated(expression))) {
-    context_require(scope, expression, Integer)
+  if field.count is Some(Times(count)) {
+    check_context_length(scope, Some(count))
   }
   let item_scope = context_scope(
     scope.graph,

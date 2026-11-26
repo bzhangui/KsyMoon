@@ -138,9 +138,21 @@ test "64-bit integers cannot silently narrow to a length" {
     #|    type: u8le
     #|  - id: data
     #|    size: length
-  expect_schema_error(
-    source, "seq[1].size: expected an earlier scalar u1, u2 or u4 field, optionally minus an integer",
-  )
+  let parser = generate(source)
+  assert_true(parser.contains("guard length <= 9223372036854775807UL"))
+}
+
+///|
+test "UInt64 and string literals can be boxed without matching fields" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - id: data
+    #|    type: u1
+    #|    if: '18446744073709551615 == [18446744073709551615][0] and ("x" + ["y"][0]) == "xy"'
+  let parser = generate(source)
+  assert_true(parser.contains("Wide(UInt64)"))
+  assert_true(parser.contains("StringValue(String)"))
 }
 
 ///|

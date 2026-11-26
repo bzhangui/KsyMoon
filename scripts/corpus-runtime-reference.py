@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CORPUS = runpy.run_path(str(ROOT / "scripts/compatibility-report.py"))
 REFERENCE = runpy.run_path(str(ROOT / "scripts/kaitai-reference.py"))
 TYPES = runpy.run_path(str(ROOT / "scripts/type-parameter-reference.py"))
-CASES = """
+V010_CASES = """
 bits_shift_by_b32_le
 bits_signed_res_b32_be
 bits_signed_res_b32_le
@@ -65,7 +65,73 @@ repeat_n_struct
 repeat_n_term_bytes
 term_bytes
 """.split()
-LAZY_FIELDS = {"position_abs": ".index", "position_to_end": ".index"}
+V011_CASES = """
+bcd_user_type_be
+bcd_user_type_le
+combine_bool
+expr_0
+expr_3
+expr_enum
+expr_io_pos_bits
+expr_mod
+instance_in_repeat_expr
+instance_std
+instance_user_array
+integers_min_max
+js_signed_right_shift
+multiple_use
+non_standard
+process_bytes_pad_term
+process_coerce_bytes
+process_repeat_usertype_dynarg_rotate
+process_repeat_usertype_dynarg_xor
+process_struct_pad_term
+repeat_n_bytes_pad
+repeat_n_bytes_pad_term
+repeat_n_strz
+repeat_n_term_struct
+repeat_until_bytes
+repeat_until_bytes_pad_term
+repeat_until_term_struct
+str_eos_pad_term_empty
+str_eos_pad_term_equal
+str_literals2
+str_pad_term_roundtrip
+struct_pad_term_equal
+term_bytes2
+term_struct3
+term_u1_val
+""".split()
+
+# The Python properties for computed and parsed instances are MoonBit methods.
+LAZY_MEMBERS = {
+    "bcd_user_type_be": {"as_int", "as_str"},
+    "bcd_user_type_le": {"as_int", "as_str"},
+    "combine_bool": {"bool_calc_bit"},
+    "expr_0": {"must_be_f7", "must_be_abc123"},
+    "expr_3": {
+        "three", "four", "is_str_eq", "is_str_ne", "is_str_lt", "is_str_gt",
+        "is_str_le", "is_str_ge", "is_str_lt2", "test_not",
+    },
+    "expr_enum": {"const_dog", "derived_boom", "derived_dog"},
+    "expr_mod": {"mod_pos_const", "mod_neg_const", "mod_pos_seq", "mod_neg_seq"},
+    "instance_std": {"header"},
+    "instance_user_array": {"user_entries"},
+    "js_signed_right_shift": {"should_be_40000000", "should_be_a00000"},
+    "multiple_use": {"second_use"},
+    "position_abs": {"index"},
+    "position_to_end": {"index"},
+    "process_coerce_bytes": {"buf"},
+    "process_repeat_usertype_dynarg_rotate": {
+        "blocks_rol_0_b", "blocks_rol_1_b", "blocks_ror_0_b", "blocks_ror_1_b", "blocks_ror_2_b",
+    },
+    "process_repeat_usertype_dynarg_xor": {"blocks_0_b", "blocks_1_b"},
+    "str_literals2": {"at_sign", "dollar1", "dollar2", "hash"},
+}
+PRESENT_OPTION_MEMBERS = {
+    "expr_io_pos_bits": {"bar", "baz", "qux"},
+    "instance_user_array": {"user_entries"},
+}
 
 
 def projection(node, frame, case):
@@ -75,8 +141,10 @@ def projection(node, frame, case):
         path, owner = projection(node.value, frame, case)
         path += "." + node.attr
         value = getattr(owner, node.attr)
-        if path == LAZY_FIELDS.get(case):
+        if node.attr in LAZY_MEMBERS.get(case, ()):
             path += "()"
+        if node.attr in PRESENT_OPTION_MEMBERS.get(case, ()):
+            path += ".unwrap()"
         return path, value
     if isinstance(node, ast.Subscript):
         path, array = projection(node.value, frame, case)
@@ -120,6 +188,9 @@ def create_test(case, spec, data, reference):
 def main():
     if importlib.metadata.version("kaitaistruct") != REFERENCE["VERSION"]:
         raise ValueError("Expected Kaitai Python runtime 0.11")
+    cases = V010_CASES + V011_CASES
+    if len(cases) != len(set(cases)):
+        raise ValueError("Duplicate runtime corpus cases")
     build = ROOT / "_build"
     build.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="extended-runtime-", dir=build))
@@ -132,7 +203,7 @@ def main():
     vectors = {}
     with ZipFile(archive_path) as archive:
         prefix = archive.namelist()[0]
-        for case in CASES:
+        for case in cases:
             spec = archive.read(prefix + f"spec/python/spec/test_{case}.py")
             match = re.search(rb"from_file\('src/([^']+)'\)", spec)
             sample = match[1].decode()
@@ -144,7 +215,7 @@ def main():
             vectors[case] = spec, vector, sample
     subprocess.run([*REFERENCE["compiler_command"](work), "--target", "python", "--python-package", "testformats",
                     "--import-path", str(formats / "ks_path"), "--outdir", str(refs),
-                    *(str(formats / f"{case}.ksy") for case in CASES)], check=True)
+                    *(str(formats / f"{case}.ksy") for case in cases)], check=True)
     subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "spec"], cwd=work, check=True)
     sys.path.insert(0, str(work))
     subprocess.run(["moon", "build", "--frozen", "--target", "js", "--release", "--deny-warn", "cmd/ksymoon"],
@@ -152,7 +223,7 @@ def main():
     cli = ROOT / "_build/js/release/build/cmd/ksymoon/ksymoon.js"
     (consumer / "moon.mod").write_text('name = "verification/ksymoon-extended"\nversion = "0.1.0"\n', encoding="utf-8")
     rows = []
-    for case in CASES:
+    for case in cases:
         package = consumer / case
         package.mkdir()
         schema = formats / f"{case}.ksy"
@@ -180,10 +251,15 @@ def main():
         "targets": ["js", "wasm", "wasm-gc", "native"],
         "official_tests": len(rows), "tests_per_target": len(rows),
         "assertions_per_target": sum(row["assertions"] for row in rows),
+        "v011_added_tests": len(V011_CASES),
+        "v011_added_assertions_per_target": sum(row["assertions"] for row in rows[len(V010_CASES):]),
+        "v011_added_schemas": [f"{case}.ksy" for case in V011_CASES],
         "schemas": rows,
     }
     (build / "extended-runtime-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(f'Extended runtime corpus: {len(rows)} original schemas, {report["assertions_per_target"]} Kaitai field assertions per target')
+    print(f'v0.11.0 additions: {len(V011_CASES)} original schemas, '
+          f'{report["v011_added_assertions_per_target"]} added field assertions per target')
 
 
 if __name__ == "__main__":

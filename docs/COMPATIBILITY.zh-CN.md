@@ -123,6 +123,14 @@ ZIP 测试比较 Stored 和 Deflate 条目的原始数据、UTF-8 文件名、CR
 
 固定语料新纳入 45 份原样 `.ksy`，执行原样二进制样本和 Python 测试，再由独立 MoonBit 消费模块逐字段复跑 170 项断言。覆盖位域、枚举、终止与填充、嵌套、定位和重复。CI 单独上传 `extended-runtime-report.json` 和 `zip-reference-report.json`，保留输入哈希与四后端结果。 [语料对照](../scripts/corpus-runtime-reference.py)
 
+## v0.11.0 的表达式、动态长度与格式对照
+
+字符串拼接支持字面量、字段和实例引用。整数比较保留 `UInt64` 的完整范围，并按数值比较有符号和无符号操作数。有界读取的 `size` 和 `repeat-expr` 可以使用 `UInt64`，超出 `Int64` 范围时返回字段与偏移诊断，转换后仍检查剩余字节和重复项预算。`repeat-expr` 可以在读取前触发惰性实例求值。 [表达式与校验对照](../scripts/expression-validation-reference.py)
+
+MIDI 从原样 Standard MIDI 和 VLQ 描述生成，验证轨道、事件、变长长度及截断。JPEG 从原样 JPEG 和 Exif 描述生成，验证段结构、两种字节序的 Exif 目录和定位读取。四份描述按固定提交下载并核对 SHA-256，保留上游文件的 CC0-1.0 许可。 [MIDI 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/media/standard_midi_file.ksy) · [VLQ 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/common/vlq_base128_be.ksy) · [JPEG 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/jpeg.ksy) · [Exif 原件](https://github.com/kaitai-io/kaitai_struct_formats/blob/30e7ad51e8c870d3a098cd618c0f4b2797efc538/image/exif.ksy)
+
+新增 35 份原样上游语料运行对照及 182 条字段断言，独立语料套件在每个后端执行 80 份官方用例和 352 条字段断言。CI 上传语料和格式报告，并继续验证全部 339 份固定语料的生成与构建状态。 [语料复现](../scripts/corpus-runtime-reference.py) · [MIDI 与 JPEG 复现](../scripts/midi-jpeg-reference.py)
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -147,6 +155,7 @@ python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
 python scripts/image-reference.py
 python scripts/zip-reference.py
+python scripts/midi-jpeg-reference.py
 ```
 
 第一条复现脚本重新生成解析器，在独立模块构建、测试并与官方目标对照。兼容盘点脚本检查全部 339 份描述，报告保存为 `_build/compatibility-report.json`，CI 将其作为 `kaitai-compatibility-inventory` 附件上传。

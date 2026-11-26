@@ -40,10 +40,10 @@ fn byte_read_code(
   instance : Bool,
   unit~ : Int32 = 1,
   big_endian~ : Bool = false,
-  evaluate~ : ((Expr) -> String)? = None,
+  evaluate~ : ((Expr, String?) -> String)? = None,
 ) -> String {
   let length = match options.length {
-    Some(length) => length_code(length, in_instance=instance, evaluate~)
+    Some(length) => length_code(length, path, in_instance=instance, evaluate~)
     None => "-1L"
   }
   let raw = if options.terminator is None && options.padding is None {
@@ -119,7 +119,7 @@ fn switch_read_code(
   bounded : Bool,
   instance : Bool,
   selector_override~ : String? = None,
-  evaluate~ : ((Expr) -> String)? = None,
+  evaluate~ : ((Expr, String?) -> String)? = None,
   parent_context~ : String? = None,
   bits~ : Bool = false,
 ) -> String {
@@ -131,7 +131,7 @@ fn switch_read_code(
   // Selection uses the parent stream/fields, while case reads use the child stream.
   let selector_code = selector_override.unwrap_or(
     match evaluate {
-      Some(evaluate) => evaluate(selector)
+      Some(evaluate) => evaluate(selector, None)
       None => expression_code(selector, reference, path, bit_stream=bits)
     },
   )
@@ -144,7 +144,7 @@ fn switch_read_code(
   )
   for index, (tag, child) in cases {
     let tag = match evaluate {
-      Some(resolve) => resolve(tag)
+      Some(resolve) => resolve(tag, None)
       None => expression_code(tag, reference, path, bit_stream=bits)
     }
     result.write_string(
@@ -175,7 +175,7 @@ fn emit_field_read(
   path : String,
   reference : (String) -> String,
   instance : Bool,
-  evaluate~ : ((Expr) -> String)? = None,
+  evaluate~ : ((Expr, String?) -> String)? = None,
   parent_context~ : String? = None,
   publish_items~ : (String, String)? = None,
   bits~ : Bool = false,
@@ -200,7 +200,7 @@ fn emit_field_read(
       match repeat {
         Times(count) =>
           output.write_string(
-            "  let count_\{target} = reader.reserve_repeats(\{length_code(count, in_instance=instance, evaluate~)}, \{path})\n",
+            "  let count_\{target} = reader.reserve_repeats(\{length_code(count, path, in_instance=instance, evaluate~)}, \{path})\n",
           )
         _ => ()
       }
@@ -263,7 +263,7 @@ fn emit_field_read(
         let predicate = match evaluate {
           _ if plain_byte_until(expression) =>
             plain_predicate_code(field.kind, expression, "item_path")
-          Some(evaluate) => evaluate(expression)
+          Some(evaluate) => evaluate(expression, None)
           None =>
             expression_code(
               expression,

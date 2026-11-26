@@ -60,11 +60,11 @@ fn processor_code(
   processor : ByteProcessor,
   raw : String,
   path : String,
-  evaluate : ((Expr) -> String)?,
+  evaluate : ((Expr, String?) -> String)?,
 ) -> String {
   let argument = fn(value) {
     if context_has_reference(value) || expression_arithmetic(value) {
-      evaluate.unwrap()(value)
+      evaluate.unwrap()(value, None)
     } else {
       expression_code(value, fn(name) { name }, path)
     }

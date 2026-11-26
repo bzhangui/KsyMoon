@@ -1,6 +1,7 @@
 ///|
 priv enum Expr {
   Integer(Int64)
+  WideLiteral(UInt64)
   RealLiteral(Double)
   Text(String)
   ByteLiteral(Bytes)
@@ -388,11 +389,17 @@ fn parse_number_literal(
     }
     RealLiteral(value)
   } else {
-    Integer(
-      @string.parse_int64(number[:]) catch {
-        _ => invalid(path, "invalid or out-of-range integer constant")
-      },
-    )
+    try @string.parse_int64(number[:]) catch {
+      _ => {
+        let digits = if number.has_prefix("+") { number[1:] } else { number[:] }
+        let value = @string.parse_uint64(digits) catch {
+          _ => invalid(path, "invalid or out-of-range integer constant")
+        }
+        WideLiteral(value)
+      }
+    } noraise {
+      value => Integer(value)
+    }
   }
 }
 
@@ -403,7 +410,19 @@ fn parse_expression(
 ) -> Expr raise SchemaError {
   match value {
     @yaml.Integer(value) => Integer(value)
-    @yaml.Real(value, ..) => RealLiteral(value)
+    @yaml.Real(value, repr~) => {
+      // The YAML decoder keeps the spelling when a scalar exceeds Int64.
+      let digits = if repr.has_prefix("+") || repr.has_prefix("-") {
+        repr[1:]
+      } else {
+        repr[:]
+      }
+      if !digits.is_empty() && digits.iter().all(is_ascii_digit) {
+        parse_number_literal(repr, path)
+      } else {
+        RealLiteral(value)
+      }
+    }
     @yaml.Array(_) => ByteLiteral(parse_contents(value, path))
     @yaml.Boolean(value) => Boolean(value)
     @yaml.String(source) => {
@@ -461,6 +480,7 @@ fn expression_type(
 ) -> ExprType raise SchemaError {
   match expression {
     Integer(_) | StreamPosition | StreamSize => Integer
+    WideLiteral(_) => WideInteger
     RealLiteral(_) => Real
     Boolean(_) | StreamEof => Boolean
     Text(_) => Text
@@ -576,6 +596,7 @@ fn expression_code(
   }
   match expression {
     Integer(n) => "\{n}L"
+    WideLiteral(n) => "\{n}UL"
     RealLiteral(value) => {
       let code = value.to_string()
       if code.contains(".") || code.contains("e") {
@@ -737,6 +758,6 @@ fn context_contains_endpoint(expr : Expr) -> Bool {
 }
 
 ///|
-fn context_contains_wide_cast(expr : Expr) -> Bool {
-  expression_any(expr, fn(value) { value is Cast(_, "u8") })
+fn context_contains_wide_value(expr : Expr) -> Bool {
+  expression_any(expr, fn(value) { value is (Cast(_, "u8") | WideLiteral(_)) })
 }
