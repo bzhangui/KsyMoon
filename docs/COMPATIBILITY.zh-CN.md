@@ -137,7 +137,9 @@ MIDI 从原样 Standard MIDI 和 VLQ 描述生成，验证轨道、事件、变�
 
 首批处理流位置参与长度计算、算术重复计数，以及序列条件和终止条件触发的惰性实例。使用 `expr_io_pos`、`repeat_n_strz_double`、`instance_in_repeat_until`、`instance_in_sized` 和 `valid_fail_inst` 验证有界读流、首次求值时机、游标恢复和预期失败。 [复现脚本](../scripts/reader-context-reference.py)
 
-后续补齐空结构、匿名字段、显式父对象与递归根引用。空结构仍须遵守外层有界读取，递归用例须验证前进、深度限制和截断。调试元数据单独验证显式读取与位置记录，绝对导入用例单独固定依赖来源。 [重复与流语义](https://doc.kaitai.io/user_guide.html#_streams_and_substreams)
+第二批实现空布局、省略序列字段 ID、`parent: false`、显式父对象表达式以及顶层类型的递归引用和转换。匿名字段以原始序列下标生成 `_unnamedN` 成员。有界空布局仍由父流消费声明的字节长度。逻辑父对象与实际读流归属分开，`_root` 保持所属模块的根对象。允许能经条件或类型分支结束的递归读取，继续拒绝无条件类型环并限制运行时深度。
+
+原样布局与导航套件比较 16 份 Kaitai 0.11 描述、1,538 个完整或前缀输入及 3 个匿名字段损坏样本。额外单测覆盖 MoonBit 的 64 层递归边界。调试元数据和目标扩展继续按各自语义核验。 [布局与导航复现](../scripts/layout-navigation-reference.py) · [重复与流语义](https://doc.kaitai.io/user_guide.html#_streams_and_substreams)
 
 ## v1.0 门禁
 
@@ -160,6 +162,7 @@ python scripts/expression-validation-reference.py
 python scripts/type-parameter-reference.py
 python scripts/corpus-runtime-reference.py
 python scripts/reader-context-reference.py
+python scripts/layout-navigation-reference.py
 python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
 python scripts/image-reference.py

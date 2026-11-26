@@ -300,6 +300,13 @@ fn flatten_types(
     Some(aliases) => aliases.copy()
     None => inherited.copy()
   }
+  if owner == "@root" {
+    for name, target in inherited {
+      visible[name] = target
+    }
+  } else if owner == module_owner {
+    visible[owner] = owner
+  }
   for name, _ in types {
     check_identifier(name, "types." + name)
     if owner != "@root" || !imports_visibility.contains(name) {
@@ -386,7 +393,12 @@ fn scoped_type_name(name : String, visible : Map[String, String]) -> String {
     full
   } else if name.split_once("::") is Some((prefix, suffix)) &&
     visible.get(prefix.to_owned()) is Some(full) {
-    full + "_" + suffix.replace_all(old="::", new="_").to_owned()
+    let relative = suffix.replace_all(old="::", new="_").to_owned()
+    if full == "@root" {
+      relative
+    } else {
+      full + "_" + relative
+    }
   } else {
     name
   }
@@ -408,6 +420,14 @@ fn scoped_field_type(
   }
   if imports_visibility.contains(first) && !visible.contains(first) {
     invalid("type", "module '" + first + "' must be imported by this document")
+  }
+  if base == name &&
+    visible.get(base) == Some("@root") &&
+    (
+      base is ("str" | "strz") ||
+      parse_builtin_kind(base, Some(Little), "type") is Some(_)
+    ) {
+    return name
   }
   scoped_type_name(name, visible)
 }

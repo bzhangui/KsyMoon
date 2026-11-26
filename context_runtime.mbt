@@ -115,6 +115,7 @@ fn context_emit_runtime(
   bits : Bool,
   recursive : Bool,
   modules : Bool,
+  overridden_parent : Bool,
   contextual_endian : Bool,
   index : Bool,
   objects : Bool,
@@ -258,7 +259,12 @@ fn context_emit_runtime(
     )
     .replace_all(
       old="__MODULE_ARG__",
-      new=if modules { ", module_id : String, module_entry : Bool" } else { "" },
+      new=(if modules {
+          ", module_id : String, module_entry : Bool"
+        } else {
+          ""
+        }) +
+        (if overridden_parent { ", parent_override : Int?" } else { "" }),
     )
     .replace_all(
       old="__MODULE_SETUP__",
@@ -271,7 +277,14 @@ fn context_emit_runtime(
     .replace_all(
       old="__MODULE_INIT__",
       new=if modules {
-        ", module_id, module_root: if same_module { self.frames[parent].unwrap().module_root } else { -1 }, logical_parent: if same_module { parent } else { -1 }"
+        let default_parent = "if same_module { parent } else { -1 }"
+        let logical_parent = if overridden_parent {
+          "parent_override.unwrap_or(" + default_parent + ")"
+        } else {
+          default_parent
+        }
+        ", module_id, module_root: if same_module { self.frames[parent].unwrap().module_root } else { -1 }, logical_parent: " +
+        logical_parent
       } else {
         ""
       },
@@ -513,6 +526,9 @@ fn context_record_expressions(record : RecordDef) -> Array[Expr] {
       expressions.push(value)
     }
     if field.condition is Some(value) {
+      expressions.push(value)
+    }
+    if field.parent is Explicit(value) {
       expressions.push(value)
     }
     match field.count {

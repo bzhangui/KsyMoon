@@ -655,6 +655,7 @@ fn context_record_raises(
     field.count is Some(_) ||
     field.validation is Some(_) ||
     field.predicate is Some(_) ||
+    field.parent is Explicit(_) ||
     (
       field.condition is Some(value) &&
       (context_has_reference(value) || expression_arithmetic(value))
@@ -884,5 +885,6 @@ fn context_instance_read_raises(
 ) -> Bool {
   position is Some(_) ||
   field.count is Some(_) ||
+  field.parent is Explicit(_) ||
   context_kind_raises(field.kind, effects)
 }

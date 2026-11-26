@@ -6,7 +6,8 @@ pub fn generate(source : String) -> String raise SchemaError {
 
 ///|
 fn generate_schema(schema : Schema) -> String raise SchemaError {
-  let needs_context = !schema.byte_orders.is_empty() ||
+  let needs_context = schema.recursive ||
+    !schema.byte_orders.is_empty() ||
     (
       schema.has_context &&
       (
@@ -245,6 +246,9 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
 
 ///|
 fn field_requires_context_evaluator(field : Field) -> Bool {
+  if !(field.parent is Implicit) {
+    return true
+  }
   if field.count is Some(Times(Calculated(value))) && !(value is Integer(_)) {
     return true
   }
@@ -535,6 +539,12 @@ fn emit_record_reader(
   effects : Map[String, Bool],
   bits : Bool,
 ) -> Unit {
+  if record.fields.is_empty() && record.instances.is_empty() {
+    output.write_string(
+      "///|\nfn \{reader_name}(reader : \{root_type}Reader, _path : String) -> \{type_name} {\n  ignore(reader.offset)\n  \{type_name}::{}\n}\n\n",
+    )
+    return
+  }
   let effect = if !record.fields
     .iter()
     .any(fn(field) { field_raises(field, effects) }) {

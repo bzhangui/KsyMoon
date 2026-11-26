@@ -62,6 +62,7 @@ fn raw_uses_context(
         return true
       }
       if properties.contains("enum") ||
+        properties.contains("parent") ||
         properties.contains("process") ||
         (
           properties.get("type")
@@ -229,6 +230,8 @@ priv struct ContextGraph {
   bits : Bool
   module_roots : Map[String, String]
   root_referenced : Bool
+  has_overridden_parent : Bool
+  has_parent_expression : Bool
   mut object_refs : Bool
   byte_orders : Map[String, ByteOrder]
 }
@@ -259,6 +262,8 @@ fn context_graph(schema : Schema) -> ContextGraph {
     parents[name] = []
   }
   let mut root_referenced = false
+  let mut has_overridden_parent = false
+  let explicit_parents = []
   for owner, record in records {
     let fields = record.fields.copy()
     for instance in record.instances {
@@ -267,16 +272,22 @@ fn context_graph(schema : Schema) -> ContextGraph {
       }
     }
     for field in fields {
+      has_overridden_parent = has_overridden_parent ||
+        !(field.parent is Implicit)
+      if field.parent is Explicit(expression) {
+        explicit_parents.push((owner, field, expression))
+      }
       for child in kind_references(field.kind) {
         root_referenced = root_referenced || child == "@root"
-        if schema.module_roots.get(child) == schema.module_roots.get(owner) &&
+        if field.parent is Implicit &&
+          schema.module_roots.get(child) == schema.module_roots.get(owner) &&
           !parents[child].contains(owner) {
           parents[child].push(owner)
         }
       }
     }
   }
-  {
+  let graph : ContextGraph = {
     records,
     parents,
     tags,
@@ -286,6 +297,8 @@ fn context_graph(schema : Schema) -> ContextGraph {
     bits: schema_has_bits(schema),
     module_roots: schema.module_roots,
     root_referenced,
+    has_overridden_parent,
+    has_parent_expression: !explicit_parents.is_empty(),
     object_refs: records
     .values()
     .any(fn(record) {
@@ -294,6 +307,42 @@ fn context_graph(schema : Schema) -> ContextGraph {
       .any(fn(parameter) { parameter_is_object(parameter.kind) })
     }),
     byte_orders: schema.byte_orders,
+  }
+  resolve_parent_overrides(graph, explicit_parents)
+  graph
+}
+
+///|
+fn resolve_parent_overrides(
+  graph : ContextGraph,
+  fields : Array[(String, Field, Expr)],
+) -> Unit {
+  // A parent expression can navigate an edge added by another override.
+  let mut changed = true
+  while changed {
+    changed = false
+    for item in fields {
+      let (owner, field, expression) = item
+      let scope = context_scope(
+        graph,
+        owner,
+        owner + "." + field.name + ".parent",
+        index_allowed=field.count is Some(_),
+      )
+      let result = context_expression_type(scope, expression) catch {
+        _ => Object([])
+      }
+      if result is Object(parents) {
+        for child in kind_references(field.kind) {
+          for parent in parents {
+            if parent != "@any" && !graph.parents[child].contains(parent) {
+              graph.parents[child].push(parent)
+              changed = true
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -518,10 +567,10 @@ fn context_cast_target(
 ) -> String raise SchemaError {
   let names = target.split("::").map(fn(part) { part.to_owned() }).collect()
   let visible = scope.graph.type_scopes[scope.owner]
-  guard visible.get(names[0]) is Some(first) else {
+  guard visible.contains(names[0]) else {
     invalid(scope.path, "unknown cast target '" + target + "'")
   }
-  let name = [first, ..names[1:].to_owned()].join("_")
+  let name = scoped_type_name(target, visible)
   guard scope.graph.records.contains(name) else {
     invalid(scope.path, "unknown cast target '" + target + "'")
   }
@@ -842,6 +891,12 @@ fn check_context_field(
   scope : ContextScope,
   field : Field,
 ) -> Unit raise SchemaError {
+  if field.parent is Explicit(expression) {
+    let scope = { ..scope, index_allowed: field.count is Some(_), }
+    guard context_expression_type(scope, expression) is Object(_) else {
+      invalid(scope.path + ".parent", "expected an object expression")
+    }
+  }
   if field.condition is Some(expression) {
     context_require(scope, expression, Boolean)
   }

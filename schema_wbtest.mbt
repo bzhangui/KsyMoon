@@ -173,6 +173,28 @@ test "recursive type definitions cannot generate unbounded parsing" {
 }
 
 ///|
+test "unconditional top-level recursion is rejected" {
+  let source =
+    #|meta: {id: example}
+    #|seq:
+    #|  - id: next
+    #|    type: example
+  expect_schema_error(
+    source, "seq: recursive type reference in sequential fields",
+  )
+}
+
+///|
+test "the root type name does not shadow built-in field types" {
+  let source =
+    #|meta: {id: u1}
+    #|seq:
+    #|  - id: value
+    #|    type: u1
+  assert_true(generate(source).contains("value : UInt"))
+}
+
+///|
 test "a schema id does not shadow a MoonBit builtin type" {
   let source =
     #|meta: {id: bytes}

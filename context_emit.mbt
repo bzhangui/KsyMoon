@@ -184,10 +184,15 @@ fn generate_context_schema(schema : Schema) -> String raise SchemaError {
     rollback,
     graph.bits,
     schema.recursive,
-    !graph.module_roots.is_empty() || graph.object_refs,
+    !graph.module_roots.is_empty() ||
+    graph.object_refs ||
+    graph.has_overridden_parent,
+    graph.has_overridden_parent,
     !graph.byte_orders.is_empty(),
     expressions.iter().any(context_contains_index),
-    !object_values.is_empty() || expressions.iter().any(context_contains_cast),
+    !object_values.is_empty() ||
+    expressions.iter().any(context_contains_cast) ||
+    graph.has_parent_expression,
     !has_instances &&
     !expressions
     .iter()
@@ -294,6 +299,7 @@ fn context_emit_entry(
     .map(fn(p) { ", " + parameter_input(p.kind, "arg_" + p.name, root) })
     .join("")
   let accounts = if accounting { ", next_account: 1" } else { "" }
+  let parent_override = if graph.has_overridden_parent { ", None" } else { "" }
   let fresh_arena = "{ frames: [], free: []\{accounts} }"
   let (entry, reader, path) = if owner == "@root" {
     ("parse_" + id, "read_" + id + "_root", id)
@@ -336,7 +342,7 @@ fn context_emit_entry(
     }
   }
   output.write_string(
-    "  let reader : \{root}Reader = { input, offset: 0\{budget}\{bit_state(graph.bits)} }\n  \{reader}(reader, \{path.escape()}, arena, -1\{arguments})\n}\n",
+    "  let reader : \{root}Reader = { input, offset: 0\{budget}\{bit_state(graph.bits)} }\n  \{reader}(reader, \{path.escape()}, arena, -1\{parent_override}\{arguments})\n}\n",
   )
 }
 
@@ -449,14 +455,21 @@ fn context_emit_reader(
   }
   let effect = if raises { " raise " + root + "ParseError" } else { "" }
   let parameters = parameter_signature(record.parameters, root)
-  let module_args = if graph.module_roots.is_empty() && !graph.object_refs {
+  let module_args = if graph.module_roots.is_empty() &&
+    !graph.object_refs &&
+    !graph.has_overridden_parent {
     ""
   } else {
     let module_owner = graph.module_roots.get(owner).unwrap_or("@root")
     ", " + module_owner.escape() + ", " + (owner == module_owner).to_string()
   }
+  let (parent_arg, parent_value) = if graph.has_overridden_parent {
+    (", parent_override : Int?", ", parent_override")
+  } else {
+    ("", "")
+  }
   output.write_string(
-    "///|\nfn \{name}(reader : \{root}Reader, path : String, arena : \{root}Arena, parent : Int\{parameters}) -> \{context_type_name(root, owner)}\{effect} {\n  let context = arena.create(\{tag}, parent, reader, path\{module_args})\n",
+    "///|\nfn \{name}(reader : \{root}Reader, path : String, arena : \{root}Arena, parent : Int\{parent_arg}\{parameters}) -> \{context_type_name(root, owner)}\{effect} {\n  let context = arena.create(\{tag}, parent, reader, path\{module_args}\{parent_value})\n",
   )
   if body_raises {
     output.write_string("  errdefer { arena.release(context) }\n")
@@ -482,6 +495,11 @@ fn context_emit_reader(
     )
   }
   select_byte_order(output, graph, owner, root)
+  if record.fields.is_empty() && graph.byte_orders.contains(owner) {
+    output.write_string(
+      "  ignore(arena.frames[context].unwrap().little_endian)\n",
+    )
+  }
   for field in record.fields {
     let name = field.name
     let path = "path_" + name
@@ -532,7 +550,11 @@ fn context_emit_reader(
       fn(name) { name },
       false,
       evaluate=Some(evaluate),
-      parent_context=Some("context"),
+      parent_context=Some(
+        context_child_parent(
+          scope, field, root, path, "arena.frames[context].unwrap().reader",
+        ),
+      ),
       publish_items=publish,
       bits=graph.bits,
     )
@@ -549,7 +571,19 @@ fn context_emit_reader(
       )
     }
   }
-  output.write_string("  {\n")
+  let empty = owner == "@root" &&
+    record.fields.is_empty() &&
+    record.parameters.is_empty() &&
+    record.instances.is_empty() &&
+    !graph.root_referenced &&
+    !graph.object_refs
+  output.write_string(
+    if empty {
+      "  \{context_type_name(root, owner)}::{\n"
+    } else {
+      "  {\n"
+    },
+  )
   for p in record.parameters {
     output.write_string(
       "    \{p.name}: \{parameter_result(p.kind, "arg_" + p.name, root)},\n",
@@ -562,6 +596,36 @@ fn context_emit_reader(
   }
   context_emit_record_state(output, graph, owner, record)
   output.write_string("  }\n}\n\n")
+}
+
+///|
+fn context_child_parent(
+  scope : ContextScope,
+  field : Field,
+  root : String,
+  path : String,
+  owner_reader : String,
+) -> String raise SchemaError {
+  if !scope.graph.has_overridden_parent {
+    return "context"
+  }
+  match field.parent {
+    Implicit => "context, None"
+    Parentless => "context, Some(-1)"
+    Explicit(expression) => {
+      let path = if field.count is Some(_) { "item_path" } else { path }
+      let value = context_value_code(
+        scope, expression, root, path, owner_reader,
+      )
+      let error = context_error(
+        root,
+        path,
+        reader=owner_reader,
+        message="parent expression is unavailable",
+      )
+      "context, Some(match \{value}.object_id() { Some(parent) => parent; None => { \{error} } })"
+    }
+  }
 }
 
 ///|
@@ -678,7 +742,11 @@ fn context_emit_instance(
         fn(name) { name },
         true,
         evaluate=Some(evaluate),
-        parent_context=Some("context"),
+        parent_context=Some(
+          context_child_parent(
+            field_scope, field, root, "field", "owner_reader",
+          ),
+        ),
         publish_items=publish,
         bits=graph.bits,
       )

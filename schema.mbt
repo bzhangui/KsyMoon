@@ -65,6 +65,13 @@ priv enum FieldKind {
 }
 
 ///|
+priv enum FieldParent {
+  Implicit
+  Parentless
+  Explicit(Expr)
+}
+
+///|
 priv struct Field {
   name : String
   kind : FieldKind
@@ -72,6 +79,7 @@ priv struct Field {
   validation : ScalarCheck?
   predicate : Expr?
   condition : Expr?
+  parent : FieldParent
 }
 
 ///|
@@ -278,8 +286,9 @@ fn parse_length(
         None => (expression.to_owned(), 0L)
       }
       match earlier.get(name) {
-        Some({ kind: Unsigned(_, _), count: None, condition: None, .. }) =>
-          EarlierField(name, subtract)
+        Some({ kind: Unsigned(_, _), count: None, condition: None, .. }) if !name.has_prefix(
+            "_",
+          ) => EarlierField(name, subtract)
         _ =>
           invalid(
             path, "expected an earlier scalar u1, u2 or u4 field, optionally minus an integer",
@@ -312,18 +321,34 @@ fn parse_kind(
     }
     return Application(base, parse_type_application(args.to_owned(), path))
   }
+  if parse_builtin_kind(type_name, endian, path) is Some(kind) {
+    return kind
+  }
+  if type_names.contains(type_name) {
+    return Nested(type_name)
+  }
+  invalid(path, "unknown or unsupported type '\{type_name}'")
+}
+
+///|
+fn parse_builtin_kind(
+  type_name : String,
+  endian : Endian?,
+  path : String,
+) -> FieldKind? raise SchemaError {
   if bit_width(type_name) is Some(width) {
     guard width >= 1 && width <= 64 else {
       invalid(path, "bit integer width must be 1..64")
     }
     let bit_endian = if type_name.has_suffix("le") { Little } else { Big }
-    return if width <= 32 {
+    let kind = if width <= 32 {
       BitInteger(width, bit_endian)
     } else {
       WideBitInteger(width, bit_endian)
     }
+    return Some(kind)
   }
-  match type_name {
+  let kind = match type_name {
     "u1" => Unsigned(1, Big)
     "u2" => Unsigned(2, default_endian(endian, path))
     "u2le" => Unsigned(2, Little)
@@ -350,9 +375,9 @@ fn parse_kind(
     "f4" => Float32(default_endian(endian, path))
     "f4le" => Float32(Little)
     "f4be" => Float32(Big)
-    name if type_names.contains(name) => Nested(name)
-    _ => invalid(path, "unknown or unsupported type '\{type_name}'")
+    _ => return None
   }
+  Some(kind)
 }
 
 ///|
@@ -448,6 +473,7 @@ fn parse_field(
   type_names : Array[String],
   path : String,
   navigation~ : Bool = false,
+  sequence_index~ : Int32? = None,
 ) -> Field raise SchemaError {
   let field = as_mapping(value, path)
   check_keys(
@@ -455,12 +481,18 @@ fn parse_field(
     [
       "id", "type", "size", "contents", "valid", "repeat", "repeat-expr", "doc",
       "enum", "doc-ref", "if", "repeat-until", "size-eos", "encoding", "terminator",
-      "pad-right", "include", "consume", "eos-error", "-orig-id", "process",
+      "pad-right", "include", "consume", "eos-error", "-orig-id", "process", "parent",
     ],
     path,
   )
-  let name = as_string(get_required(field, "id", path), path + ".id")
-  check_identifier(name, path + ".id")
+  let name = match (field.get("id"), sequence_index) {
+    (None, Some(index)) => "_unnamed\{index}"
+    _ => {
+      let name = as_string(get_required(field, "id", path), path + ".id")
+      check_identifier(name, path + ".id")
+      name
+    }
+  }
   guard !earlier.contains(name) else {
     invalid(path + ".id", "duplicate field '\{name}'")
   }
@@ -550,7 +582,19 @@ fn parse_field(
   } else {
     kind
   }
-  { name, kind, count, validation, predicate, condition, }
+  let parent = match field.get("parent") {
+    None => FieldParent::Implicit
+    Some(value) => {
+      guard !kind_references(kind).is_empty() else {
+        invalid(path + ".parent", "parent requires a user type")
+      }
+      match parse_expression(value, path + ".parent") {
+        Boolean(false) => Parentless
+        expression => Explicit(expression)
+      }
+    }
+  }
+  { name, kind, count, validation, predicate, condition, parent, }
 }
 
 ///|
@@ -579,6 +623,7 @@ fn parse_record(
       type_names,
       "\{path}[\{i}]",
       navigation~,
+      sequence_index=Some(i),
     )
     earlier[field.name] = field
     fields.push(field)
@@ -622,9 +667,6 @@ fn parse_record(
   }
   if !navigation {
     check_instances(record, instance_path)
-  }
-  guard navigation || !fields.is_empty() || !record.instances.is_empty() else {
-    invalid(path, "expected at least one field or instance")
   }
   record
 }
@@ -728,7 +770,8 @@ fn check_eager_type_cycles(
   checked : Map[String, Bool],
 ) -> Unit raise SchemaError {
   guard !active.contains(name) else {
-    invalid("types." + name, "recursive type reference in sequential fields")
+    let path = if name == "@root" { "seq" } else { "types." + name }
+    invalid(path, "recursive type reference in sequential fields")
   }
   if checked.contains(name) {
     return
@@ -739,7 +782,17 @@ fn check_eager_type_cycles(
     if field.condition is Some(condition) && !(condition is Boolean(true)) {
       continue
     }
-    for child in kind_references(field.kind) {
+    if field.count is Some(repeat) {
+      let required = match repeat {
+        Until(_) => true
+        Times(Constant(count) | Calculated(Integer(count))) => count > 0L
+        _ => false
+      }
+      if !required {
+        continue
+      }
+    }
+    for child in eager_type_references(field.kind) {
       check_eager_type_cycles(
         child,
         definitions[child],
@@ -750,6 +803,21 @@ fn check_eager_type_cycles(
     }
   }
   checked[name] = true
+}
+
+///|
+fn eager_type_references(kind : FieldKind) -> Array[String] {
+  match kind {
+    Nested(name) | Application(name, _) => [name]
+    Bounded(inner, _) => eager_type_references(inner)
+    Switch(_, _, cases, Some(fallback)) =>
+      eager_type_references(fallback).filter(fn(name) {
+        cases
+        .iter()
+        .all(fn(item) { eager_type_references(item.1).contains(name) })
+      })
+    _ => []
+  }
 }
 
 ///|
@@ -790,7 +858,7 @@ fn load_schema(
   let root = flatten_types(
     inherit_read_defaults(root, Map([]), imports_visibility, byte_orders),
     "",
-    Map([]),
+    Map([(id, "@root")]),
     Map([]),
     type_scopes,
     Map([]),
@@ -818,10 +886,7 @@ fn load_schema(
       value is @yaml.Map(properties) && properties.contains("params")
     }) ||
     raw_uses_context(root, types, [])
-  let names = types.keys().collect()
-  if !imports_visibility.is_empty() {
-    names.push("@root")
-  }
+  let names = ["@root", ..types.keys().collect()]
   let definitions : Map[String, RecordDef] = Map([])
   for name, value in types {
     let path = "types.\{name}"
