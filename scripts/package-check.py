@@ -54,6 +54,7 @@ def main():
             "scripts/image-reference.py", "scripts/type-parameter-reference.py",
             "scripts/zip-reference.py", "scripts/corpus-runtime-reference.py",
             "scripts/midi-jpeg-reference.py",
+            "scripts/reader-context-reference.py",
         })
         assert required.issubset(files), f"Missing source, fixture or license: {required.difference(files)}"
         assert all(not path.endswith(("/wav.ksy", "/riff.ksy")) for path in files), "WAV/RIFF descriptions should be fetched on demand"

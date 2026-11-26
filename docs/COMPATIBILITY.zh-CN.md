@@ -131,6 +131,14 @@ MIDI 从原样 Standard MIDI 和 VLQ 描述生成，验证轨道、事件、变�
 
 新增 35 份原样上游语料运行对照及 182 条字段断言，独立语料套件在每个后端执行 80 份官方用例和 352 条字段断言。CI 上传语料和格式报告，并继续验证全部 339 份固定语料的生成与构建状态。 [语料复现](../scripts/corpus-runtime-reference.py) · [MIDI 与 JPEG 复现](../scripts/midi-jpeg-reference.py)
 
+## v0.12.0 开发方向
+
+以 `v0.11.0` 的 278 份四后端构建和 202 份具名运行对照为基线，优先修复读取上下文与结构描述。61 份首个诊断中，14 份涉及读取时机或对象上下文，9 份涉及空布局或匿名字段。其余诊断按表达式与编码、调试、外部扩展、枚举与分支以及缺失依赖分别保留。 [固定语料](https://github.com/kaitai-io/kaitai_struct_tests/tree/4108136c807f8df88df843de6571f1a7bf29c74e)
+
+首批处理流位置参与长度计算、算术重复计数，以及序列条件和终止条件触发的惰性实例。使用 `expr_io_pos`、`repeat_n_strz_double`、`instance_in_repeat_until`、`instance_in_sized` 和 `valid_fail_inst` 验证有界读流、首次求值时机、游标恢复和预期失败。 [复现脚本](../scripts/reader-context-reference.py)
+
+后续补齐空结构、匿名字段、显式父对象与递归根引用。空结构仍须遵守外层有界读取，递归用例须验证前进、深度限制和截断。调试元数据单独验证显式读取与位置记录，绝对导入用例单独固定依赖来源。 [重复与流语义](https://doc.kaitai.io/user_guide.html#_streams_and_substreams)
+
 ## v1.0 门禁
 
 - 语言指南中的全部描述、表达式和流语义都有明确实现与测试入口。标准未知键或类型不能静默忽略。
@@ -151,6 +159,7 @@ python scripts/numeric-endian-reference.py
 python scripts/expression-validation-reference.py
 python scripts/type-parameter-reference.py
 python scripts/corpus-runtime-reference.py
+python scripts/reader-context-reference.py
 python scripts/compatibility-report.py --runtime-report
 python scripts/wav-reference.py --all-scenarios
 python scripts/image-reference.py

@@ -8,6 +8,7 @@ fn raw_uses_context(
     Some(@yaml.Array(fields)) => fields.copy()
     _ => []
   }
+  let sequence_count = fields.length()
   let instances = match record.get("instances") {
     Some(@yaml.Map(instances)) => instances
     _ => Map([])
@@ -54,7 +55,7 @@ fn raw_uses_context(
   let is_text = fn(expression) {
     raw_text_expression(expression, values, text_types)
   }
-  for field in fields {
+  for index, field in fields {
     if field is @yaml.Map(properties) {
       if properties.get("valid") is Some(value) &&
         raw_predicate_validation(properties, value) {
@@ -78,9 +79,13 @@ fn raw_uses_context(
             _ => Expr::Integer(0L)
           }
           let length = key is ("size" | "repeat-expr")
+          let reads_instance = length ||
+            (index < sequence_count && key is ("if" | "repeat-until"))
           if expression_needs_context(expression, is_text, fn(name) {
-              wide_fields.contains(name) || (length && instances.contains(name))
+              wide_fields.contains(name) ||
+              (reads_instance && instances.contains(name))
             }) ||
+            (length && computed_read_length(expression)) ||
             (key == "value" && expression_returns_record(expression, objects)) {
             return true
           }
@@ -132,6 +137,18 @@ fn raw_uses_context(
     }
   }
   false
+}
+
+///|
+fn computed_read_length(expression : Expr) -> Bool {
+  match expression {
+    Binary("-", Reference(_), Integer(amount)) if amount >= 0L => false
+    Binary("+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^", _, _)
+    | Choose(_, _, _)
+    | StreamPosition
+    | StreamSize => true
+    _ => false
+  }
 }
 
 ///|

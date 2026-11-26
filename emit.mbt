@@ -22,13 +22,7 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
         .any(fn(record) {
           !record.parameters.is_empty() ||
           !record.instances.is_empty() ||
-          record.fields
-          .iter()
-          .any(fn(field) {
-            walk_kinds(field.kind)
-            .iter()
-            .any(fn(kind) { kind is Application(_, _) })
-          })
+          record.fields.iter().any(field_requires_context_evaluator)
         })
       )
     )
@@ -247,6 +241,23 @@ fn generate_schema(schema : Schema) -> String raise SchemaError {
   )
   output.write_string("  read_\{id}_root(reader, \"\{id}\")\n}\n")
   output.to_string()
+}
+
+///|
+fn field_requires_context_evaluator(field : Field) -> Bool {
+  if field.count is Some(Times(Calculated(value))) && !(value is Integer(_)) {
+    return true
+  }
+  walk_kinds(field.kind)
+  .iter()
+  .any(fn(kind) {
+    match kind {
+      Application(_, _) => true
+      ByteField(options) | Text(options, _) | Bounded(_, options) =>
+        options.length is Some(Calculated(value)) && !(value is Integer(_))
+      _ => false
+    }
+  })
 }
 
 ///|

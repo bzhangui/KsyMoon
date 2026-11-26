@@ -49,6 +49,7 @@ jobs:
           python scripts/expression-validation-reference.py
           python scripts/type-parameter-reference.py
           python scripts/corpus-runtime-reference.py
+          python scripts/reader-context-reference.py
           python scripts/compatibility-report.py --runtime-report
           node examples/quickstart/run.mjs --source --all-targets
           python scripts/wav-reference.py --all-scenarios
@@ -71,6 +72,7 @@ jobs:
             _build/native-cli-report.json
             _build/image-reference-report.json
             _build/extended-runtime-report.json
+            _build/reader-context-reference-report.json
             _build/zip-reference-report.json
             _build/midi-jpeg-reference-report.json
           if-no-files-found: error
